@@ -1,0 +1,2397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>内部系统助手 - 管理面板</title>
+
+  <!-- TailwindCSS CDN (latest) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome 6.5+ CDN -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+  />
+
+  <!-- Noto Sans SC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-50: #eff6ff;
+      --primary-100: #dbeafe;
+      --primary-600: #2563eb;
+      --primary-700: #1d4ed8;
+
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --success-text: #047857;
+
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --warning-text: #b45309;
+
+      --danger: #ef4444;
+      --danger-light: #fee2e2;
+      --danger-text: #b91c1c;
+
+      --purple: #8b5cf6;
+      --purple-light: #ede9fe;
+      --purple-text: #6d28d9;
+
+      --orange: #f97316;
+      --orange-light: #ffedd5;
+      --orange-text: #c2410c;
+
+      --bg: #f5f7fa;
+      --card-bg: #ffffff;
+      --border: #e5e7eb;
+      --border-soft: #f3f4f6;
+
+      --text-primary: #111827;
+      --text-secondary: #6b7280;
+      --text-tertiary: #9ca3af;
+
+      --header-h: 44px;
+      --sidebar-w: 208px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Noto Sans SC", "Amazon Ember", -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ============ Browser Chrome ============ */
+    .browser-chrome {
+      height: var(--header-h);
+      background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%);
+      border-bottom: 1px solid #d1d5db;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+    }
+
+    .nav-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4b5563;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.15s;
+      font-size: 13px;
+    }
+    .nav-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .nav-btn.active {
+      color: #111827;
+    }
+
+    .chrome-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: #1f2937;
+    }
+
+    .shield-icon {
+      width: 22px;
+      height: 22px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+    }
+
+    .home-icon-btn {
+      background: #1f2937;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .home-icon-btn:hover {
+      background: #111827;
+    }
+
+    .url-bar {
+      flex: 1;
+      max-width: 360px;
+      height: 28px;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    /* ============ Page Header ============ */
+    .page-header {
+      height: 56px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .icon-btn:hover {
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+      cursor: pointer;
+    }
+
+    /* ============ Sidebar ============ */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: white;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 14px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .online-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 6px;
+      background: #d1fae5;
+      color: #047857;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+    .online-badge::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+
+    .sidebar-icon-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .sidebar-icon-btn:hover {
+      background: #f3f4f6;
+    }
+
+    .sidebar-search {
+      margin: 0 12px 12px;
+      position: relative;
+    }
+    .sidebar-search input {
+      width: 100%;
+      height: 30px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 0 10px 0 30px;
+      font-size: 12px;
+      background: #f9fafb;
+      outline: none;
+      transition: all 0.15s;
+      font-family: inherit;
+      color: #111827;
+    }
+    .sidebar-search input:focus {
+      background: white;
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .sidebar-search i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 11px;
+    }
+    .sidebar-search .shortcut {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: #9ca3af;
+      border: 1px solid #e5e7eb;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: white;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .quick-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 4px;
+      background: #f9fafb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .quick-action:hover {
+      background: #f3f4f6;
+      transform: translateY(-1px);
+    }
+    .quick-action .qa-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+    }
+    .qa-blue {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+    .qa-green {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    .qa-orange {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    .qa-purple {
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    }
+    .quick-action .qa-label {
+      font-size: 11px;
+      color: #374151;
+      font-weight: 500;
+    }
+
+    .recent-header {
+      padding: 6px 14px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+    }
+    .recent-header a {
+      font-size: 11px;
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 400;
+    }
+
+    .recent-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 4px 4px;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 2px;
+    }
+    .recent-item:hover {
+      background: #f3f4f6;
+    }
+    .recent-item .ri-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .ri-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .ri-name {
+      font-size: 12px;
+      color: #111827;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ri-name .badge-new {
+      background: #fee2e2;
+      color: #b91c1c;
+        font-size: 9px;
+      padding: 0 4px;
+      border-radius: 3px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .ri-url {
+      font-size: 10px;
+      color: #9ca3af;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ri-time {
+      font-size: 10px;
+      color: #9ca3af;
+      white-space: nowrap;
+    }
+
+    .role-tag {
+      display: inline-block;
+      padding: 1px 6px;
+      font-size: 10px;
+      border-radius: 3px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .role-admin {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .role-dev {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .role-editor {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+    .role-readonly {
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .sidebar-footer {
+      padding: 10px 12px 14px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .open-panel-btn {
+      width: 100%;
+      height: 32px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #374151;
+      font-weight: 500;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .open-panel-btn:hover {
+      border-color: #93c5fd;
+      color: #2563eb;
+    }
+
+    /* ============ Tabs ============ */
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 16px;
+      height: 44px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px;
+      height: 100%;
+      font-size: 13px;
+      color: #6b7280;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.15s;
+      font-weight: 500;
+    }
+    .nav-tab:hover {
+      color: #111827;
+    }
+    .nav-tab.active {
+      color: #2563eb;
+      font-weight: 600;
+    }
+    .nav-tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 8px;
+      right: 8px;
+      height: 2px;
+      background: #2563eb;
+      border-radius: 2px 2px 0 0;
+    }
+
+    /* ============ Action Bar ============ */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: white;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+    .btn-default {
+      background: white;
+      color: #374151;
+      border-color: #e5e7eb;
+    }
+    .btn-default:hover {
+      border-color: #93c5fd;
+      color: #2563eb;
+    }
+    .btn-danger {
+      background: white;
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+    .btn-danger:hover {
+      background: #fef2f2;
+      border-color: #f87171;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: #6b7280;
+    }
+    .btn-ghost:hover {
+      color: #111827;
+    }
+
+    .search-input {
+      flex: 1;
+      max-width: 240px;
+      height: 30px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 0 10px 0 30px;
+      font-size: 12px;
+      background: white;
+      outline: none;
+      font-family: inherit;
+      color: #111827;
+      position: relative;
+    }
+    .search-wrap {
+      position: relative;
+    }
+    .search-wrap i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 11px;
+    }
+
+    /* ============ Table ============ */
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+    }
+    .data-table thead th {
+      background: #f9fafb;
+      color: #6b7280;
+      font-weight: 500;
+      padding: 9px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-soft);
+      white-space: nowrap;
+    }
+    .data-table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      color: #111827;
+      white-space: nowrap;
+    }
+    .data-table tbody tr {
+      transition: background 0.12s;
+    }
+    .data-table tbody tr:hover {
+      background: #f9fafb;
+    }
+    .data-table tbody tr.selected {
+      background: #eff6ff;
+    }
+    .data-table input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #2563eb;
+      cursor: pointer;
+    }
+
+    .sys-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sys-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 9px;
+      flex-shrink: 0;
+    }
+
+    .env-tag {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .env-prod {
+      background: #d1fae5;
+      color: #047857;
+    }
+    .env-dev {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .env-test {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .env-mw {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+    .env-ops {
+      background: #ffedd5;
+      color: #c2410c;
+    }
+    .env-core {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .row-action {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.15s;
+    }
+    .row-action:hover {
+      background: #f3f4f6;
+      color: #2563eb;
+    }
+
+    /* ============ Pagination ============ */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: white;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .page-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .page-btn {
+      min-width: 26px;
+      height: 26px;
+      padding: 0 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      background: white;
+      font-size: 12px;
+      color: #374151;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .page-btn:hover {
+      border-color: #93c5fd;
+      color: #2563eb;
+    }
+    .page-btn.active {
+      background: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+
+    /* ============ Card / Panel ============ */
+    .card {
+      background: white;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .card-title i {
+      color: #2563eb;
+      font-size: 12px;
+    }
+
+    /* ============ Detail Panel ============ */
+    .detail-panel {
+      background: white;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .detail-header {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .detail-tabs {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .detail-tab {
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #6b7280;
+      cursor: pointer;
+      position: relative;
+      font-weight: 500;
+    }
+    .detail-tab.active {
+      color: #2563eb;
+      font-weight: 600;
+    }
+    .detail-tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 12px;
+      right: 12px;
+      height: 2px;
+      background: #2563eb;
+      border-radius: 2px 2px 0 0;
+    }
+    .detail-tab .count {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-left: 2px;
+    }
+    .detail-body {
+      padding: 14px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .form-row {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .form-label {
+      width: 78px;
+      font-size: 12px;
+      color: #6b7280;
+      padding-top: 7px;
+      flex-shrink: 0;
+    }
+    .form-label .req {
+      color: #ef4444;
+    }
+    .form-field {
+      flex: 1;
+      min-width: 0;
+    }
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      height: 30px;
+      border: 1px solid #e5e7eb;
+      border-radius: 5px;
+      padding: 0 10px;
+      font-size: 12px;
+      background: white;
+      outline: none;
+      font-family: inherit;
+      color: #111827;
+      transition: all 0.15s;
+    }
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .form-textarea {
+      height: 56px;
+      padding: 6px 10px;
+      resize: none;
+    }
+    .form-select {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 6px center;
+      background-size: 14px;
+      padding-right: 26px;
+      appearance: none;
+    }
+
+    .form-icon {
+      position: relative;
+    }
+    .form-icon i {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .input-with-btn {
+      display: flex;
+      gap: 6px;
+    }
+    .input-with-btn .form-input {
+      flex: 1;
+    }
+
+    .form-section {
+      margin-top: 14px;
+    }
+    .form-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+
+    .account-list {
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .account-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr 60px;
+      align-items: center;
+      padding: 7px 10px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-soft);
+      gap: 8px;
+    }
+    .account-item:last-child {
+      border-bottom: none;
+    }
+    .account-item.header-row {
+      background: #f9fafb;
+      color: #6b7280;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .account-item .acc-pwd {
+      letter-spacing: 1px;
+    }
+    .acc-icons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      justify-content: flex-end;
+    }
+
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+    .tag-pill .x {
+      cursor: pointer;
+      opacity: 0.6;
+    }
+    .tag-pill .x:hover {
+      opacity: 1;
+    }
+
+    .upload-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .upload-box {
+      width: 36px;
+      height: 36px;
+      border: 1px dashed #93c5fd;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #2563eb;
+      background: #f0f7ff;
+      font-size: 13px;
+    }
+    .upload-text {
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .detail-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: #fafbfc;
+    }
+
+    /* ============ Server Cards ============ */
+    .server-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 12px;
+    }
+    .server-card {
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      padding: 10px;
+      transition: all 0.15s;
+      cursor: pointer;
+      background: white;
+    }
+    .server-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+    }
+    .server-card.add-card {
+      border: 1px dashed #d1d5db;
+      background: #fafbfc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      font-size: 12px;
+      min-height: 110px;
+    }
+    .server-card.add-card:hover {
+      border-color: #93c5fd;
+      color: #2563eb;
+    }
+    .server-card.add-card i {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    .server-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      color: #047857;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .server-status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+    .server-status.warn {
+      color: #b45309;
+    }
+    .server-status.warn::before {
+      background: #f59e0b;
+    }
+    .server-ip {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+    .server-desc {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+    .server-meta {
+      font-size: 11px;
+      color: #4b5563;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+    .server-tags {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .server-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      border-top: 1px solid var(--border-soft);
+      padding-top: 6px;
+      margin-top: 4px;
+    }
+
+    /* ============ Import/Export ============ */
+    .ie-section {
+      margin-bottom: 14px;
+    }
+    .ie-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+    .ie-btn {
+      width: 100%;
+      height: 32px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 6px;
+      font-family: inherit;
+    }
+    .ie-btn:hover {
+      background: #dbeafe;
+    }
+    .ie-btn.danger {
+      background: #fef2f2;
+      color: #b91c1c;
+      border-color: #fecaca;
+    }
+    .ie-btn.danger:hover {
+      background: #fee2e2;
+    }
+    .ie-btn.green {
+      background: #f0fdf4;
+      color: #047857;
+      border-color: #bbf7d0;
+    }
+    .ie-btn.green:hover {
+      background: #dcfce7;
+    }
+    .ie-btn.orange {
+      background: #fff7ed;
+      color: #c2410c;
+      border-color: #fed7aa;
+    }
+    .ie-btn.orange:hover {
+      background: #ffedd5;
+    }
+
+    .md-preview {
+      background: #f9fafb;
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: "SF Mono", "Monaco", "Consolas", "Roboto Mono", monospace;
+      font-size: 11px;
+      line-height: 1.7;
+      color: #1f2937;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .md-preview h1,
+    .md-preview h2,
+    .md-preview h3 {
+      color: #111827;
+      font-family: "Noto Sans SC", sans-serif;
+      margin: 4px 0;
+    }
+    .md-preview h1 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .md-preview h2 {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .md-preview h3 {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .md-preview code {
+      background: #f3f4f6;
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: #be185d;
+      font-size: 10.5px;
+    }
+    .md-preview ul {
+      margin: 2px 0;
+      padding-left: 18px;
+    }
+    .md-preview table {
+      border-collapse: collapse;
+      margin: 4px 0;
+    }
+    .md-preview th,
+    .md-preview td {
+      border: 1px solid #e5e7eb;
+      padding: 2px 6px;
+      font-size: 10.5px;
+    }
+    .md-preview th {
+      background: #f3f4f6;
+    }
+
+    /* ============ Main Layout ============ */
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .body-grid {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .content-area {
+      flex: 1;
+      min-width: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .top-row {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 12px;
+    }
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ============ Scrollbar ============ */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .top-row {
+        grid-template-columns: 1fr;
+      }
+      .bottom-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <!-- ============ Browser Chrome ============ -->
+    <div class="browser-chrome">
+      <div class="flex items-center gap-1">
+        <div class="nav-btn"><i class="fa-solid fa-arrow-left"></i></div>
+        <div class="nav-btn"><i class="fa-solid fa-arrow-right"></i></div>
+        <div class="nav-btn"><i class="fa-solid fa-rotate-right"></i></div>
+      </div>
+      <div class="home-icon-btn">
+        <i class="fa-solid fa-house text-[11px]"></i>
+      </div>
+      <div class="chrome-title">
+        <div class="shield-icon">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        内部系统助手 - 管理面板
+      </div>
+      <div class="url-bar">
+        <i class="fa-solid fa-lock text-[10px]"></i>
+        <span>https://internal-assistant.local/panel</span>
+      </div>
+    </div>
+
+    <!-- ============ Page Header ============ -->
+    <div class="page-header">
+      <div class="page-title">
+        <div class="shield-icon">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <span>内部系统助手 - 管理面板</span>
+      </div>
+      <div class="header-actions">
+        <div class="icon-btn" title="主题"><i class="fa-solid fa-sun"></i></div>
+        <div class="icon-btn" title="搜索">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+        <div class="icon-btn" title="全屏">
+          <i class="fa-solid fa-expand"></i>
+        </div>
+        <div class="icon-btn relative" title="通知">
+          <i class="fa-solid fa-bell"></i>
+          <span
+            class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full"
+          ></span>
+        </div>
+        <div class="user-avatar" title="admin">A</div>
+      </div>
+    </div>
+
+    <!-- ============ Body Grid ============ -->
+    <div class="body-grid">
+      <!-- ============ Sidebar ============ -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <div class="shield-icon">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            内部系统助手
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="online-badge">已登录</span>
+            <div class="sidebar-icon-btn"><i class="fa-solid fa-gear"></i></div>
+            <div class="sidebar-icon-btn"><i class="fa-solid fa-bell"></i></div>
+          </div>
+        </div>
+
+        <div class="sidebar-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" placeholder="搜索系统名称 / URL / 标签..." />
+          <span class="shortcut">⌘K</span>
+        </div>
+
+        <div class="quick-actions">
+          <div class="quick-action">
+            <div class="qa-icon qa-blue">
+              <i class="fa-solid fa-plus"></i>
+            </div>
+            <div class="qa-label">新增系统</div>
+          </div>
+          <div class="quick-action">
+            <div class="qa-icon qa-green">
+              <i class="fa-solid fa-rocket"></i>
+            </div>
+            <div class="qa-label">快捷跳转</div>
+          </div>
+          <div class="quick-action">
+            <div class="qa-icon qa-orange">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div class="qa-label">最近使用</div>
+          </div>
+          <div class="quick-action">
+            <div class="qa-icon qa-purple">
+              <i class="fa-solid fa-table-columns"></i>
+            </div>
+            <div class="qa-label">打开面板</div>
+          </div>
+        </div>
+
+        <div class="recent-header">
+          <span>最近访问</span>
+          <a href="#">全部 ›</a>
+        </div>
+
+        <div class="recent-list">
+          <div class="recent-item">
+            <div class="ri-icon qa-blue">
+              <i class="fa-solid fa-briefcase"></i>
+            </div>
+            <div class="ri-text">
+              <div class="ri-name">
+                内部OA系统
+                <span class="role-tag role-admin">admin</span>
+              </div>
+              <div class="ri-url">https://oa.company.com</div>
+            </div>
+            <div class="ri-time">2 分钟前</div>
+          </div>
+
+          <div class="recent-item">
+            <div class="ri-icon" style="background: linear-gradient(135deg,#f97316,#ea580c);">
+              <i class="fa-brands fa-gitlab"></i>
+            </div>
+            <div class="ri-text">
+              <div class="ri-name">
+                代码仓库 GitLab
+                <span class="role-tag role-dev">dev</span>
+              </div>
+              <div class="ri-url">https://gitlab.company.com</div>
+            </div>
+            <div class="ri-time">15 分钟前</div>
+          </div>
+
+          <div class="recent-item">
+            <div class="ri-icon" style="background: linear-gradient(135deg,#8b5cf6,#7c3aed);">
+              <i class="fa-solid fa-flask-vial"></i>
+            </div>
+            <div class="ri-text">
+              <div class="ri-name">
+                测试环境管理平台
+                <span class="role-tag role-editor">editor</span>
+              </div>
+              <div class="ri-url">https://test.platform.com</div>
+            </div>
+            <div class="ri-time">1 小时前</div>
+          </div>
+
+          <div class="recent-item">
+            <div class="ri-icon" style="background: linear-gradient(135deg,#10b981,#059669);">
+              <i class="fa-solid fa-gauge-high"></i>
+            </div>
+            <div class="ri-text">
+              <div class="ri-name">
+                生产环境控制台
+                <span class="role-tag role-admin">admin</span>
+              </div>
+              <div class="ri-url">https://prod.console.com</div>
+            </div>
+            <div class="ri-time">3 小时前</div>
+          </div>
+
+          <div class="recent-item">
+            <div class="ri-icon" style="background: linear-gradient(135deg,#ef4444,#dc2626);">
+              <i class="fa-solid fa-database"></i>
+            </div>
+            <div class="ri-text">
+              <div class="ri-name">
+                Redis 管理平台
+                <span class="role-tag role-dev">dev</span>
+              </div>
+              <div class="ri-url">https://redis.admin.com</div>
+            </div>
+            <div class="ri-time">昨天</div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <button class="open-panel-btn">
+            <span>打开完整管理面板</span>
+            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ============ Content Area ============ -->
+      <main class="content-area">
+        <!-- ===== Top Row: Tabs + Table + Detail Panel ===== -->
+        <div class="top-row">
+          <!-- ===== Left: System Management ===== -->
+          <section class="card">
+            <!-- Tabs -->
+            <div class="nav-tabs">
+              <div class="nav-tab active">
+                <i class="fa-solid fa-table-columns"></i>
+                <span>系统管理</span>
+              </div>
+              <div class="nav-tab">
+                <i class="fa-solid fa-server"></i>
+                <span>服务器</span>
+              </div>
+              <div class="nav-tab">
+                <i class="fa-solid fa-cubes"></i>
+                <span>中间件</span>
+              </div>
+              <div class="nav-tab">
+                <i class="fa-solid fa-file-import"></i>
+                <span>导入 / 导出</span>
+              </div>
+              <div class="nav-tab">
+                <i class="fa-solid fa-gear"></i>
+                <span>设置中心</span>
+              </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="action-bar">
+              <button class="btn btn-primary">
+                <i class="fa-solid fa-plus"></i> 新增系统
+              </button>
+              <button class="btn btn-default">
+                <i class="fa-solid fa-pen-to-square"></i> 批量编辑
+              </button>
+              <button class="btn btn-danger">
+                <i class="fa-solid fa-trash"></i> 删除
+              </button>
+
+              <div class="search-wrap ml-auto" style="flex:1; max-width:240px;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input
+                  class="search-input"
+                  type="text"
+                  placeholder="搜索系统..."
+                />
+              </div>
+
+              <button class="btn btn-default">
+                <i class="fa-solid fa-filter"></i> 筛选
+              </button>
+              <button class="btn btn-ghost icon-btn" style="width:30px; padding:0;">
+                <i class="fa-solid fa-gear"></i>
+              </button>
+            </div>
+
+            <!-- Table -->
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:36px;"><input type="checkbox" /></th>
+                  <th>系统名称</th>
+                  <th>URL</th>
+                  <th style="width:60px;">账号数</th>
+                  <th style="width:80px;">环境</th>
+                  <th>标签</th>
+                  <th style="width:90px;">最近使用</th>
+                  <th style="width:60px;">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="selected">
+                  <td><input type="checkbox" checked /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon qa-blue">
+                        <i class="fa-solid fa-briefcase"></i>
+                      </div>
+                      内部OA系统
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://oa.company.com</a
+                    >
+                  </td>
+                  <td>3</td>
+                  <td><span class="env-tag env-prod">生产</span></td>
+                  <td>
+                    <span class="env-tag env-prod">办公</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-admin">admin</span>
+                  </td>
+                  <td>2 分钟前</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background: linear-gradient(135deg,#f97316,#ea580c);">
+                        <i class="fa-brands fa-gitlab"></i>
+                      </div>
+                      代码仓库 GitLab
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://gitlab.company.com</a
+                    >
+                  </td>
+                  <td>2</td>
+                  <td><span class="env-tag env-dev">开发</span></td>
+                  <td>
+                    <span class="env-tag env-dev">代码</span>
+                    <span class="env-tag env-mw">DevOps</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-dev">dev</span>
+                  </td>
+                  <td>15 分钟前</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background: linear-gradient(135deg,#8b5cf6,#7c3aed);">
+                        <i class="fa-solid fa-flask-vial"></i>
+                      </div>
+                      测试环境管理平台
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://test.platform.com</a
+                    >
+                  </td>
+                  <td>2</td>
+                  <td><span class="env-tag env-test">测试</span></td>
+                  <td>
+                    <span class="env-tag env-test">测试</span>
+                    <span class="env-tag env-mw">平台</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-editor">editor</span>
+                  </td>
+                  <td>1 小时前</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background: linear-gradient(135deg,#10b981,#059669);">
+                        <i class="fa-solid fa-gauge-high"></i>
+                      </div>
+                      生产环境控制台
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://prod.console.com</a
+                    >
+                  </td>
+                  <td>2</td>
+                  <td><span class="env-tag env-prod">生产</span></td>
+                  <td>
+                    <span class="env-tag env-prod">生产</span>
+                    <span class="env-tag env-ops">运维</span>
+                    <span class="env-tag env-core">核心</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-admin">admin</span>
+                  </td>
+                  <td>3 小时前</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background: linear-gradient(135deg,#ef4444,#dc2626);">
+                        <i class="fa-solid fa-database"></i>
+                      </div>
+                      Redis 管理平台
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://redis.admin.com</a
+                    >
+                  </td>
+                  <td>1</td>
+                  <td><span class="env-tag env-dev">开发</span></td>
+                  <td>
+                    <span class="env-tag env-mw">中间件</span>
+                    <span class="env-tag env-ops">缓存</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-dev">dev</span>
+                  </td>
+                  <td>昨天</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background: linear-gradient(135deg,#22c55e,#16a34a);">
+                        <i class="fa-solid fa-globe"></i>
+                      </div>
+                      Nginx 管理界面
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://nginx.admin.com</a
+                    >
+                  </td>
+                  <td>1</td>
+                  <td><span class="env-tag env-prod">生产</span></td>
+                  <td>
+                    <span class="env-tag env-mw">中间件</span>
+                    <span class="env-tag env-ops">Web</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-admin">admin</span>
+                  </td>
+                  <td>昨天</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background: linear-gradient(135deg,#f59e0b,#d97706);">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                      </div>
+                      ELK 日志平台
+                    </div>
+                  </td>
+                  <td>
+                    <a href="#" class="text-blue-600 hover:underline"
+                      >https://elk.company.com</a
+                    >
+                  </td>
+                  <td>1</td>
+                  <td><span class="env-tag env-test">监控</span></td>
+                  <td>
+                    <span class="env-tag env-test">日志</span>
+                    <span class="env-tag env-ops">监控</span>
+                  </td>
+                  <td>
+                    <span class="role-tag role-readonly">read</span>
+                  </td>
+                  <td>2 天前</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <div class="pagination">
+              <span>共 7 条</span>
+              <div class="flex items-center gap-1">
+                <span class="page-controls" style="margin-right:8px;">20 条/页</span>
+                <button class="page-btn"><i class="fa-solid fa-chevron-left text-[10px]"></i></button>
+                <button class="page-btn active">1</button>
+                <button class="page-btn"><i class="fa-solid fa-chevron-right text-[10px]"></i></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Right: Detail Panel ===== -->
+          <aside class="detail-panel">
+            <div class="detail-header">
+              <div class="card-title">
+                <i class="fa-solid fa-briefcase"></i>
+                内部OA系统
+              </div>
+              <div class="icon-btn" style="width:24px; height:24px;">
+                <i class="fa-solid fa-xmark text-[12px]"></i>
+              </div>
+            </div>
+
+            <div class="detail-tabs">
+              <div class="detail-tab active">基本信息</div>
+              <div class="detail-tab">账号密码 <span class="count">(3)</span></div>
+              <div class="detail-tab">备注信息</div>
+            </div>
+
+            <div class="detail-body">
+              <div class="form-row">
+                <div class="form-label">系统名称<span class="req">*</span></div>
+                <div class="form-field">
+                  <input class="form-input" type="text" value="内部OA系统" />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-label">系统地址<span class="req">*</span></div>
+                <div class="form-field">
+                  <div class="form-icon">
+                    <input
+                      class="form-input"
+                      type="text"
+                      value="https://oa.company.com"
+                    />
+                    <i class="fa-solid fa-copy"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-label">环境分类</div>
+                <div class="form-field">
+                  <select class="form-select">
+                    <option>生产环境</option>
+                    <option>开发环境</option>
+                    <option>测试环境</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-label">标签</div>
+                <div class="form-field">
+                  <div class="flex flex-wrap gap-1 items-center">
+                    <span class="tag-pill">
+                      办公 <span class="x"><i class="fa-solid fa-xmark"></i></span>
+                    </span>
+                    <span class="tag-pill">
+                      admin <span class="x"><i class="fa-solid fa-xmark"></i></span>
+                    </span>
+                    <button
+                      class="text-[11px] text-blue-600 px-1.5 py-0.5 border border-dashed border-blue-300 rounded hover:bg-blue-50"
+                    >
+                      <i class="fa-solid fa-plus text-[10px]"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section-title">账号信息</div>
+                <div class="account-list">
+                  <div class="account-item header-row">
+                    <div>平台标识</div>
+                    <div>用户名</div>
+                    <div>密码</div>
+                    <div class="text-right">操作</div>
+                  </div>
+                  <div class="account-item">
+                    <div>OA-Admin</div>
+                    <div>admin</div>
+                    <div class="acc-pwd">••••••••</div>
+                    <div class="acc-icons">
+                      <div class="row-action"><i class="fa-regular fa-eye"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-copy"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-trash text-red-500"></i></div>
+                    </div>
+                  </div>
+                  <div class="account-item">
+                    <div>OA-Dev</div>
+                    <div>dev_user</div>
+                    <div class="acc-pwd">••••••••</div>
+                    <div class="acc-icons">
+                      <div class="row-action"><i class="fa-regular fa-eye"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-copy"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-trash text-red-500"></i></div>
+                    </div>
+                  </div>
+                  <div class="account-item">
+                    <div>OA-ReadOnly</div>
+                    <div>readonly</div>
+                    <div class="acc-pwd">••••••••</div>
+                    <div class="acc-icons">
+                      <div class="row-action"><i class="fa-regular fa-eye"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-copy"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-trash text-red-500"></i></div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  class="mt-2 text-[12px] text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <i class="fa-solid fa-plus text-[10px]"></i> 新增账号
+                </button>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section-title">备注信息</div>
+                <div class="upload-area">
+                  <div class="upload-box">
+                    <i class="fa-solid fa-image"></i>
+                  </div>
+                  <div class="upload-text">
+                    公司内部办公系统<br />
+                    包含消息、提单、审批等功能模块<br />
+                    管理员账号拥有所有权限，请谨慎使用。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-footer">
+              <button class="btn btn-default">取消</button>
+              <button class="btn btn-primary">保存</button>
+            </div>
+          </aside>
+        </div>
+
+        <!-- ===== Bottom Row ===== -->
+        <div class="bottom-row">
+          <!-- ===== Server Cards ===== -->
+          <section class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-server"></i>
+                服务器
+              </div>
+              <button class="btn btn-primary" style="height:28px; padding:0 10px;">
+                <i class="fa-solid fa-plus text-[10px]"></i> 新增服务器
+              </button>
+            </div>
+            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+              <div class="flex items-center gap-2 text-[12px] text-gray-600">
+                <i class="fa-solid fa-table-list"></i>
+                <span>扩展服务器</span>
+              </div>
+              <div class="search-wrap" style="width:140px;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input
+                  class="search-input"
+                  type="text"
+                  placeholder="搜索服务器..."
+                  style="height:26px; font-size:11px;"
+                />
+              </div>
+              <div class="flex items-center gap-1">
+                <button class="icon-btn" style="width:24px; height:24px; background:#eff6ff; color:#2563eb;">
+                  <i class="fa-solid fa-grip text-[10px]"></i>
+                </button>
+                <button class="icon-btn" style="width:24px; height:24px;">
+                  <i class="fa-solid fa-list text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="server-grid">
+              <div class="server-card">
+                <div class="server-status">在线</div>
+                <div class="server-ip">10.0.1.10</div>
+                <div class="server-desc">生产服务器</div>
+                <div class="server-meta">
+                  CentOS 7.9<br />
+                  root / SSH Key<br />
+                  22
+                </div>
+                <div class="server-tags">
+                  <span class="env-tag env-prod">核心业务</span>
+                </div>
+                <div class="server-actions">
+                  <div class="row-action" title="编辑"><i class="fa-solid fa-pen"></i></div>
+                  <div class="row-action" title="终端"><i class="fa-solid fa-terminal"></i></div>
+                  <div class="row-action" title="监控"><i class="fa-solid fa-chart-line"></i></div>
+                  <div class="row-action ml-auto" title="更多"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+                </div>
+              </div>
+
+              <div class="server-card">
+                <div class="server-status">在线</div>
+                <div class="server-ip">10.0.1.20</div>
+                <div class="server-desc">测试服务器</div>
+                <div class="server-meta">
+                  Ubuntu 22.04<br />
+                  deploy / 密码<br />
+                  22
+                </div>
+                <div class="server-tags">
+                  <span class="env-tag env-test">测试环境</span>
+                </div>
+                <div class="server-actions">
+                  <div class="row-action"><i class="fa-solid fa-pen"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-terminal"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-chart-line"></i></div>
+                  <div class="row-action ml-auto"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+                </div>
+              </div>
+
+              <div class="server-card">
+                <div class="server-status warn">告警</div>
+                <div class="server-ip">10.0.2.30</div>
+                <div class="server-desc">备份服务器</div>
+                <div class="server-meta">
+                  CentOS 7.6<br />
+                  backup / SSH Key<br />
+                  22
+                </div>
+                <div class="server-tags">
+                  <span class="env-tag env-core">备份</span>
+                </div>
+                <div class="server-actions">
+                  <div class="row-action"><i class="fa-solid fa-pen"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-terminal"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-chart-line"></i></div>
+                  <div class="row-action ml-auto"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+                </div>
+              </div>
+
+              <div class="server-card">
+                <div class="server-status">在线</div>
+                <div class="server-ip">10.0.3.40</div>
+                <div class="server-desc">数据库服务器</div>
+                <div class="server-meta">
+                  CentOS 7.9<br />
+                  dbadmin / 密码<br />
+                  22
+                </div>
+                <div class="server-tags">
+                  <span class="env-tag env-mw">数据库</span>
+                </div>
+                <div class="server-actions">
+                  <div class="row-action"><i class="fa-solid fa-pen"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-terminal"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-chart-line"></i></div>
+                  <div class="row-action ml-auto"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+                </div>
+              </div>
+
+              <div class="server-card">
+                <div class="server-status">在线</div>
+                <div class="server-ip">10.0.3.50</div>
+                <div class="server-desc">预发布</div>
+                <div class="server-meta">
+                  CentOS 7.9<br />
+                  jumperer / SSH Key<br />
+                  22
+                </div>
+                <div class="server-tags">
+                  <span class="env-tag env-test">预发布</span>
+                </div>
+                <div class="server-actions">
+                  <div class="row-action"><i class="fa-solid fa-pen"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-terminal"></i></div>
+                  <div class="row-action"><i class="fa-solid fa-chart-line"></i></div>
+                  <div class="row-action ml-auto"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+                </div>
+              </div>
+
+              <div class="server-card add-card">
+                <i class="fa-solid fa-plus"></i>
+                <div>新增服务器</div>
+              </div>
+            </div>
+
+            <div class="px-3 py-2 border-t border-gray-100 text-[12px] text-gray-500 flex items-center justify-between">
+              <span>共 5 台服务器</span>
+              <a href="#" class="text-blue-600">查看全部 ›</a>
+            </div>
+          </section>
+
+          <!-- ===== Middleware Table ===== -->
+          <section class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-cubes"></i>
+                中间件
+              </div>
+              <button class="btn btn-primary" style="height:28px; padding:0 10px;">
+                <i class="fa-solid fa-plus text-[10px]"></i> 新增中间件
+              </button>
+            </div>
+            <div class="px-3 py-2 border-b border-gray-100">
+              <div class="search-wrap" style="max-width:100%;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input
+                  class="search-input"
+                  type="text"
+                  placeholder="搜索中间件..."
+                />
+              </div>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>类型</th>
+                  <th>名称 / 版本</th>
+                  <th>连接地址</th>
+                  <th style="width:60px;">端口</th>
+                  <th style="width:80px;">账号</th>
+                  <th style="width:60px;">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background:linear-gradient(135deg,#00758f,#005673);">
+                        <i class="fa-solid fa-database"></i>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="font-medium">MySQL 8.0.32</div>
+                  </td>
+                  <td>10.0.1.20</td>
+                  <td>3306</td>
+                  <td>root</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background:linear-gradient(135deg,#dc382d,#a41e11);">
+                        <i class="fa-solid fa-bolt"></i>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="font-medium">Redis 6.2.6</div>
+                  </td>
+                  <td>10.0.1.20</td>
+                  <td>6379</td>
+                  <td>default</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background:linear-gradient(135deg,#009639,#006b27);">
+                        <i class="fa-solid fa-globe"></i>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="font-medium">Nginx 1.24.0</div>
+                  </td>
+                  <td>10.0.1.10</td>
+                  <td>80</td>
+                  <td>-</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background:linear-gradient(135deg,#ff6600,#cc4f00);">
+                        <i class="fa-solid fa-message"></i>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="font-medium">RabbitMQ 3.11.9</div>
+                  </td>
+                  <td>10.0.1.20</td>
+                  <td>5672</td>
+                  <td>admin</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="sys-name">
+                      <div class="sys-icon" style="background:linear-gradient(135deg,#005571,#003d52);">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="font-medium">Elasticsearch 8.8.1</div>
+                  </td>
+                  <td>10.0.1.30</td>
+                  <td>9200</td>
+                  <td>elastic</td>
+                  <td>
+                    <div class="row-actions">
+                      <div class="row-action"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                      <div class="row-action"><i class="fa-solid fa-ellipsis"></i></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="px-3 py-2 border-t border-gray-100 text-[12px] text-gray-500 flex items-center justify-between">
+              <span>共 5 条中间件</span>
+              <a href="#" class="text-blue-600">查看全部 ›</a>
+            </div>
+          </section>
+
+          <!-- ===== Import/Export ===== -->
+          <section class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-file-import"></i>
+                导入 / 导出
+              </div>
+              <div class="icon-btn" style="width:24px; height:24px;" title="复制全部">
+                <i class="fa-solid fa-copy text-[11px]"></i>
+              </div>
+            </div>
+            <div class="detail-body">
+              <div class="ie-section">
+                <div class="ie-title">导出数据</div>
+                <button class="ie-btn">
+                  <i class="fa-brands fa-markdown"></i> 导出为 Markdown (.md)
+                </button>
+                <button class="ie-btn green">
+                  <i class="fa-solid fa-code"></i> 导出为 JSON (.json)
+                </button>
+              </div>
+
+              <div class="ie-section">
+                <div class="ie-title">导入数据</div>
+                <button class="ie-btn">
+                  <i class="fa-brands fa-markdown"></i> 从 Markdown 导入 (.md)
+                </button>
+                <button class="ie-btn orange">
+                  <i class="fa-solid fa-file-code"></i> 从 JSON 导入 (.json)
+                </button>
+              </div>
+
+              <div class="ie-section">
+                <div class="ie-title">数据管理</div>
+                <button class="ie-btn danger">
+                  <i class="fa-solid fa-trash"></i> 清空所有数据
+                </button>
+              </div>
+
+              <div class="ie-section">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="ie-title mb-0">Markdown 预览</div>
+                  <button
+                    class="text-[11px] text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <i class="fa-solid fa-copy text-[10px]"></i> 复制全部
+                  </button>
+                </div>
+                <div class="md-preview"># 内部系统助手 - 数据预览
+
+## 系统
+
+### 内部OA系统
+- **URL**: <code>https://oa.company.com</code>
+- **环境**: 生产
+- **标签**: 办公
+- **备注**:
+  公司内部办公系统。
+  包含消息、提单、审批等功能模块。
+  管理员账号拥有所有权限，请谨慎使用。
+
+### 代码仓库 GitLab
+- **URL**: <code>https://gitlab.company.com</code>
+- **环境**: 开发
+- **标签**: 代码, DevOps
+
+## 账号列表
+
+| 平台标识 | 用户名 | 密码 |
+|---------|-------|------|
+| OA-Admin | admin | •••••••• |
+| OA-Dev | dev_user | •••••••• |
+| OA-ReadOnly | readonly | •••••••• |
+</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // ============ Tab 切换交互 ============
+    document.querySelectorAll('.nav-tab').forEach((tab) => {
+      tab.addEventListener('click', function () {
+        const tabs = this.parentElement.querySelectorAll('.nav-tab');
+        tabs.forEach((t) => t.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    document.querySelectorAll('.detail-tab').forEach((tab) => {
+      tab.addEventListener('click', function () {
+        const tabs = this.parentElement.querySelectorAll('.detail-tab');
+        tabs.forEach((t) => t.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    // ============ 表格行选中 ============
+    document.querySelectorAll('.data-table tbody tr').forEach((row) => {
+      row.addEventListener('click', function (e) {
+        // 避免点 action 按钮时触发
+        if (e.target.closest('.row-action')) return;
+        document
+          .querySelectorAll('.data-table tbody tr')
+          .forEach((r) => r.classList.remove('selected'));
+        this.classList.add('selected');
+        const checkbox = this.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = true;
+      });
+    });
+
+    // ============ 快速操作 hover 反馈 ============
+    document.querySelectorAll('.quick-action').forEach((item) => {
+      item.addEventListener('click', function () {
+        console.log('Quick action:', this.querySelector('.qa-label').textContent);
+      });
+    });
+
+    // ============ 密码显示切换 ============
+    document.querySelectorAll('.acc-icons .fa-eye, .acc-icons .fa-eye-slash').forEach((icon) => {
+      icon.parentElement.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const pwdEl = this.closest('.account-item').querySelector('.acc-pwd');
+        if (icon.classList.contains('fa-eye')) {
+          icon.classList.remove('fa-eye');
+          icon.classList.add('fa-eye-slash');
+          pwdEl.textContent = 'admin123';
+        } else {
+          icon.classList.remove('fa-eye-slash');
+          icon.classList.add('fa-eye');
+          pwdEl.textContent = '••••••••';
+        }
+      });
+    });
+
+    // ============ 复制按钮反馈 ============
+    document.querySelectorAll('.form-icon .fa-copy, .row-action .fa-copy').forEach((btn) => {
+      btn.parentElement.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const orig = this.style.color;
+        this.style.color = '#10b981';
+        setTimeout(() => (this.style.color = orig), 600);
+      });
+    });
+  </script>
+</body>
+</html>
