@@ -1,2 +1,14 @@
+:root {
+  --primary: #2563eb;
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-700: #1d4ed8;
+  --bg: #f5f7fa;
+  --border: #e5e7eb;
+  --border-soft: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+}
 * { box-sizing: border-box; }
-body { font-family: 'Noto Sans SC', -apple-system, sans-serif; font-size: 13px; }
+body { font-family: 'Noto Sans SC', -apple-system, sans-serif; font-size: 13px; margin: 0; }
