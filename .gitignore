@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-zip/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+.env
+.env.local
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/

@@ -1,0 +1,38 @@
+{
+  "name": "nav-portal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension for managing internal systems, accounts, servers, middleware",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "lint": "eslint src --ext .ts,.vue",
+    "type-check": "vue-tsc --noEmit",
+    "zip": "cd dist && zip -r ../nav-portal-v$npm_package_version.zip ."
+  },
+  "dependencies": {
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.7",
+    "dexie": "^4.0.4",
+    "markdown-it": "^14.1.0",
+    "front-matter": "^4.0.2"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.25",
+    "@types/chrome": "^0.0.263",
+    "@types/markdown-it": "^14.0.1",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "@vue/test-utils": "^2.4.5",
+    "fake-indexeddb": "^6.0.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.4.3",
+    "vite": "^5.2.6",
+    "vitest": "^1.4.0",
+    "vue-tsc": "^2.0.7"
+  }
+}
