@@ -1,0 +1,50 @@
+/* eslint-env node */
+module.exports = {
+  root: true,
+  env: {
+    browser: true,
+    es2022: true,
+    node: true,
+    'webextensions': true,
+  },
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:vue/vue3-recommended',
+  ],
+  parser: 'vue-eslint-parser',
+  parserOptions: {
+    parser: '@typescript-eslint/parser',
+    ecmaVersion: 2022,
+    sourceType: 'module',
+  },
+  rules: {
+    // Lenient configuration: focus on real bugs, not style preferences.
+    // Warnings do not fail CI (only errors do).
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    '@typescript-eslint/ban-ts-comment': 'off',
+    '@typescript-eslint/no-empty-function': 'off',
+    '@typescript-eslint/no-empty-object-type': 'off',
+    'vue/multi-word-component-names': 'off',
+    'vue/no-unused-vars': 'warn',
+    'vue/require-default-prop': 'off',
+    'vue/attributes-order': 'off',
+    'vue/html-self-closing': 'off',
+    'vue/max-attributes-per-line': 'off',
+    'vue/singleline-html-element-content-newline': 'off',
+    'vue/html-indent': 'off',
+    'vue/html-closing-bracket-newline': 'off',
+    'vue/component-tags-order': 'off',
+    'vue/attributes-order': 'off',
+    'no-undef': 'off',
+    'no-unused-vars': 'off',
+    'no-empty': 'off',
+    'no-prototype-builtins': 'off',
+    'no-case-declarations': 'off',
+    'no-fallthrough': 'off',
+    'no-useless-escape': 'off',
+    'prefer-const': 'off',
+  },
+  ignorePatterns: ['dist/', 'node_modules/', '*.config.ts', 'tests/**'],
+};
