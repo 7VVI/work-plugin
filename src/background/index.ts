@@ -8,10 +8,4 @@ setupTabMonitor();
 setupCommands();
 setupMessaging();
 
-chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === 'install') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#/onboarding') });
-  }
-});
-
 console.log('[Nav Portal] background service worker started');

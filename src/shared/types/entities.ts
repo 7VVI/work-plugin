@@ -87,6 +87,23 @@ export interface Recent {
   role?: string;
 }
 
+export interface ConfigItem {
+  key: string;
+  label?: string;
+  defaultValue?: string;
+  value?: string;
+}
+
+export interface ConfigGroup {
+  id: string;
+  name: string;
+  items: ConfigItem[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ConfigGroupInput = Omit<ConfigGroup, 'id' | 'createdAt' | 'updatedAt'>;
+
 export interface MetaEntry {
   key: string;
   value: unknown;

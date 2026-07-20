@@ -33,12 +33,6 @@ export const systemService = {
     await systemRepo.delete(id);
   },
 
-  async toggleFavorite(id: string): Promise<void> {
-    const system = await systemRepo.byId(id);
-    if (!system) return;
-    await systemRepo.update(id, { favorite: !system.favorite });
-  },
-
   async reorder(orderedIds: string[]): Promise<void> {
     await systemRepo.reorder(orderedIds);
   },

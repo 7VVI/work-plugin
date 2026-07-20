@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   System, Account, Server, Middleware, Tag,
-  SystemTag, ServerTag, MiddlewareTag, Recent, MetaEntry,
+  SystemTag, ServerTag, MiddlewareTag, Recent, MetaEntry, ConfigGroup,
 } from '../types/entities';
 
 export class NavPortalDB extends Dexie {
@@ -15,6 +15,7 @@ export class NavPortalDB extends Dexie {
   middlewareTags!: Table<MiddlewareTag, string>;
   recents!: Table<Recent, string>;
   meta!: Table<MetaEntry, string>;
+  configs!: Table<ConfigGroup, string>;
 
   constructor() {
     super('NavPortalDB');
@@ -29,6 +30,9 @@ export class NavPortalDB extends Dexie {
       middlewareTags: '[middlewareId+tagId], middlewareId, tagId',
       recents:        'id, entityType, entityId, lastAccessedAt',
       meta:           'key',
+    });
+    this.version(2).stores({
+      configs:        'id, name, createdAt, updatedAt',
     });
   }
 }

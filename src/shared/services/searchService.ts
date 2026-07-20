@@ -9,7 +9,6 @@ export interface SearchResult {
   title: string;
   subtitle: string;
   matchedField: string;
-  favorite?: boolean;
 }
 
 export const searchService = {
@@ -32,7 +31,6 @@ export const searchService = {
         title: s.name,
         subtitle: s.url,
         matchedField: findMatchedField(q, { name: s.name, url: s.url, remark: s.remark }),
-        favorite: s.favorite,
       });
     }
 
@@ -43,7 +41,6 @@ export const searchService = {
         title: s.name,
         subtitle: `${s.ip}:${s.sshPort}`,
         matchedField: findMatchedField(q, { name: s.name, ip: s.ip, remark: s.remark }),
-        favorite: s.favorite,
       });
     }
 
@@ -54,7 +51,6 @@ export const searchService = {
         title: m.name,
         subtitle: `${m.host}:${m.port}`,
         matchedField: findMatchedField(q, { name: m.name, host: m.host, remark: m.remark }),
-        favorite: m.favorite,
       });
     }
 
@@ -62,11 +58,7 @@ export const searchService = {
   },
 
   rankResults(results: SearchResult[]): SearchResult[] {
-    return results.sort((a, b) => {
-      if (a.favorite && !b.favorite) return -1;
-      if (!a.favorite && b.favorite) return 1;
-      return a.title.localeCompare(b.title);
-    });
+    return results.sort((a, b) => a.title.localeCompare(b.title));
   },
 };
 

@@ -18,7 +18,6 @@ export const serverService = {
     requireString(input.name, '名称');
     requireString(input.ip, 'IP');
     requireNumber(input.sshPort, 'SSH 端口');
-    requireString(input.username, '账号');
     const encryptedPassword = await cryptoService.encryptField(input.password);
     const encryptedSshKey = input.sshKey ? await cryptoService.encryptField(input.sshKey) : undefined;
     return serverRepo.create({
@@ -39,10 +38,10 @@ export const serverService = {
   async update(id: string, patch: Partial<ServerInput>): Promise<void> {
     const { password, sshKey, ...rest } = patch;
     const updatePatch: Partial<Server> = { ...rest };
-    if (password !== undefined) {
+    if (password && password.trim()) {
       updatePatch.password = await cryptoService.encryptField(password);
     }
-    if (sshKey !== undefined) {
+    if (sshKey && sshKey.trim()) {
       updatePatch.sshKey = await cryptoService.encryptField(sshKey);
     }
     await serverRepo.update(id, updatePatch);
@@ -50,12 +49,6 @@ export const serverService = {
 
   async delete(id: string): Promise<void> {
     await serverRepo.delete(id);
-  },
-
-  async toggleFavorite(id: string): Promise<void> {
-    const server = await serverRepo.byId(id);
-    if (!server) return;
-    await serverRepo.update(id, { favorite: !server.favorite });
   },
 
   async copyIp(id: string): Promise<void> {

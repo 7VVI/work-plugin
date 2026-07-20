@@ -13,6 +13,16 @@ interface BackupData {
   tags: Tag[];
 }
 
+function buildTable(headers: string[], rows: string[][]): string[] {
+  const lines: string[] = [];
+  lines.push(`| ${headers.join(' | ')} |`);
+  lines.push(`| ${headers.map(() => '---').join(' | ')} |`);
+  for (const row of rows) {
+    lines.push(`| ${row.map(c => (c ?? '').replace(/\|/g, '\\|')).join(' | ')} |`);
+  }
+  return lines;
+}
+
 export function serializeMarkdown(data: ParsedBackup | BackupData, options: SerializeOptions): string {
   const lines: string[] = [];
 
@@ -32,13 +42,30 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
     for (const s of data.systems) {
       lines.push(`### ${s.name}`);
       lines.push('');
-      if (s.url) lines.push(`- **URL**: ${s.url}`);
-      if (s.environment) lines.push(`- **环境**: ${s.environment}`);
-      if (s.icon) lines.push(`- **图标**: ${s.icon}`);
-      if (s.color) lines.push(`- **颜色**: ${s.color}`);
-      if (s.tags && s.tags.length > 0) lines.push(`- **标签**: ${s.tags.join(', ')}`);
-      if (s.remark) lines.push(`- **备注**: ${s.remark}`);
-      lines.push('');
+      const rows: string[][] = [];
+      if (s.url) rows.push(['URL', s.url]);
+      if (s.environment) rows.push(['环境', s.environment]);
+      if (s.icon) rows.push(['图标', s.icon]);
+      if (s.color) rows.push(['颜色', s.color]);
+      if (s.tags && s.tags.length > 0) rows.push(['标签', s.tags.join(', ')]);
+      if (s.remark) rows.push(['备注', s.remark]);
+      if (rows.length > 0) {
+        lines.push(...buildTable(['字段', '值'], rows));
+        lines.push('');
+      }
+      const plainAccounts = (s as any).plainAccounts as Array<{ role: string; username: string; password: string; isDefault?: boolean }> | undefined;
+      if (plainAccounts && plainAccounts.length > 0) {
+        lines.push('#### 账号');
+        lines.push('');
+        const accRows = plainAccounts.map(a => [
+          a.role,
+          a.username,
+          options.includePasswords && a.password ? a.password : '********',
+          a.isDefault ? '是' : '否',
+        ]);
+        lines.push(...buildTable(['角色', '用户名', '密码', '默认'], accRows));
+        lines.push('');
+      }
     }
   }
 
@@ -48,15 +75,19 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
     for (const s of data.servers) {
       lines.push(`### ${s.name}`);
       lines.push('');
-      if (s.ip) lines.push(`- **IP**: ${s.ip}`);
-      if (s.sshPort) lines.push(`- **SSH 端口**: ${s.sshPort}`);
-      if (s.username) lines.push(`- **账号**: ${s.username}`);
       const pwd = (s as any).plainPassword;
-      lines.push(`- **密码**: ${options.includePasswords && pwd ? pwd : '********'}`);
-      if (s.environment) lines.push(`- **环境**: ${s.environment}`);
-      if (s.purpose) lines.push(`- **用途**: ${s.purpose}`);
-      if (s.remark) lines.push(`- **备注**: ${s.remark}`);
-      lines.push('');
+      const rows: string[][] = [];
+      if (s.ip) rows.push(['IP', s.ip]);
+      if (s.sshPort) rows.push(['SSH 端口', String(s.sshPort)]);
+      if (s.username) rows.push(['账号', s.username]);
+      rows.push(['密码', options.includePasswords && pwd ? pwd : '********']);
+      if (s.environment) rows.push(['环境', s.environment]);
+      if (s.purpose) rows.push(['用途', s.purpose]);
+      if (s.remark) rows.push(['备注', s.remark]);
+      if (rows.length > 0) {
+        lines.push(...buildTable(['字段', '值'], rows));
+        lines.push('');
+      }
     }
   }
 
@@ -66,26 +97,33 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
     for (const m of data.middlewares) {
       lines.push(`### ${m.name}`);
       lines.push('');
-      if (m.type) lines.push(`- **类型**: ${m.type}`);
-      if (m.version) lines.push(`- **版本**: ${m.version}`);
-      if (m.host) lines.push(`- **Host**: ${m.host}`);
-      if (m.port) lines.push(`- **端口**: ${m.port}`);
-      if (m.database) lines.push(`- **数据库**: ${m.database}`);
-      if (m.username) lines.push(`- **账号**: ${m.username}`);
       const pwd = (m as any).plainPassword;
-      if (pwd || m.password) lines.push(`- **密码**: ${options.includePasswords && pwd ? pwd : '********'}`);
-      if (m.remark) lines.push(`- **备注**: ${m.remark}`);
-      lines.push('');
+      const rows: string[][] = [];
+      if (m.type) rows.push(['类型', m.type]);
+      if (m.version) rows.push(['版本', m.version]);
+      if (m.host) rows.push(['Host', m.host]);
+      if (m.port) rows.push(['端口', String(m.port)]);
+      if (m.database) rows.push(['数据库', m.database]);
+      if (m.username) rows.push(['账号', m.username]);
+      if (pwd || m.password) rows.push(['密码', options.includePasswords && pwd ? pwd : '********']);
+      if (m.remark) rows.push(['备注', m.remark]);
+      if (m.extra && Object.keys(m.extra).length > 0) {
+        for (const [k, v] of Object.entries(m.extra)) {
+          rows.push([`额外：${k}`, String(v)]);
+        }
+      }
+      if (rows.length > 0) {
+        lines.push(...buildTable(['字段', '值'], rows));
+        lines.push('');
+      }
     }
   }
 
   if (data.tags.length > 0) {
     lines.push('## 标签');
     lines.push('');
-    for (const t of data.tags) {
-      const colorPart = t.color ? ` (${t.color})` : '';
-      lines.push(`- ${t.name}${colorPart}`);
-    }
+    const rows = data.tags.map(t => [t.name ?? '', t.color ?? '']);
+    lines.push(...buildTable(['名称', '颜色'], rows));
     lines.push('');
   }
 

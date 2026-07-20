@@ -32,11 +32,6 @@ export const useMiddlewareStore = defineStore('middleware', () => {
     await load();
   }
 
-  async function toggleFavorite(id: string) {
-    await middlewareService.toggleFavorite(id);
-    await load();
-  }
-
   async function copyConnectionString(id: string) { await middlewareService.copyConnectionString(id); }
   async function copyPassword(id: string) { await middlewareService.copyPassword(id); }
 
@@ -52,7 +47,7 @@ export const useMiddlewareStore = defineStore('middleware', () => {
 
   return {
     list, loading, selectedId, searchQuery, filtered, selected,
-    load, create, update, remove, toggleFavorite,
+    load, create, update, remove,
     copyConnectionString, copyPassword,
   };
 });

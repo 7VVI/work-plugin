@@ -1,39 +1,95 @@
 <template>
   <div class="page-header">
-    <div class="page-title">
-      <div class="shield-icon"><i class="fa-solid fa-shield-halved"></i></div>
-      <span>Nav Portal - 管理面板</span>
+    <div class="brand">
+      <div class="brand-logo">D</div>
+      <span class="brand-name">Dock</span>
+      <span class="brand-sub">管理面板</span>
     </div>
     <div class="header-actions">
-      <div class="icon-btn" @click="toggleTheme" :title="theme === 'light' ? '切换深色' : '切换浅色'">
-        <i :class="theme === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'"></i>
-      </div>
       <div class="icon-btn" @click="$router.push('/settings')" title="设置">
         <i class="fa-solid fa-gear"></i>
       </div>
-      <div class="user-avatar" title="admin">A</div>
+      <div class="user-avatar">A</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { usePrefStore } from '@shared/stores/prefStore';
-import { computed } from 'vue';
-
-const prefStore = usePrefStore();
-const theme = computed(() => prefStore.theme);
-
-function toggleTheme() {
-  prefStore.theme = theme.value === 'light' ? 'dark' : 'light';
-}
 </script>
 
 <style scoped>
-.page-header { height: 56px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
-.page-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--text-primary); }
-.shield-icon { width: 22px; height: 22px; background: linear-gradient(135deg, #3b82f6, #2563eb); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; }
-.header-actions { display: flex; align-items: center; gap: 4px; }
-.icon-btn { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+.page-header {
+  height: var(--header-h);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--page-pad);
+  flex-shrink: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  font-family: "SF Pro Display", -apple-system, sans-serif;
+  letter-spacing: -0.5px;
+}
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+.brand-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 3px 8px;
+  background: var(--border-soft);
+  border-radius: 5px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
 .icon-btn:hover { background: var(--border-soft); color: var(--text-primary); }
-.user-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; margin-left: 8px; cursor: pointer; }
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--text-secondary) 0%, var(--text-primary) 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 4px;
+  cursor: pointer;
+}
 </style>

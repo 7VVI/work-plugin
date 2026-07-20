@@ -8,8 +8,13 @@
           <div class="form-row"><div class="form-label">IP <span class="req">*</span></div><input v-model="form.ip" class="form-input" /></div>
           <div class="form-row"><div class="form-label">SSH 端口</div><input v-model.number="form.sshPort" class="form-input" type="number" /></div>
           <div class="form-row"><div class="form-label">账号</div><input v-model="form.username" class="form-input" /></div>
-          <div class="form-row"><div class="form-label">密码</div><input v-model="form.password" class="form-input" type="password" /></div>
-          <div class="form-row"><div class="form-label">SSH Key</div><textarea v-model="form.sshKey" class="form-textarea"></textarea></div>
+          <div class="form-row"><div class="form-label">密码</div>
+            <div class="pwd-field">
+              <input v-model="form.password" :type="showPwd ? 'text' : 'password'" class="form-input" :placeholder="server ? '留空则不修改' : ''" />
+              <i :class="showPwd ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'" @click="showPwd = !showPwd"></i>
+            </div>
+          </div>
+          <div class="form-row"><div class="form-label">SSH Key</div><textarea v-model="form.sshKey" class="form-textarea" :placeholder="server ? '留空则不修改' : ''"></textarea></div>
           <div class="form-row"><div class="form-label">环境</div>
             <select v-model="form.environment" class="form-select">
               <option v-for="env in ENVIRONMENTS" :key="env.value" :value="env.value">{{ env.label }}</option>
@@ -33,9 +38,12 @@ import type { Server, ServerInput } from '@shared/types/entities';
 import { ENVIRONMENTS } from '@shared/types/enums';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { cryptoService } from '@shared/services/cryptoService';
 
 const props = defineProps<{ visible: boolean; server: Server | null }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
+
+const showPwd = ref(false);
 
 const store = useServerStore();
 const toast = useToastStore();
@@ -45,10 +53,26 @@ const form = ref<ServerInput>({
   environment: 'development', purpose: '', remark: '', favorite: false,
 });
 
-watch(() => props.visible, (v) => {
+watch(() => props.visible, async (v) => {
   if (v) {
+    showPwd.value = false;
     if (props.server) {
-      form.value = { ...props.server, password: '', sshKey: '' };
+      const { password: _p, sshKey: _s, ...rest } = props.server;
+      form.value = { ...rest, password: '', sshKey: '' } as ServerInput;
+      if (props.server.password) {
+        try {
+          form.value.password = await cryptoService.decryptField(props.server.password);
+        } catch {
+          form.value.password = '';
+        }
+      }
+      if (props.server.sshKey) {
+        try {
+          form.value.sshKey = await cryptoService.decryptField(props.server.sshKey);
+        } catch {
+          form.value.sshKey = '';
+        }
+      }
     } else {
       form.value = { name: '', ip: '', sshPort: 22, username: '', password: '', sshKey: '', environment: 'development', purpose: '', remark: '', favorite: false };
     }
@@ -56,14 +80,21 @@ watch(() => props.visible, (v) => {
 });
 
 async function save() {
-  if (props.server) {
-    await store.update(props.server.id, form.value);
-    toast.success('服务器已更新');
-  } else {
-    await store.create(form.value);
-    toast.success('服务器已创建');
+  if (!form.value.name.trim()) { toast.error('请填写名称'); return; }
+  if (!form.value.ip.trim()) { toast.error('请填写 IP 地址'); return; }
+  if (!form.value.sshPort || form.value.sshPort <= 0) { toast.error('请填写有效的 SSH 端口'); return; }
+  try {
+    if (props.server) {
+      await store.update(props.server.id, form.value);
+      toast.success('服务器已更新');
+    } else {
+      await store.create(form.value);
+      toast.success('服务器已创建');
+    }
+    emit('saved');
+  } catch (e) {
+    toast.error((e as Error).message || '保存失败');
   }
-  emit('saved');
 }
 </script>
 
@@ -77,6 +108,10 @@ async function save() {
 .form-field { flex: 1; }
 .form-input, .form-select, .form-textarea { width: 100%; height: 30px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; font-size: 12px; outline: none; font-family: inherit; }
 .form-textarea { height: 60px; padding: 6px 10px; resize: vertical; }
+.pwd-field { position: relative; flex: 1; }
+.pwd-field .form-input { padding-right: 32px; }
+.pwd-field i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-tertiary); font-size: 12px; }
+.pwd-field i:hover { color: var(--text-primary); }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .btn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; }
 .btn-primary { background: var(--primary); color: white; }

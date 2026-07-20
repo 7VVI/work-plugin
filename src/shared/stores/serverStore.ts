@@ -32,11 +32,6 @@ export const useServerStore = defineStore('server', () => {
     await load();
   }
 
-  async function toggleFavorite(id: string) {
-    await serverService.toggleFavorite(id);
-    await load();
-  }
-
   async function copyIp(id: string) { await serverService.copyIp(id); }
   async function copySshCommand(id: string) { await serverService.copySshCommand(id); }
   async function copyPassword(id: string) { await serverService.copyPassword(id); }
@@ -50,11 +45,10 @@ export const useServerStore = defineStore('server', () => {
   });
 
   const selected = computed(() => list.value.find(s => s.id === selectedId.value));
-  const favorites = computed(() => list.value.filter(s => s.favorite));
 
   return {
-    list, loading, selectedId, searchQuery, filtered, selected, favorites,
-    load, create, update, remove, toggleFavorite,
+    list, loading, selectedId, searchQuery, filtered, selected,
+    load, create, update, remove,
     copyIp, copySshCommand, copyPassword,
   };
 });

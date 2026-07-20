@@ -31,6 +31,19 @@ export const autoFillService = {
       }
     }
 
+    // 默认账号排在第一位
+    matches.sort((a, b) => {
+      if (a.account.isDefault && !b.account.isDefault) return -1;
+      if (!a.account.isDefault && b.account.isDefault) return 1;
+      return 0;
+    });
+
     return matches;
+  },
+
+  async findDefaultAccountForUrl(url: string): Promise<AccountMatch | null> {
+    const matches = await this.findAccountsForUrl(url);
+    if (matches.length === 0) return null;
+    return matches[0];
   },
 };

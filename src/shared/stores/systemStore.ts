@@ -35,11 +35,6 @@ export const useSystemStore = defineStore('system', () => {
     await load();
   }
 
-  async function toggleFavorite(id: string) {
-    await systemService.toggleFavorite(id);
-    await load();
-  }
-
   async function reorder(orderedIds: string[]) {
     await systemService.reorder(orderedIds);
     await load();
@@ -71,11 +66,10 @@ export const useSystemStore = defineStore('system', () => {
   });
 
   const selected = computed(() => list.value.find(s => s.id === selectedId.value));
-  const favorites = computed(() => list.value.filter(s => s.favorite));
 
   return {
     list, loading, selectedId, filterEnv, filterTagId, searchQuery,
-    filtered, selected, favorites,
-    load, create, update, remove, toggleFavorite, reorder, setTags, select,
+    filtered, selected,
+    load, create, update, remove, reorder, setTags, select,
   };
 });

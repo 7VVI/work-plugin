@@ -2,6 +2,7 @@ import { systemRepo } from '../db/repositories/systemRepo';
 import { serverRepo } from '../db/repositories/serverRepo';
 import { middlewareRepo } from '../db/repositories/middlewareRepo';
 import { tagRepo } from '../db/repositories/tagRepo';
+import { accountRepo } from '../db/repositories/accountRepo';
 import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
@@ -26,7 +27,7 @@ export const importExportService = {
     const encrypted = await cryptoService.isEnabled();
 
     if (options.includePasswords && encrypted && !cryptoService.isUnlocked()) {
-      throw new Error('Master password locked. Unlock first or exclude passwords.');
+      throw new Error('已启用主密码加密，请先在设置中解锁主密码后再导出明文密码');
     }
 
     const serversWithPlain = await Promise.all(servers.map(async s => ({
@@ -42,7 +43,14 @@ export const importExportService = {
     const resolvedSystems = await Promise.all(systems.map(async s => {
       const tagIds = await systemTagRepo.tagsFor(s.id);
       const tagNames = await Promise.all(tagIds.map(async tid => (await tagRepo.byId(tid))?.name ?? ''));
-      return { ...s, tags: tagNames };
+      const accounts = await accountRepo.bySystemId(s.id);
+      const plainAccounts = await Promise.all(accounts.map(async a => ({
+        role: a.role,
+        username: a.username,
+        password: await cryptoService.decryptField(a.password).catch(() => ''),
+        isDefault: a.isDefault,
+      })));
+      return { ...s, tags: tagNames, plainAccounts };
     }));
 
     return serializeMarkdown({

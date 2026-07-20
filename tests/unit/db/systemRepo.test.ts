@@ -56,14 +56,6 @@ describe('systemRepo', () => {
     expect(tags).toHaveLength(0);
   });
 
-  it('returns favorites only', async () => {
-    await systemRepo.create({ ...sampleSystem, favorite: false });
-    await systemRepo.create({ ...sampleSystem, name: 'Fav', favorite: true });
-    const favs = await systemRepo.favorites();
-    expect(favs).toHaveLength(1);
-    expect(favs[0].name).toBe('Fav');
-  });
-
   it('searches by name, url, and remark (case-insensitive substring)', async () => {
     await systemRepo.create({ ...sampleSystem, name: 'Redis Admin', url: 'https://redis.example.com', remark: 'Cache layer' });
     await systemRepo.create({ ...sampleSystem, name: 'MySQL', url: 'https://mysql.example.com', remark: 'Primary DB' });

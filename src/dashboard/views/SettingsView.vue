@@ -64,12 +64,14 @@ import { ref } from 'vue';
 import { useCryptoStore } from '@shared/stores/cryptoStore';
 import { usePrefStore } from '@shared/stores/prefStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { useDialogStore } from '@shared/stores/dialogStore';
 import { importExportService } from '@shared/services/importExportService';
 import { ENVIRONMENTS } from '@shared/types/enums';
 
 const cryptoStore = useCryptoStore();
 const prefStore = usePrefStore();
 const toast = useToastStore();
+const dialog = useDialogStore();
 
 const setupPassword = ref('');
 const unlockPassword = ref('');
@@ -92,9 +94,9 @@ async function onUnlock() {
 }
 
 async function onChangePassword() {
-  const oldPwd = prompt('当前密码');
+  const oldPwd = await dialog.prompt('修改密码', '请输入当前密码');
   if (!oldPwd) return;
-  const newPwd = prompt('新密码');
+  const newPwd = await dialog.prompt('修改密码', '请输入新密码');
   if (!newPwd) return;
   try {
     await cryptoStore.changePassword(oldPwd, newPwd);
@@ -105,7 +107,7 @@ async function onChangePassword() {
 }
 
 async function onDisable() {
-  const pwd = prompt('输入主密码以禁用');
+  const pwd = await dialog.prompt('禁用主密码', '输入主密码以禁用');
   if (!pwd) return;
   try {
     await cryptoStore.disablePassword(pwd);
@@ -116,27 +118,44 @@ async function onDisable() {
 }
 
 async function onClearAll() {
-  if (!confirm('确认清空所有数据？此操作不可恢复！')) return;
-  if (!confirm('再次确认：所有系统、账号、服务器、中间件将被永久删除。')) return;
+  const ok1 = await dialog.confirm('确认清空', '确认清空所有数据？此操作不可恢复！');
+  if (!ok1) return;
+  const ok2 = await dialog.confirm('再次确认', '所有系统、账号、服务器、中间件将被永久删除。');
+  if (!ok2) return;
   await importExportService.clearAll();
   toast.success('所有数据已清空');
 }
 </script>
 
 <style scoped>
-.settings-view { padding: 12px; max-width: 600px; }
-.settings-section { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-.settings-section h3 { margin: 0 0 12px; font-size: 14px; color: var(--text-primary); }
-.crypto-section .status { font-size: 12px; color: var(--text-secondary); margin: 0 0 8px; }
-.form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.form-row label { font-size: 12px; color: var(--text-secondary); width: 100px; flex-shrink: 0; }
-.form-input, .form-select { height: 30px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; font-size: 12px; outline: none; font-family: inherit; flex: 1; }
-.form-input.small { max-width: 80px; }
-.button-group { display: flex; gap: 8px; margin-bottom: 8px; }
-.btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; }
+.settings-view { padding: 14px var(--page-pad); max-width: 640px; height: 100%; overflow-y: auto; }
+.settings-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 14px; }
+.settings-section h3 { margin: 0 0 14px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.crypto-section .status { font-size: 13px; color: var(--text-secondary); margin: 0 0 10px; }
+.form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.form-row label { font-size: 13px; color: var(--text-secondary); width: 110px; flex-shrink: 0; }
+.form-input, .form-select {
+  height: 34px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0 12px; font-size: 13px; outline: none; font-family: inherit;
+  flex: 1; background: var(--card-bg); color: var(--text-primary);
+  transition: var(--transition);
+}
+.form-input:focus, .form-select:focus { border-color: var(--text-primary); box-shadow: var(--shadow-focus); }
+.form-input.small { max-width: 100px; }
+.button-group { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  border: 1px solid transparent; font-family: inherit;
+  transition: var(--transition);
+}
 .btn-primary { background: var(--primary); color: white; }
-.btn-default { background: white; color: #374151; border-color: var(--border); }
-.btn-danger { background: white; color: #dc2626; border-color: #fecaca; }
-.hint { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; }
-.danger-zone { border-color: #fecaca; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-default { background: var(--card-bg); color: var(--text-primary); border-color: var(--border); }
+.btn-default:hover { border-color: var(--text-primary); }
+.btn-danger { background: var(--card-bg); color: var(--danger); border-color: var(--danger-light); }
+.btn-danger:hover { background: var(--danger-light); }
+.hint { font-size: 12px; color: var(--text-tertiary); margin-top: 8px; line-height: 1.6; }
+.danger-zone { border-color: var(--danger-light); }
 </style>

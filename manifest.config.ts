@@ -6,7 +6,6 @@ export default defineManifest({
   name: 'Nav Portal',
   version: pkg.version,
   description: pkg.description,
-  default_locale: 'zh_CN',
   action: {
     default_popup: 'popup.html',
     default_title: 'Nav Portal',

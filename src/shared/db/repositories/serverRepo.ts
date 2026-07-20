@@ -11,12 +11,6 @@ export const serverRepo = {
     return db.servers.get(id);
   },
 
-  async favorites(): Promise<Server[]> {
-    // Dexie 4 + IndexedDB cannot index boolean values (not valid keys per spec).
-    // Use filter() instead of where().equals() so favorites query works correctly.
-    return db.servers.filter(s => s.favorite === true).toArray();
-  },
-
   async create(data: Omit<Server, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const now = Date.now();
     const id = generateId();

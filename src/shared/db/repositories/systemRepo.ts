@@ -15,12 +15,6 @@ export const systemRepo = {
     return db.systems.where('environment').equals(environment).toArray();
   },
 
-  async favorites(): Promise<System[]> {
-    // Dexie 4 + IndexedDB cannot index boolean values (not valid keys per spec).
-    // Use filter() instead of where().equals() so favorites query works correctly.
-    return db.systems.filter(s => s.favorite === true).toArray();
-  },
-
   async create(data: SystemInput): Promise<string> {
     const now = Date.now();
     const id = generateId();

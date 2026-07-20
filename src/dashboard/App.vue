@@ -1,37 +1,44 @@
 <template>
   <div class="app-shell">
     <PageHeader />
-    <div class="body-grid">
-      <Sidebar />
-      <main class="content-area">
-        <NavTabs />
+    <main class="content-area">
+      <NavTabs />
+      <div class="view-container">
         <router-view />
-      </main>
-    </div>
+      </div>
+    </main>
     <ToastContainer />
+    <DialogHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, watch } from 'vue';
 import PageHeader from './components/layout/PageHeader.vue';
-import Sidebar from './components/layout/Sidebar.vue';
 import NavTabs from './components/layout/NavTabs.vue';
 import ToastContainer from './components/common/ToastContainer.vue';
+import DialogHost from './components/common/DialogHost.vue';
 import { usePrefStore } from '@shared/stores/prefStore';
 import { useCryptoStore } from '@shared/stores/cryptoStore';
 
 const prefStore = usePrefStore();
 const cryptoStore = useCryptoStore();
 
+function applyTheme(theme: string) {
+  document.documentElement.dataset.theme = theme;
+}
+
 onMounted(async () => {
   await prefStore.load();
+  applyTheme(prefStore.theme);
   await cryptoStore.checkStatus();
 });
+
+watch(() => prefStore.theme, (t) => applyTheme(t));
 </script>
 
 <style scoped>
-.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
-.body-grid { flex: 1; display: flex; min-height: 0; }
-.content-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app-shell { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+.content-area { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.view-container { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 </style>

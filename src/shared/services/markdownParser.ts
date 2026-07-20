@@ -71,7 +71,7 @@ function parseSystems(body: string): ParsedBackup['systems'] {
 
   for (const section of sections) {
     const name = section.heading.trim();
-    const fields = parseBulletFields(section.body);
+    const fields = parseFields(section.body);
     const tagLine = fields['标签'] || fields['Tags'];
     systems.push({
       name,
@@ -92,7 +92,7 @@ function parseServers(body: string): ParsedBackup['servers'] {
 
   for (const section of sections) {
     const name = section.heading.trim();
-    const fields = parseBulletFields(section.body);
+    const fields = parseFields(section.body);
     servers.push({
       name,
       ip: fields['IP'],
@@ -113,7 +113,7 @@ function parseMiddlewares(body: string): ParsedBackup['middlewares'] {
 
   for (const section of sections) {
     const name = section.heading.trim();
-    const fields = parseBulletFields(section.body);
+    const fields = parseFields(section.body);
     middlewares.push({
       type: (fields['类型'] as MiddlewareType) || 'redis',
       name,
@@ -132,6 +132,17 @@ function parseMiddlewares(body: string): ParsedBackup['middlewares'] {
 function parseTags(body: string): ParsedBackup['tags'] {
   const tags: ParsedBackup['tags'] = [];
   const lines = body.split('\n');
+
+  // 先尝试解析表格格式
+  const tableFields = parseTableFields(body);
+  if (Object.keys(tableFields).length > 0) {
+    for (const [name, color] of Object.entries(tableFields)) {
+      if (name) tags.push({ name: name.trim(), color: color?.trim() || undefined });
+    }
+    if (tags.length > 0) return tags;
+  }
+
+  // 兼容旧的列表格式
   for (const line of lines) {
     const match = line.match(/^\s*-\s+(.+?)(?:\s+\(#([0-9a-fA-F]{6})\))?$/);
     if (match) {
@@ -151,4 +162,38 @@ function parseBulletFields(body: string): Record<string, string> {
     }
   }
   return fields;
+}
+
+function parseTableFields(body: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+  let inTable = false;
+  let headers: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.slice(1, -1).split('|').map(c => c.trim());
+      if (cells.every(c => /^-+$/.test(c))) {
+        inTable = true;
+        continue;
+      }
+      if (!inTable) {
+        headers = cells;
+        continue;
+      }
+      if (headers.length >= 2) {
+        const key = cells[0];
+        const value = cells[1];
+        if (key) fields[key.trim()] = value?.trim() ?? '';
+      }
+    } else {
+      inTable = false;
+    }
+  }
+  return fields;
+}
+
+function parseFields(body: string): Record<string, string> {
+  const tableFields = parseTableFields(body);
+  const bulletFields = parseBulletFields(body);
+  return { ...bulletFields, ...tableFields };
 }

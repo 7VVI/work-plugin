@@ -44,7 +44,7 @@ import { importExportService, type ImportSummary } from '@shared/services/import
 import { useToastStore } from '@shared/stores/toastStore';
 
 const toast = useToastStore();
-const includePasswords = ref(false);
+const includePasswords = ref(true);
 const importMode = ref<'merge' | 'replace'>('merge');
 const preview = ref('');
 const summary = ref<ImportSummary | null>(null);
@@ -96,16 +96,32 @@ function downloadFile(content: string, filename: string, mime: string) {
 </script>
 
 <style scoped>
-.ie-view { padding: 12px; max-width: 600px; }
-.ie-section { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-.ie-section h3 { margin: 0 0 12px; font-size: 14px; }
-.checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 8px; cursor: pointer; }
-.ie-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 32px; background: var(--primary-50); color: var(--primary-700); border: 1px solid var(--primary-100); border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; margin-bottom: 6px; font-family: inherit; }
-.ie-btn:hover { background: var(--primary-100); }
-.ie-btn.green { background: #f0fdf4; color: #047857; border-color: #bbf7d0; }
-.import-mode { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.import-mode label { font-size: 12px; color: var(--text-secondary); }
-.form-select { height: 28px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; font-size: 12px; font-family: inherit; }
-.md-preview { background: #f9fafb; border: 1px solid var(--border-soft); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-.summary p { margin: 4px 0; font-size: 12px; }
+.ie-view { padding: 14px var(--page-pad); max-width: 720px; height: 100%; overflow-y: auto; }
+.ie-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 14px; }
+.ie-section h3 { margin: 0 0 14px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 10px; cursor: pointer; color: var(--text-primary); }
+.checkbox-label input { accent-color: var(--primary); width: 15px; height: 15px; }
+.ie-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; height: 36px;
+  background: var(--card-bg); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; cursor: pointer; margin-bottom: 8px;
+  font-family: inherit; transition: var(--transition);
+}
+.ie-btn:hover { border-color: var(--text-primary); background: var(--surface-secondary); }
+.ie-btn.green { color: var(--success); }
+.ie-btn.green:hover { border-color: var(--success); background: var(--success-light); }
+.import-mode { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.import-mode label { font-size: 13px; color: var(--text-secondary); }
+.form-select { height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; font-size: 13px; font-family: inherit; background: var(--card-bg); color: var(--text-primary); }
+.md-preview {
+  background: var(--surface-secondary); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); padding: 12px;
+  font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 11.5px;
+  max-height: 240px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all;
+  color: var(--text-primary);
+}
+.summary p { margin: 4px 0; font-size: 13px; color: var(--text-secondary); }
 </style>

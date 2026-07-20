@@ -15,12 +15,6 @@ export const middlewareRepo = {
     return db.middlewares.where('type').equals(type).toArray();
   },
 
-  async favorites(): Promise<Middleware[]> {
-    // Dexie 4 + IndexedDB cannot index boolean values (not valid keys per spec).
-    // Use filter() instead of where().equals() so favorites query works correctly.
-    return db.middlewares.filter(m => m.favorite === true).toArray();
-  },
-
   async create(data: Omit<Middleware, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const now = Date.now();
     const id = generateId();

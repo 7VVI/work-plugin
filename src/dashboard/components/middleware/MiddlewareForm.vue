@@ -15,7 +15,12 @@
           <div class="form-row"><div class="form-label">端口</div><input v-model.number="form.port" class="form-input" type="number" /></div>
           <div class="form-row"><div class="form-label">数据库</div><input v-model="form.database" class="form-input" /></div>
           <div class="form-row"><div class="form-label">账号</div><input v-model="form.username" class="form-input" /></div>
-          <div class="form-row"><div class="form-label">密码</div><input v-model="form.password" class="form-input" type="password" /></div>
+          <div class="form-row"><div class="form-label">密码</div>
+            <div class="pwd-field">
+              <input v-model="form.password" :type="showPwd ? 'text' : 'password'" class="form-input" :placeholder="middleware ? '留空则不修改' : ''" />
+              <i :class="showPwd ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'" @click="showPwd = !showPwd"></i>
+            </div>
+          </div>
           <div v-if="extraFields.length > 0" class="extra-section">
             <div class="section-title">额外参数</div>
             <div v-for="field in extraFields" :key="field.key" class="form-row">
@@ -41,12 +46,14 @@ import { MIDDLEWARE_TYPES } from '@shared/types/enums';
 import { MIDDLEWARE_EXTRA_SCHEMAS } from '@shared/types/middlewareSchemas';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { cryptoService } from '@shared/services/cryptoService';
 
 const props = defineProps<{ visible: boolean; middleware: Middleware | null }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const store = useMiddlewareStore();
 const toast = useToastStore();
+const showPwd = ref(false);
 
 const form = ref<MiddlewareInput>({
   type: 'redis', name: '', version: '', host: '', port: 6379, database: '',
@@ -56,14 +63,24 @@ const extraValues = ref<Record<string, unknown>>({});
 
 const extraFields = computed(() => MIDDLEWARE_EXTRA_SCHEMAS[form.value.type] ?? []);
 
-watch(() => props.visible, (v) => {
+watch(() => props.visible, async (v) => {
   if (v) {
+    showPwd.value = false;
     if (props.middleware) {
-      form.value = { ...props.middleware, password: '' };
+      const { password: _p, ...rest } = props.middleware;
+      form.value = { ...rest, password: '' } as MiddlewareInput;
+      if (props.middleware.password) {
+        try {
+          form.value.password = await cryptoService.decryptField(props.middleware.password);
+        } catch {
+          form.value.password = '';
+        }
+      }
       extraValues.value = { ...(props.middleware.extra ?? {}) };
     } else {
       form.value = { type: 'redis', name: '', version: '', host: '', port: 6379, database: '', username: '', password: '', extra: {}, remark: '', favorite: false };
       extraValues.value = {};
+      onTypeChange();
     }
   }
 });
@@ -80,15 +97,24 @@ function onTypeChange() {
 }
 
 async function save() {
+  if (!form.value.name.trim()) { toast.error('请填写名称'); return; }
+  if (!form.value.host.trim()) { toast.error('请填写 Host'); return; }
+  const port = Number(form.value.port);
+  if (!port || port <= 0) { toast.error('请填写有效的端口'); return; }
+  form.value.port = port;
   form.value.extra = { ...extraValues.value };
-  if (props.middleware) {
-    await store.update(props.middleware.id, form.value);
-    toast.success('中间件已更新');
-  } else {
-    await store.create(form.value);
-    toast.success('中间件已创建');
+  try {
+    if (props.middleware) {
+      await store.update(props.middleware.id, form.value);
+      toast.success('中间件已更新');
+    } else {
+      await store.create(form.value);
+      toast.success('中间件已创建');
+    }
+    emit('saved');
+  } catch (e) {
+    toast.error((e as Error).message || '保存失败');
   }
-  emit('saved');
 }
 </script>
 
@@ -101,6 +127,10 @@ async function save() {
 .form-label .req { color: var(--danger); }
 .form-input, .form-select, .form-textarea { width: 100%; height: 30px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; font-size: 12px; outline: none; font-family: inherit; }
 .form-textarea { height: 60px; padding: 6px 10px; resize: vertical; }
+.pwd-field { position: relative; flex: 1; }
+.pwd-field .form-input { padding-right: 32px; }
+.pwd-field i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-tertiary); font-size: 12px; }
+.pwd-field i:hover { color: var(--text-primary); }
 .extra-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
 .section-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
