@@ -96,32 +96,97 @@ function downloadFile(content: string, filename: string, mime: string) {
 </script>
 
 <style scoped>
-.ie-view { padding: 14px var(--page-pad); max-width: 720px; height: 100%; overflow-y: auto; }
-.ie-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 14px; }
-.ie-section h3 { margin: 0 0 14px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 10px; cursor: pointer; color: var(--text-primary); }
-.checkbox-label input { accent-color: var(--primary); width: 15px; height: 15px; }
-.ie-btn {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: 100%; height: 36px;
-  background: var(--card-bg); color: var(--text-primary);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  font-size: 13px; font-weight: 500; cursor: pointer; margin-bottom: 8px;
-  font-family: inherit; transition: var(--transition);
+.ie-view {
+  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
+  max-width: 760px;
+  height: 100%;
+  overflow-y: auto;
 }
-.ie-btn:hover { border-color: var(--text-primary); background: var(--surface-secondary); }
-.ie-btn.green { color: var(--success); }
-.ie-btn.green:hover { border-color: var(--success); background: var(--success-light); }
-.import-mode { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.import-mode label { font-size: 13px; color: var(--text-secondary); }
-.form-select { height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; font-size: 13px; font-family: inherit; background: var(--card-bg); color: var(--text-primary); }
-.md-preview {
-  background: var(--surface-secondary); border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm); padding: 12px;
-  font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 11.5px;
-  max-height: 240px; overflow-y: auto;
-  white-space: pre-wrap; word-break: break-all;
+.ie-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--gap-xl);
+  margin-bottom: var(--gap-lg);
+  box-shadow: var(--shadow-sm);
+}
+.ie-section h3 {
+  margin: 0 0 var(--gap-lg);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
   color: var(--text-primary);
+  letter-spacing: -0.2px;
 }
-.summary p { margin: 4px 0; font-size: 13px; color: var(--text-secondary); }
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  font-size: var(--text-sm);
+  margin-bottom: var(--gap-md);
+  cursor: pointer;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.checkbox-label input { width: 16px; height: 16px; }
+.ie-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-sm);
+  width: 100%;
+  height: var(--control-h);
+  background: var(--bg-pure);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  margin-bottom: var(--gap-sm);
+  font-family: inherit;
+  transition: var(--transition-fast);
+}
+.ie-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-50);
+}
+.ie-btn.green:hover {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-light);
+}
+.import-mode {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-md);
+}
+.import-mode label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+.md-preview {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--gap-md) var(--gap-lg);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  max-height: 280px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-primary);
+  line-height: var(--leading-normal);
+}
+.summary p {
+  margin: var(--gap-xs) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+}
+.summary p::before { content: ""; }
 </style>

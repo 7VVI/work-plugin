@@ -29,12 +29,12 @@ function isActive(path: string): boolean {
 <style scoped>
 .tabs-bar {
   height: var(--tabs-h);
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-soft);
   display: flex;
   align-items: center;
   padding: 0 var(--page-pad);
-  gap: 4px;
+  gap: var(--gap-xs);
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -42,32 +42,30 @@ function isActive(path: string): boolean {
 .tabs-bar::-webkit-scrollbar { display: none; }
 
 .tab {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  height: 40px;
   padding: 0 14px;
-  height: var(--tabs-h);
-  font-size: 13px;
-  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+  color: var(--text-tertiary);
   cursor: pointer;
-  position: relative;
-  transition: color 0.15s;
-  font-weight: 500;
-  user-select: none;
+  transition: var(--transition-fast);
   text-decoration: none;
   white-space: nowrap;
+  user-select: none;
 }
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--text-primary); font-weight: 600; }
-.tab.active::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 14px;
-  right: 14px;
-  height: 2px;
-  background: var(--primary);
-  border-radius: 2px 2px 0 0;
+.tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
-.tab i { font-size: 13px; }
+.tab.active {
+  background: var(--primary-50);
+  color: var(--primary);
+  font-weight: var(--font-semibold);
+}
+.tab i { font-size: var(--text-sm); opacity: 0.85; }
+.tab.active i { opacity: 1; }
 </style>

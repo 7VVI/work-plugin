@@ -34,8 +34,8 @@
           </div>
         </div>
         <div class="acc-footer">
-          <button class="btn-cancel" @click="$emit('close')">取消</button>
-          <button class="btn-save" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+          <button class="btn btn-default" @click="$emit('close')">取消</button>
+          <button class="btn btn-primary" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </div>
     </div>
@@ -118,29 +118,136 @@ async function save() {
 </script>
 
 <style scoped>
-.acc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 10001; }
-.acc-dialog { background: white; border-radius: 8px; padding: 20px; width: 400px; max-width: 90vw; }
-.acc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.acc-header h3 { margin: 0; font-size: 15px; color: var(--text-primary); }
-.icon-btn { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
-.icon-btn:hover { background: var(--border-soft); }
-.acc-body { display: flex; flex-direction: column; gap: 12px; }
-.form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-row label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-.form-row label .req { color: var(--danger); }
-.form-input, .form-textarea { width: 100%; height: 32px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; font-size: 13px; outline: none; font-family: inherit; background: white; color: var(--text-primary); }
-.form-textarea { height: 60px; padding: 6px 10px; resize: none; }
-.form-input:focus, .form-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+.acc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal-top);
+  padding: 24px;
+}
+.acc-dialog {
+  background: var(--bg-pure);
+  border-radius: var(--radius-xl);
+  padding: 4px 0 0;
+  width: 420px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-soft);
+}
+.acc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+  flex-shrink: 0;
+}
+.acc-header h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  background: transparent;
+  border: none;
+}
+.icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.acc-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+  padding: 4px 24px 8px;
+}
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+.form-row label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+.form-row label .req { color: var(--danger); margin-left: 2px; }
+.form-input, .form-textarea {
+  width: 100%;
+  height: var(--control-h);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 0 14px;
+  font-size: var(--text-sm);
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-pure);
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+}
+.form-input::placeholder, .form-textarea::placeholder { color: var(--text-quaternary); }
+.form-input:hover, .form-textarea:hover { border-color: var(--text-quaternary); }
+.form-input:focus, .form-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+.form-textarea {
+  height: auto;
+  padding: 10px 14px;
+  resize: vertical;
+  min-height: 72px;
+}
 .pwd-wrap { position: relative; }
-.pwd-wrap .form-input { padding-right: 32px; }
-.pwd-wrap i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-tertiary); font-size: 13px; }
-.pwd-wrap i:hover { color: var(--text-primary); }
+.pwd-wrap .form-input { padding-right: 40px; }
+.pwd-wrap i {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--text-quaternary);
+  font-size: var(--text-sm);
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+}
+.pwd-wrap i:hover { color: var(--primary); background: var(--primary-50); }
 .checkbox-row { flex-direction: row; align-items: center; }
-.checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-primary); }
-.checkbox-label input { width: 14px; height: 14px; accent-color: var(--primary); }
-.acc-footer { display: flex; gap: 8px; margin-top: 16px; }
-.btn-cancel, .btn-save { flex: 1; height: 34px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; }
-.btn-cancel { background: var(--border-soft); color: var(--text-secondary); }
-.btn-save { background: var(--primary); color: white; }
-.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  user-select: none;
+}
+.checkbox-label input { width: 16px; height: 16px; }
+.acc-footer {
+  display: flex;
+  gap: var(--gap-md);
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: var(--gap-md);
+  flex-shrink: 0;
+}
 </style>

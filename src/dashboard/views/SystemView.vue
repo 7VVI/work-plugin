@@ -18,20 +18,20 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width:40px;"><input type="checkbox" :checked="allChecked" @change="toggleAll" /></th>
+            <th style="width:48px;"><input type="checkbox" class="form-check" :checked="allChecked" @change="toggleAll" /></th>
             <th>系统名称</th>
             <th>URL</th>
-            <th style="width:90px;">环境</th>
-            <th style="width:120px;">最近更新</th>
-            <th style="width:120px;">操作</th>
+            <th style="width:96px;">环境</th>
+            <th style="width:140px;">最近更新</th>
+            <th style="width:160px;">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="s in filteredSystems" :key="s.id">
-            <td><input type="checkbox" :checked="selectedIds.has(s.id)" @change="toggleOne(s.id)" /></td>
+            <td><input type="checkbox" class="form-check" :checked="selectedIds.has(s.id)" @change="toggleOne(s.id)" /></td>
             <td>
               <div class="sys-cell">
-                <div class="sys-icon" :style="{ background: s.iconColor || defaultIconBg }">
+                <div class="sys-icon" :style="iconStyle(s)">
                   <i :class="s.icon || 'fa-solid fa-globe'"></i>
                 </div>
                 <div class="sys-text">
@@ -41,20 +41,27 @@
               </div>
             </td>
             <td>
-              <span class="url-link" @click.stop="onOpen(s)" :title="s.url">{{ s.url }}</span>
+              <a class="url-link" @click.stop="onOpen(s)" :title="s.url">
+                <i class="fa-solid fa-globe"></i>
+                <span class="url-text">{{ s.url }}</span>
+              </a>
             </td>
             <td><EnvBadge :env="s.environment" /></td>
             <td><span class="time-cell">{{ formatRelativeTime(s.updatedAt) }}</span></td>
             <td>
               <div class="row-actions">
-                <button class="row-action" @click.stop="onEdit(s)" title="编辑"><i class="fa-solid fa-pen"></i></button>
-                <button class="row-action" @click.stop="onOpen(s)" title="打开"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
-                <button class="row-action" @click.stop="onDelete(s.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
+                <button class="row-action row-action-sm edit" @click.stop="onEdit(s)" title="编辑"><i class="fa-solid fa-pen"></i></button>
+                <button class="row-action row-action-sm" @click.stop="onOpen(s)" title="打开"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+                <button class="row-action row-action-sm danger" @click.stop="onDelete(s.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
               </div>
             </td>
           </tr>
           <tr v-if="filteredSystems.length === 0">
-            <td colspan="6" class="empty-row">暂无系统，点击"新增系统"添加</td>
+            <td colspan="6" class="empty-row">
+              <i class="fa-regular fa-folder-open empty-icon"></i>
+              <div>暂无系统</div>
+              <div class="empty-hint">点击"新增系统"开始添加</div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -81,7 +88,20 @@ const editing = ref<System | null>(null);
 const search = ref('');
 const selectedIds = ref<Set<string>>(new Set());
 
-const defaultIconBg = 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)';
+const iconPalettes = [
+  'linear-gradient(135deg, #4F7CFF 0%, #3D6DF7 100%)',
+  'linear-gradient(135deg, #34D399 0%, #10B981 100%)',
+  'linear-gradient(135deg, #A78BFA 0%, #8B5CF6 100%)',
+  'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)',
+  'linear-gradient(135deg, #F472B6 0%, #EC4899 100%)',
+  'linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%)',
+];
+
+function iconStyle(s: System) {
+  if (s.iconColor) return { background: s.iconColor };
+  const hash = s.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0);
+  return { background: iconPalettes[Math.abs(hash) % iconPalettes.length] };
+}
 
 onMounted(async () => { await store.load(); });
 
@@ -141,13 +161,13 @@ async function onSaved() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px var(--page-pad);
-  gap: 12px;
+  padding: var(--gap-lg) var(--page-pad);
+  gap: var(--gap-lg);
   flex-shrink: 0;
 }
-.action-left { display: flex; align-items: center; gap: 8px; }
-.action-right { display: flex; align-items: center; gap: 8px; }
-.search-input { width: 280px; }
+.action-left { display: flex; align-items: center; gap: var(--gap-md); }
+.action-right { display: flex; align-items: center; gap: var(--gap-md); }
+.action-right .search-wrap { width: 320px; }
 
 .table-wrap {
   flex: 1;
@@ -155,115 +175,107 @@ async function onSaved() {
   overflow: auto;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   margin: 0 var(--page-pad) var(--page-pad);
+  box-shadow: var(--shadow-sm);
 }
 
 .data-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .data-table thead th {
   background: var(--surface-secondary);
-  color: var(--text-secondary);
-  font-weight: 500;
-  padding: 11px 14px;
+  color: var(--text-tertiary);
+  font-weight: var(--font-medium);
+  padding: 0 var(--gap-lg);
+  height: var(--table-header-h);
   text-align: left;
   border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: var(--text-xs);
+  letter-spacing: 0.3px;
+  text-transform: none;
   position: sticky;
   top: 0;
   z-index: 1;
 }
 .data-table tbody td {
-  padding: 14px;
+  padding: 0 var(--gap-lg);
+  height: var(--table-row-h);
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-primary);
   vertical-align: middle;
 }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { transition: background 0.12s; }
-.data-table tbody tr:hover { background: var(--surface-secondary); }
-.data-table input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
+.data-table tbody tr { transition: background 0.15s ease; }
+.data-table tbody tr:hover td { background: var(--surface-active); }
 
-.sys-cell { display: flex; align-items: center; gap: 10px; }
+.sys-cell { display: flex; align-items: center; gap: var(--gap-md); }
 .sys-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 13px;
+  font-size: var(--text-base);
   flex-shrink: 0;
+  box-shadow: var(--shadow-xs);
 }
 .sys-text { min-width: 0; }
 .sys-name {
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
   color: var(--text-primary);
-  line-height: 1.3;
+  line-height: var(--leading-tight);
 }
 .sys-desc {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
+  max-width: 320px;
 }
 
-.url-link {
-  color: var(--text-primary);
-  font-family: 'SF Mono', Monaco, Consolas, monospace;
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: color 0.15s;
+.url-text {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.url-link:hover { color: var(--primary); text-decoration: underline; }
 
 .time-cell {
-  color: var(--text-secondary);
-  font-size: 12.5px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
 }
 
-.row-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.row-action {
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  border: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: var(--transition);
-  font-size: 13px;
-}
-.row-action:hover { background: var(--border-soft); color: var(--text-primary); }
+.row-actions { display: flex; align-items: center; gap: var(--gap-sm); }
 
 .empty-row {
   text-align: center;
   color: var(--text-tertiary);
-  padding: 48px 0;
-  font-size: 13px;
+  padding: 64px 0;
+  height: auto !important;
 }
-
-.btn { height: 34px; padding: 0 14px; }
+.empty-row .empty-icon {
+  font-size: 32px;
+  color: var(--text-quaternary);
+  margin-bottom: var(--gap-md);
+  display: block;
+}
+.empty-row > div { font-size: var(--text-base); color: var(--text-secondary); }
+.empty-row .empty-hint {
+  font-size: var(--text-sm);
+  color: var(--text-quaternary);
+  margin-top: var(--gap-xs);
+}
 </style>

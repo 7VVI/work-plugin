@@ -17,8 +17,8 @@
           />
         </div>
         <div class="dialog-footer">
-          <button class="btn-cancel" @click="store.cancel()">取消</button>
-          <button class="btn-ok" @click="store.ok()">{{ store.state.type === 'confirm' ? '确认' : '确定' }}</button>
+          <button class="btn btn-default" @click="store.cancel()">取消</button>
+          <button class="btn btn-primary" @click="store.ok()">{{ store.state.type === 'confirm' ? '确认' : '确定' }}</button>
         </div>
       </div>
     </div>
@@ -50,17 +50,74 @@ watch(inputValue, (v) => {
 </script>
 
 <style scoped>
-.dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 10002; }
-.dialog-box { background: white; border-radius: 8px; padding: 20px; min-width: 360px; max-width: 420px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
-.dialog-header h3 { margin: 0 0 12px; font-size: 15px; color: var(--text-primary); }
-.dialog-body { margin-bottom: 16px; }
-.dialog-message { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
-.dialog-input { width: 100%; height: 34px; border: 1px solid var(--border); border-radius: 6px; padding: 0 12px; font-size: 13px; outline: none; font-family: inherit; box-sizing: border-box; }
-.dialog-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
-.dialog-footer { display: flex; gap: 8px; justify-content: flex-end; }
-.btn-cancel, .btn-ok { height: 32px; padding: 0 16px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; }
-.btn-cancel { background: var(--border-soft); color: var(--text-secondary); }
-.btn-cancel:hover { background: var(--border); }
-.btn-ok { background: var(--primary); color: white; }
-.btn-ok:hover { background: var(--primary-700); }
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-dialog-host);
+  padding: 24px;
+}
+.dialog-box {
+  background: var(--bg-pure);
+  border-radius: var(--radius-xl);
+  padding: 4px 0 0;
+  min-width: 380px;
+  max-width: 440px;
+  width: auto;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+.dialog-header {
+  padding: 20px 24px 8px;
+}
+.dialog-header h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.dialog-body {
+  padding: 8px 24px 8px;
+  margin-bottom: 0;
+}
+.dialog-message {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+.dialog-input {
+  width: 100%;
+  height: var(--control-h);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 0 14px;
+  font-size: var(--text-sm);
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-pure);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  transition: var(--transition-fast);
+}
+.dialog-input::placeholder { color: var(--text-quaternary); }
+.dialog-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+.dialog-footer {
+  display: flex;
+  gap: var(--gap-md);
+  justify-content: flex-end;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: var(--gap-md);
+}
 </style>

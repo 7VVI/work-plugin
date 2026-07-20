@@ -8,8 +8,8 @@
         <TagPill :name="t.name" :color="t.color" />
         <div class="tag-actions">
           <input v-model="editColors[t.id]" type="color" @change="onColorChange(t.id)" :title="'颜色'" />
-          <div class="row-action" @click="onRename(t)"><i class="fa-solid fa-pen"></i></div>
-          <div class="row-action" @click="onDelete(t.id)"><i class="fa-solid fa-trash"></i></div>
+          <button class="row-action row-action-sm edit" @click="onRename(t)"><i class="fa-solid fa-pen"></i></button>
+          <button class="row-action row-action-sm danger" @click="onDelete(t.id)"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
     </div>
@@ -62,33 +62,58 @@ async function onDelete(id: string) {
 </script>
 
 <style scoped>
-.tag-view { padding: 14px var(--page-pad); display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; gap: 14px; }
+.tag-view {
+  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  gap: var(--gap-lg);
+}
 .action-bar { flex-shrink: 0; }
-.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; background: var(--primary); color: white; border: 1px solid transparent; font-family: inherit; transition: var(--transition); }
-.btn:hover { background: var(--primary-hover); }
+
 .tag-grid {
-  flex: 1; min-height: 0; overflow-y: auto;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px; align-content: start;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--gap-md);
+  align-content: start;
 }
 .tag-card {
-  background: var(--card-bg); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 14px;
-  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--gap-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-md);
   transition: var(--transition);
+  box-shadow: var(--shadow-xs);
 }
-.tag-card:hover { border-color: var(--text-tertiary); box-shadow: var(--shadow-sm); }
-.tag-actions { display: flex; align-items: center; gap: 4px; }
+.tag-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+.tag-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+}
 .tag-actions input[type="color"] {
-  width: 28px; height: 28px; border: 1px solid var(--border);
-  border-radius: var(--radius-sm); cursor: pointer; padding: 2px; background: var(--card-bg);
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  padding: 2px;
+  background: var(--bg-pure);
+  transition: var(--transition-fast);
 }
-.row-action {
-  width: 28px; height: 28px; border-radius: var(--radius-sm);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-tertiary); cursor: pointer; font-size: 11px;
-  background: transparent; border: none; transition: var(--transition);
+.tag-actions input[type="color"]:hover {
+  border-color: var(--primary);
 }
-.row-action:hover { background: var(--border-soft); color: var(--text-primary); }
-.row-action:last-child:hover { color: var(--danger); }
 </style>

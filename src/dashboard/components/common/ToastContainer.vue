@@ -25,10 +25,42 @@ function iconFor(type: string) {
 </script>
 
 <style scoped>
-.toast-container { position: fixed; bottom: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
-.toast { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 6px; background: white; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-size: 13px; cursor: pointer; animation: slideIn 0.2s; }
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-pure);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  cursor: pointer;
+  animation: slideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 220px;
+  max-width: 360px;
+}
+.toast i { font-size: var(--text-base); }
 .toast.success { border-color: var(--success); color: var(--success-text); }
+.toast.success i { color: var(--success); }
 .toast.error { border-color: var(--danger); color: var(--danger-text); }
-.toast.info { border-color: var(--primary); color: var(--primary-700); }
-@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.toast.error i { color: var(--danger); }
+.toast.info { border-color: var(--primary); color: var(--primary); }
+.toast.info i { color: var(--primary); }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
 </style>

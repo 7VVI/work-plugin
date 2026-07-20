@@ -66,20 +66,75 @@ async function onSetupCrypto() {
 </script>
 
 <style scoped>
-.onboarding { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
-.wizard-card { background: white; border-radius: 12px; padding: 32px; max-width: 480px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-.wizard-card h2 { margin: 0 0 24px; font-size: 20px; text-align: center; }
-.steps { display: flex; justify-content: space-between; margin-bottom: 24px; }
-.step { font-size: 11px; color: var(--text-tertiary); flex: 1; text-align: center; padding: 8px; border-bottom: 2px solid var(--border); }
-.step.active { color: var(--primary); border-color: var(--primary); font-weight: 600; }
-.step-content { text-align: center; }
-.step-content p { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
-.form-input { width: 100%; height: 36px; border: 1px solid var(--border); border-radius: 6px; padding: 0 12px; font-size: 13px; margin-bottom: 8px; outline: none; font-family: inherit; }
-.form-input:focus { border-color: var(--primary); }
-.btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 20px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: inherit; margin-top: 8px; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--primary); color: white; }
-.btn-default { background: var(--border-soft); color: var(--text-primary); }
-.btn-group { display: flex; gap: 8px; justify-content: center; }
-.success-icon { font-size: 48px; color: var(--success); margin: 16px 0; }
+.onboarding {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg);
+  padding: var(--gap-xl);
+}
+.wizard-card {
+  background: var(--bg-pure);
+  border-radius: var(--radius-2xl);
+  padding: 40px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-soft);
+}
+.wizard-card h2 {
+  margin: 0 0 var(--gap-xl);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  text-align: center;
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+}
+.steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--gap-xl);
+  gap: var(--gap-sm);
+}
+.step {
+  font-size: var(--text-xs);
+  color: var(--text-quaternary);
+  flex: 1;
+  text-align: center;
+  padding: var(--gap-sm) 0;
+  border-bottom: 2px solid var(--border);
+  font-weight: var(--font-medium);
+  transition: var(--transition);
+}
+.step.active {
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: var(--font-semibold);
+}
+.step-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+.step-content > p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--gap-md);
+}
+.step-content .form-input { margin-bottom: var(--gap-sm); }
+.step-content .btn { width: 100%; margin-top: var(--gap-sm); }
+.btn-group {
+  display: flex;
+  gap: var(--gap-sm);
+  justify-content: center;
+  margin-top: var(--gap-sm);
+}
+.btn-group .btn { flex: 1; margin-top: 0; }
+.success-icon {
+  font-size: 56px;
+  color: var(--success);
+  margin: var(--gap-lg) 0;
+}
 </style>

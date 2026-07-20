@@ -129,25 +129,168 @@ function closeForm() {
 </script>
 
 <style scoped>
-.quick-actions { padding: 0 12px 12px; }
-.qa-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; background: var(--primary-50); border: 1px solid var(--primary-100); color: var(--primary-700); border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; margin-bottom: 8px; }
-.qa-btn:hover { background: var(--primary-100); }
-.qa-btn.secondary { background: white; color: var(--text-secondary); border-color: var(--border); margin-bottom: 0; }
-.qa-btn.secondary:hover { background: var(--border-soft); }
-.form-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: flex; flex-direction: column; }
-.form-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: white; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--text-primary); flex-shrink: 0; }
-.form-header i { cursor: pointer; color: var(--text-tertiary); padding: 4px; font-size: 14px; }
-.form-header i:hover { color: var(--text-primary); }
-.form-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-.form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-row label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
-.form-row label .req { color: var(--danger); }
-.form-input, .form-select, .form-textarea { width: 100%; height: 30px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; font-size: 12px; outline: none; font-family: inherit; background: white; color: var(--text-primary); }
-.form-textarea { height: 60px; padding: 6px 10px; resize: none; }
-.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
-.form-footer { display: flex; gap: 8px; padding: 10px 14px; background: white; border-top: 1px solid var(--border); flex-shrink: 0; }
-.btn-cancel, .btn-save { flex: 1; height: 34px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; }
-.btn-cancel { background: var(--border-soft); color: var(--text-secondary); }
-.btn-save { background: var(--primary); color: white; }
-.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.quick-actions {
+  padding: 0 var(--gap-md) var(--gap-md);
+}
+.qa-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-sm);
+  height: 40px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: var(--gap-sm);
+  transition: var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+}
+.qa-btn:hover {
+  background: var(--primary-hover);
+  box-shadow: var(--shadow-primary);
+}
+.qa-btn:active { transform: scale(0.98); }
+.qa-btn.secondary {
+  background: var(--bg-pure);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  box-shadow: none;
+  margin-bottom: 0;
+}
+.qa-btn.secondary:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--text-quaternary);
+  box-shadow: none;
+}
+
+.form-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gap-md) var(--gap-lg);
+  background: var(--bg-pure);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.form-header i {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: var(--text-base);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+}
+.form-header i:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.form-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap-md) var(--gap-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+}
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+.form-row label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+.form-row label .req { color: var(--danger); margin-left: 2px; }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  height: var(--control-h);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 0 14px;
+  font-size: var(--text-sm);
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-pure);
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+}
+.form-input::placeholder, .form-textarea::placeholder { color: var(--text-quaternary); }
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+.form-textarea {
+  height: auto;
+  padding: 10px 14px;
+  resize: vertical;
+  min-height: 72px;
+  line-height: var(--leading-normal);
+}
+
+.form-footer {
+  display: flex;
+  gap: var(--gap-sm);
+  padding: var(--gap-md) var(--gap-lg);
+  background: var(--bg-pure);
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.form-footer .btn-cancel,
+.form-footer .btn-save {
+  flex: 1;
+  height: var(--control-h);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: var(--transition-fast);
+}
+.form-footer .btn-cancel {
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+.form-footer .btn-cancel:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.form-footer .btn-save {
+  background: var(--primary);
+  color: white;
+}
+.form-footer .btn-save:hover {
+  background: var(--primary-hover);
+  box-shadow: var(--shadow-primary);
+}
+.form-footer .btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 </style>

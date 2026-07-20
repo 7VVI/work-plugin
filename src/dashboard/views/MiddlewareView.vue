@@ -39,15 +39,19 @@
             <td><span class="mono">{{ m.username || '—' }}</span></td>
             <td>
               <div class="row-actions">
-                <button class="row-action" @click="store.copyConnectionString(m.id)" title="复制连接串"><i class="fa-solid fa-link"></i></button>
-                <button class="row-action" @click="store.copyPassword(m.id)" title="复制密码"><i class="fa-solid fa-key"></i></button>
-                <button class="row-action" @click="onEdit(m)" title="编辑"><i class="fa-solid fa-pen"></i></button>
-                <button class="row-action" @click="onDelete(m.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
+                <button class="row-action row-action-sm" @click="store.copyConnectionString(m.id)" title="复制连接串"><i class="fa-solid fa-link"></i></button>
+                <button class="row-action row-action-sm" @click="store.copyPassword(m.id)" title="复制密码"><i class="fa-solid fa-key"></i></button>
+                <button class="row-action row-action-sm edit" @click="onEdit(m)" title="编辑"><i class="fa-solid fa-pen"></i></button>
+                <button class="row-action row-action-sm danger" @click="onDelete(m.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
               </div>
             </td>
           </tr>
           <tr v-if="filtered.length === 0">
-            <td colspan="6" class="empty-row">暂无中间件，点击"新增中间件"添加</td>
+            <td colspan="6" class="empty-row">
+              <i class="fa-regular fa-folder-open empty-icon"></i>
+              <div>暂无中间件</div>
+              <div class="empty-hint">点击"新增中间件"开始添加</div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -94,52 +98,103 @@ async function onSaved() { formVisible.value = false; await store.load(); }
 
 <style scoped>
 .middleware-view { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+
 .action-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px var(--page-pad); gap: 12px; flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gap-lg) var(--page-pad);
+  gap: var(--gap-lg);
+  flex-shrink: 0;
 }
-.action-left, .action-right { display: flex; align-items: center; gap: 8px; }
-.search-input { width: 280px; }
+.action-left, .action-right { display: flex; align-items: center; gap: var(--gap-md); }
+.action-right .search-wrap { width: 320px; }
 
 .table-wrap {
-  flex: 1; min-height: 0; overflow: auto;
-  background: var(--card-bg); border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
   margin: 0 var(--page-pad) var(--page-pad);
+  box-shadow: var(--shadow-sm);
 }
 
-.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); }
 .data-table thead th {
-  background: var(--surface-secondary); color: var(--text-secondary);
-  font-weight: 500; padding: 11px 14px; text-align: left;
-  border-bottom: 1px solid var(--border-soft); white-space: nowrap;
-  font-size: 12.5px; position: sticky; top: 0; z-index: 1;
+  background: var(--surface-secondary);
+  color: var(--text-tertiary);
+  font-weight: var(--font-medium);
+  padding: 0 var(--gap-lg);
+  height: var(--table-header-h);
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  letter-spacing: 0.3px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .data-table tbody td {
-  padding: 12px 14px; border-bottom: 1px solid var(--border-soft);
-  color: var(--text-primary); vertical-align: middle;
+  padding: 0 var(--gap-lg);
+  height: var(--table-row-h);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  vertical-align: middle;
 }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { transition: background 0.12s; }
-.data-table tbody tr:hover { background: var(--surface-secondary); }
+.data-table tbody tr { transition: background 0.15s ease; }
+.data-table tbody tr:hover td { background: var(--surface-active); }
 
 .type-icon {
-  width: 30px; height: 30px; border-radius: var(--radius-sm);
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--text-base);
+  box-shadow: var(--shadow-xs);
 }
-.mw-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.mw-version { font-size: 11.5px; color: var(--text-tertiary); margin-top: 2px; }
-.mono { font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 12.5px; color: var(--text-primary); }
-
-.row-actions { display: flex; align-items: center; gap: 2px; }
-.row-action {
-  width: 28px; height: 28px; border-radius: 5px; border: none; background: transparent;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-tertiary); cursor: pointer; transition: var(--transition); font-size: 12px;
+.mw-name {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
 }
-.row-action:hover { background: var(--border-soft); color: var(--text-primary); }
+.mw-version {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+}
 
-.empty-row { text-align: center; color: var(--text-tertiary); padding: 48px 0; font-size: 13px; }
-.btn { height: 34px; padding: 0 14px; }
+.row-actions { display: flex; align-items: center; gap: var(--gap-sm); }
+
+.empty-row {
+  text-align: center;
+  color: var(--text-tertiary);
+  padding: 64px 0;
+  height: auto !important;
+}
+.empty-row .empty-icon {
+  font-size: 32px;
+  color: var(--text-quaternary);
+  margin-bottom: var(--gap-md);
+  display: block;
+}
+.empty-row > div { font-size: var(--text-base); color: var(--text-secondary); }
+.empty-row .empty-hint {
+  font-size: var(--text-sm);
+  color: var(--text-quaternary);
+  margin-top: var(--gap-xs);
+}
 </style>

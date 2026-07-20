@@ -87,9 +87,9 @@ async function onSelect(r: SearchResult) {
 
 function getColor(type: string) {
   const colors: Record<string, string> = {
-    system: 'linear-gradient(135deg,#3b82f6,#2563eb)',
-    server: 'linear-gradient(135deg,#10b981,#059669)',
-    middleware: 'linear-gradient(135deg,#f59e0b,#d97706)',
+    system: 'linear-gradient(135deg,#4F7CFF,#3D6DF7)',
+    server: 'linear-gradient(135deg,#34D399,#10B981)',
+    middleware: 'linear-gradient(135deg,#FBBF24,#F59E0B)',
   };
   return colors[type] || colors.system;
 }
@@ -110,17 +110,106 @@ function typeLabel(type: string) {
 </script>
 
 <style scoped>
-.search-box { position: relative; padding: 12px; }
-.search-icon { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); font-size: 13px; }
-.search-box input { width: 100%; height: 36px; border: 1px solid var(--border); border-radius: 8px; padding: 0 50px 0 36px; font-size: 13px; outline: none; font-family: inherit; }
-.search-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-.shortcut { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--text-tertiary); border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px; background: white; }
-.results { max-height: 300px; overflow-y: auto; padding: 0 8px; }
-.result-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px; cursor: pointer; }
-.result-item:hover, .result-item.active { background: var(--primary-50); }
-.result-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; flex-shrink: 0; }
+.search-box {
+  position: relative;
+  padding: var(--gap-md);
+}
+.search-icon {
+  position: absolute;
+  left: 26px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-quaternary);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+.search-box input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 0 56px 0 40px;
+  font-size: var(--text-sm);
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-pure);
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+}
+.search-box input::placeholder { color: var(--text-quaternary); }
+.search-box input:hover { border-color: var(--text-quaternary); }
+.search-box input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+.search-box:focus-within .search-icon { color: var(--primary); }
+
+.shortcut {
+  position: absolute;
+  right: 26px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-secondary);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.5px;
+}
+
+.results {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0 var(--gap-sm);
+}
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: var(--gap-sm) var(--gap-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.result-item:hover, .result-item.active {
+  background: var(--primary-50);
+}
+.result-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 11px;
+  flex-shrink: 0;
+}
 .result-text { flex: 1; min-width: 0; }
-.result-title { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.result-subtitle { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.result-type { font-size: 10px; color: var(--text-tertiary); background: var(--border-soft); padding: 1px 6px; border-radius: 3px; }
+.result-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.result-type {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  background: var(--surface-secondary);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-weight: var(--font-medium);
+}
 </style>

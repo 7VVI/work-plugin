@@ -29,7 +29,12 @@ function onSaved() {
 </script>
 
 <style scoped>
-.popup-root { width: 360px; height: 600px; overflow-y: auto; background: var(--bg); display: flex; flex-direction: column; }
-.popup-root::-webkit-scrollbar { width: 6px; }
-.popup-root::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+.popup-root {
+  width: 360px;
+  height: 600px;
+  overflow-y: auto;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
 </style>

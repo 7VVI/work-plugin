@@ -130,28 +130,147 @@ function confirmAdd() {
 </script>
 
 <style scoped>
-.account-section { margin-top: 14px; }
-.form-section-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
-.account-list { border: 1px solid var(--border-soft); border-radius: 6px; overflow: hidden; }
-.account-item { display: grid; grid-template-columns: 1fr 1fr 1.2fr 120px; align-items: center; padding: 7px 10px; font-size: 12px; border-bottom: 1px solid var(--border-soft); gap: 8px; }
+.account-section { margin-top: var(--gap-md); }
+.form-section-title {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-tertiary);
+  margin-bottom: var(--gap-sm);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.account-list {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.account-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr 140px;
+  align-items: center;
+  padding: 0 14px;
+  height: 40px;
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--border-soft);
+  gap: var(--gap-sm);
+}
 .account-item:last-child { border-bottom: none; }
-.account-item.header-row { background: #f9fafb; color: var(--text-secondary); font-size: 11px; font-weight: 500; }
-.account-item.edit-row { background: var(--primary-50); padding: 6px 10px; }
-.acc-pwd { letter-spacing: 1px; }
-.acc-icons { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
-.row-action { width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); cursor: pointer; font-size: 11px; }
-.row-action:hover { background: var(--border-soft); color: var(--primary); }
-.row-action.danger:hover { color: var(--danger); }
+.account-item.header-row {
+  background: var(--surface-secondary);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  height: 36px;
+  letter-spacing: 0.3px;
+}
+.account-item.edit-row {
+  background: var(--primary-50);
+  height: auto;
+  padding: 8px 14px;
+}
+.acc-pwd {
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.acc-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: flex-end;
+}
+.row-action {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-quaternary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: var(--transition-fast);
+  background: transparent;
+}
+.row-action:hover { background: var(--primary-50); color: var(--primary); }
+.row-action.danger:hover { background: var(--danger-light); color: var(--danger); }
 .row-action.confirm { color: var(--success); }
 .row-action.confirm:hover { background: var(--success-light); }
-.default-badge { font-size: 9px; padding: 0 4px; background: var(--warning-light); color: var(--warning-text); border-radius: 3px; margin-left: 4px; }
-.empty-row { padding: 16px; text-align: center; color: var(--text-tertiary); font-size: 11px; }
-.cell-input { width: 100%; height: 28px; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; font-size: 12px; outline: none; font-family: inherit; background: white; color: var(--text-primary); }
-.cell-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+.default-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--warning-light);
+  color: var(--warning-text);
+  border-radius: var(--radius-sm);
+  margin-left: 6px;
+  font-weight: var(--font-medium);
+}
+.empty-row {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  height: auto !important;
+}
+.cell-input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  font-size: var(--text-sm);
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-pure);
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+}
+.cell-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
 .pwd-cell { position: relative; }
-.pwd-cell .cell-input { padding-right: 28px; }
-.pwd-cell i { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-tertiary); font-size: 11px; }
-.pwd-cell i:hover { color: var(--text-primary); }
-.add-account-btn { margin-top: 8px; font-size: 12px; color: var(--primary); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.add-account-btn:hover { color: var(--primary-700); }
+.pwd-cell .cell-input { padding-right: 32px; }
+.pwd-cell i {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--text-quaternary);
+  font-size: 11px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  transition: var(--transition-fast);
+}
+.pwd-cell i:hover { color: var(--primary); background: var(--primary-50); }
+
+.add-account-btn {
+  margin-top: var(--gap-sm);
+  font-size: var(--text-sm);
+  color: var(--primary);
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-sm);
+  width: 100%;
+  font-weight: var(--font-medium);
+  font-family: inherit;
+  transition: var(--transition-fast);
+}
+.add-account-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  color: var(--primary);
+}
 </style>
