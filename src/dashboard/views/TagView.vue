@@ -12,6 +12,10 @@
           <button class="row-action row-action-sm danger" @click="onDelete(t.id)"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
+      <div v-if="store.list.length === 0" class="empty-state">
+        <i class="fa-solid fa-tags"></i>
+        <p>暂无标签，点击“新增标签”添加</p>
+      </div>
     </div>
   </div>
 </template>
@@ -81,6 +85,7 @@ async function onDelete(id: string) {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--gap-md);
   align-content: start;
+  position: relative;
 }
 .tag-card {
   background: var(--card-bg);
@@ -116,4 +121,20 @@ async function onDelete(id: string) {
 .tag-actions input[type="color"]:hover {
   border-color: var(--primary);
 }
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+.empty-state i {
+  font-size: 36px;
+  margin-bottom: var(--gap-md);
+  color: var(--text-quaternary);
+}
+.empty-state p { font-size: var(--text-sm); margin: 0; }
 </style>

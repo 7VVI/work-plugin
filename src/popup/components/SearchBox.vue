@@ -112,7 +112,7 @@ function typeLabel(type: string) {
 <style scoped>
 .search-box {
   position: relative;
-  padding: var(--gap-md);
+  padding: var(--gap-sm) var(--gap-md);
 }
 .search-icon {
   position: absolute;

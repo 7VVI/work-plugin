@@ -71,8 +71,26 @@ function parseSystems(body: string): ParsedBackup['systems'] {
 
   for (const section of sections) {
     const name = section.heading.trim();
-    const fields = parseFields(section.body);
+    // Split section body into main fields and account sub-section
+    const subSections = splitByHeading(section.body, 4);
+    let mainBody = '';
+    let accountBody = '';
+    // Content before any #### heading
+    const firstSubIdx = section.body.indexOf('#### ');
+    if (firstSubIdx === -1) {
+      mainBody = section.body;
+    } else {
+      mainBody = section.body.slice(0, firstSubIdx);
+    }
+    for (const sub of subSections) {
+      if (sub.heading.trim() === '账号' || sub.heading.trim() === 'Accounts') {
+        accountBody = sub.body;
+      }
+    }
+
+    const fields = parseFields(mainBody);
     const tagLine = fields['标签'] || fields['Tags'];
+    const accounts = accountBody ? parseAccounts(accountBody) : [];
     systems.push({
       name,
       url: fields['URL'],
@@ -81,9 +99,46 @@ function parseSystems(body: string): ParsedBackup['systems'] {
       color: fields['颜色'],
       remark: fields['备注'],
       tags: tagLine ? tagLine.split(',').map(s => s.trim()) : [],
+      accounts,
     });
   }
   return systems;
+}
+
+function parseAccounts(body: string): Array<{ role: string; username: string; password: string; isDefault?: boolean }> {
+  const accounts: Array<{ role: string; username: string; password: string; isDefault?: boolean }> = [];
+  const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+  let inTable = false;
+  let headers: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.slice(1, -1).split('|').map(c => c.trim());
+      if (cells.every(c => /^-+$/.test(c))) {
+        inTable = true;
+        continue;
+      }
+      if (!inTable) {
+        headers = cells;
+        continue;
+      }
+      // Map columns by header names
+      const roleIdx = headers.findIndex(h => h === '角色' || h === 'Role');
+      const userIdx = headers.findIndex(h => h === '用户名' || h === 'Username');
+      const pwdIdx = headers.findIndex(h => h === '密码' || h === 'Password');
+      const defIdx = headers.findIndex(h => h === '默认' || h === 'Default');
+      if (userIdx >= 0 && cells[userIdx]) {
+        accounts.push({
+          role: roleIdx >= 0 ? (cells[roleIdx] || 'admin') : 'admin',
+          username: cells[userIdx],
+          password: pwdIdx >= 0 ? (cells[pwdIdx] || '') : '',
+          isDefault: defIdx >= 0 ? (cells[defIdx] === '是' || cells[defIdx] === 'true') : accounts.length === 0,
+        });
+      }
+    } else {
+      inTable = false;
+    }
+  }
+  return accounts;
 }
 
 function parseServers(body: string): ParsedBackup['servers'] {

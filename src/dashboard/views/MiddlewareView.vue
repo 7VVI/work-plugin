@@ -16,8 +16,8 @@
         <thead>
           <tr>
             <th style="width:50px;">类型</th>
-            <th>名称 / 版本</th>
-            <th>连接地址</th>
+            <th style="width:25%;">名称 / 版本</th>
+            <th style="width:30%;">连接地址</th>
             <th style="width:80px;">端口</th>
             <th style="width:120px;">账号</th>
             <th style="width:140px;">操作</th>
@@ -47,10 +47,11 @@
             </td>
           </tr>
           <tr v-if="filtered.length === 0">
-            <td colspan="6" class="empty-row">
-              <i class="fa-regular fa-folder-open empty-icon"></i>
-              <div>暂无中间件</div>
-              <div class="empty-hint">点击"新增中间件"开始添加</div>
+            <td colspan="6" class="empty-cell">
+              <div class="empty-state">
+                <i class="fa-solid fa-layer-group"></i>
+                <p>暂无中间件，点击“新增中间件”添加</p>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -119,6 +120,7 @@ async function onSaved() { formVisible.value = false; await store.load(); }
   border-radius: var(--radius-xl);
   margin: 0 var(--page-pad) var(--page-pad);
   box-shadow: var(--shadow-sm);
+  position: relative;
 }
 
 .data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); }
@@ -128,7 +130,7 @@ async function onSaved() { formVisible.value = false; await store.load(); }
   font-weight: var(--font-medium);
   padding: 0 var(--gap-lg);
   height: var(--table-header-h);
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
   font-size: var(--text-xs);
@@ -137,26 +139,39 @@ async function onSaved() { formVisible.value = false; await store.load(); }
   top: 0;
   z-index: 1;
 }
+/* 名称/版本列左对齐 */
+.data-table thead th:nth-child(2) { text-align: left; }
 .data-table tbody td {
   padding: 0 var(--gap-lg);
   height: var(--table-row-h);
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-primary);
   vertical-align: middle;
+  text-align: center;
 }
+/* 名称/版本列左对齐 */
+.data-table tbody td:nth-child(2) { text-align: left; }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { transition: background 0.15s ease; }
-.data-table tbody tr:hover td { background: var(--surface-active); }
+.data-table tbody tr { transition: background 0.2s ease, box-shadow 0.2s ease; }
+.data-table tbody tr:hover td {
+  background: var(--surface-hover);
+}
+.data-table tbody tr:hover td:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+.data-table tbody tr:hover td:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
 
 .type-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
-  display: flex;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   box-shadow: var(--shadow-xs);
 }
 .mw-name {
@@ -177,24 +192,25 @@ async function onSaved() { formVisible.value = false; await store.load(); }
   font-weight: var(--font-medium);
 }
 
-.row-actions { display: flex; align-items: center; gap: var(--gap-sm); }
+.row-actions { display: flex; align-items: center; justify-content: center; gap: var(--gap-sm); }
 
-.empty-row {
-  text-align: center;
-  color: var(--text-tertiary);
-  padding: 64px 0;
+.empty-cell {
+  padding: 0 !important;
   height: auto !important;
 }
-.empty-row .empty-icon {
-  font-size: 32px;
-  color: var(--text-quaternary);
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+.empty-state i {
+  font-size: 36px;
   margin-bottom: var(--gap-md);
-  display: block;
-}
-.empty-row > div { font-size: var(--text-base); color: var(--text-secondary); }
-.empty-row .empty-hint {
-  font-size: var(--text-sm);
   color: var(--text-quaternary);
-  margin-top: var(--gap-xs);
 }
+.empty-state p { font-size: var(--text-sm); margin: 0; }
 </style>

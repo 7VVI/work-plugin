@@ -55,8 +55,8 @@ const form = ref<ServerInput>({
 
 watch(() => props.visible, async (v) => {
   if (v) {
-    showPwd.value = false;
     if (props.server) {
+      showPwd.value = true;
       const { password: _p, sshKey: _s, ...rest } = props.server;
       form.value = { ...rest, password: '', sshKey: '' } as ServerInput;
       if (props.server.password) {
@@ -74,6 +74,7 @@ watch(() => props.visible, async (v) => {
         }
       }
     } else {
+      showPwd.value = false;
       form.value = { name: '', ip: '', sshPort: 22, username: '', password: '', sshKey: '', environment: 'development', purpose: '', remark: '', favorite: false };
     }
   }

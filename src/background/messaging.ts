@@ -22,8 +22,31 @@ async function handleMessage(msg: Message, _sender: chrome.runtime.MessageSender
     case 'RECORD_ACCESS':
       await recentRepo.touch(msg.entityType, msg.entityId, msg.role);
       return { ok: true };
-    case 'PAGE_HAS_LOGIN_FORM':
+    case 'PAGE_HAS_LOGIN_FORM': {
+      // Content script detected a login form - trigger auto-fill if not already done
+      const tabId = _sender.tab?.id;
+      if (tabId && _sender.tab?.url) {
+        const match = await autoFillService.findDefaultAccountForUrl(_sender.tab.url);
+        if (match) {
+          // Send auto-fill after a short delay to ensure content script is fully ready
+          setTimeout(async () => {
+            try {
+              await chrome.tabs.sendMessage(tabId, {
+                type: 'AUTO_FILL',
+                payload: {
+                  systemId: match.systemId,
+                  systemName: match.systemName,
+                  account: match.account,
+                },
+              });
+            } catch {
+              // ignore
+            }
+          }, 200);
+        }
+      }
       return { ok: true };
+    }
     case 'CRYPTO_KEY_SYNC':
       await cryptoService.setKeyFromBackground(msg.keyBytes);
       chrome.alarms.create('crypto-lock', { delayInMinutes: 5 });

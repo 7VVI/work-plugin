@@ -1,13 +1,6 @@
 <template>
   <div class="section">
-    <div class="section-header" @click="toggleExpand">
-      <span>全部系统</span>
-      <div class="header-right">
-        <span class="count">{{ systems.length }}</span>
-        <i :class="expanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-      </div>
-    </div>
-    <div v-if="expanded" class="sys-list">
+    <div class="sys-list">
       <div v-for="s in systems" :key="s.id" class="sys-item" @click="onOpen(s)" :title="s.url">
         <div class="sys-icon" :style="{ background: s.iconColor || 'linear-gradient(135deg,#4F7CFF,#3D6DF7)' }">
           <i :class="s.icon || 'fa-solid fa-globe'"></i>
@@ -18,7 +11,7 @@
         </div>
         <EnvBadge :env="s.environment" />
       </div>
-      <div v-if="systems.length === 0" class="empty">暂无系统，点击下方"新增系统"添加</div>
+      <div v-if="systems.length === 0" class="empty">暂无系统，点击右上角“新增”添加</div>
     </div>
   </div>
 </template>
@@ -30,17 +23,15 @@ import { recentRepo } from '@shared/db/repositories/recentRepo';
 import type { System } from '@shared/types/entities';
 import EnvBadge from '../../dashboard/components/common/EnvBadge.vue';
 
+const emit = defineEmits<{ count: [n: number] }>();
+
 const systems = ref<System[]>([]);
-const expanded = ref(true);
 
 onMounted(async () => {
   const all = await systemRepo.all();
   systems.value = all.sort((a, b) => a.sort - b.sort || b.updatedAt - a.updatedAt);
+  emit('count', systems.value.length);
 });
-
-function toggleExpand() {
-  expanded.value = !expanded.value;
-}
 
 async function onOpen(s: System) {
   await recentRepo.touch('system', s.id);
@@ -50,43 +41,14 @@ async function onOpen(s: System) {
 </script>
 
 <style scoped>
-.section { padding: 0 var(--gap-md) var(--gap-sm); }
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--text-tertiary);
-  padding: var(--gap-sm) var(--gap-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  user-select: none;
-  transition: var(--transition-fast);
-}
-.section-header:hover { color: var(--text-primary); }
-.header-right { display: flex; align-items: center; gap: 6px; }
-.count {
-  font-size: 10px;
-  color: var(--text-tertiary);
-  background: var(--surface-secondary);
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  font-weight: var(--font-medium);
-}
-.header-right i {
-  font-size: 9px;
-  color: var(--text-quaternary);
-  transition: var(--transition-fast);
-}
-.section-header:hover .header-right i { color: var(--text-secondary); }
+.section { padding: 0 var(--gap-md) var(--gap-sm); flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 .sys-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 300px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 .sys-item {

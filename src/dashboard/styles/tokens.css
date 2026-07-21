@@ -384,24 +384,26 @@ a:hover { color: var(--primary-hover); }
    行内操作按钮（40×40 圆角方块）
    ============================================================ */
 .row-action {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--bg-pure);
-  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
   color: var(--text-tertiary);
   cursor: pointer;
   transition: var(--transition-fast);
   flex-shrink: 0;
 }
-.row-action i { font-size: var(--text-sm); }
+.row-action i { font-size: var(--text-xs); }
 .row-action:hover {
   background: var(--surface-hover);
   color: var(--text-primary);
   border-color: var(--text-quaternary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
 }
 .row-action.edit:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-50); }
 .row-action.danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-light); }
@@ -410,7 +412,7 @@ a:hover { color: var(--primary-hover); }
 .row-action-sm {
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
 }
 
 /* ============================================================
@@ -557,3 +559,7 @@ input[type="checkbox"].form-check:checked::after {
   color: var(--text-tertiary);
 }
 [data-theme="dark"] .row-action:hover { background: var(--surface-hover); color: var(--text-primary); }
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); background-clip: content-box; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.35); background-clip: content-box; }
+[data-theme="dark"] ::selection { background: rgba(107, 154, 255, 0.3); }

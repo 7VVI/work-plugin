@@ -8,22 +8,32 @@
         </button>
       </div>
       <div class="action-right">
+        <div class="view-toggle">
+          <button class="vt-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'" title="列表视图">
+            <i class="fa-solid fa-list"></i>
+          </button>
+          <button class="vt-btn" :class="{ active: viewMode === 'card' }" @click="viewMode = 'card'" title="卡片视图">
+            <i class="fa-solid fa-grip"></i>
+          </button>
+        </div>
         <div class="search-wrap">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input v-model="search" class="search-input" type="text" placeholder="搜索系统名称、URL..." />
         </div>
       </div>
     </div>
-    <div class="table-wrap">
+
+    <!-- 列表视图 -->
+    <div v-if="viewMode === 'table'" class="table-wrap">
       <table class="data-table">
         <thead>
           <tr>
             <th style="width:48px;"><input type="checkbox" class="form-check" :checked="allChecked" @change="toggleAll" /></th>
-            <th>系统名称</th>
-            <th>URL</th>
-            <th style="width:96px;">环境</th>
-            <th style="width:140px;">最近更新</th>
-            <th style="width:160px;">操作</th>
+            <th style="width:28%;">系统名称</th>
+            <th style="width:32%;">URL</th>
+            <th style="width:80px;">环境</th>
+            <th style="width:120px;">最近更新</th>
+            <th style="width:140px;">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -40,7 +50,7 @@
                 </div>
               </div>
             </td>
-            <td>
+            <td class="url-cell">
               <a class="url-link" @click.stop="onOpen(s)" :title="s.url">
                 <i class="fa-solid fa-globe"></i>
                 <span class="url-text">{{ s.url }}</span>
@@ -57,15 +67,47 @@
             </td>
           </tr>
           <tr v-if="filteredSystems.length === 0">
-            <td colspan="6" class="empty-row">
-              <i class="fa-regular fa-folder-open empty-icon"></i>
-              <div>暂无系统</div>
-              <div class="empty-hint">点击"新增系统"开始添加</div>
+            <td colspan="6" class="empty-cell">
+              <div class="empty-state">
+                <i class="fa-solid fa-globe"></i>
+                <p>暂无系统，点击“新增系统”添加</p>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <!-- 卡片视图 -->
+    <div v-else class="card-wrap">
+      <div class="card-grid">
+        <div v-for="s in filteredSystems" :key="s.id" class="sys-card" @click="onOpen(s)">
+          <div class="card-header">
+            <div class="card-icon" :style="iconStyle(s)">
+              <i :class="s.icon || 'fa-solid fa-globe'"></i>
+            </div>
+            <div class="card-actions" @click.stop>
+              <button class="row-action row-action-sm edit" @click="onEdit(s)" title="编辑"><i class="fa-solid fa-pen"></i></button>
+              <button class="row-action row-action-sm danger" @click="onDelete(s.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">{{ s.name }}</div>
+            <div class="card-url" :title="s.url">{{ s.url }}</div>
+            <div v-if="s.remark" class="card-remark">{{ s.remark }}</div>
+          </div>
+          <div class="card-footer">
+            <EnvBadge :env="s.environment" />
+            <span class="card-time">{{ formatRelativeTime(s.updatedAt) }}</span>
+          </div>
+        </div>
+        <div v-if="filteredSystems.length === 0" class="empty-state">
+          <i class="fa-solid fa-globe"></i>
+          <p>暂无系统，点击“新增系统”添加</p>
+        </div>
+      </div>
+    </div>
+
     <SystemForm v-if="formVisible" :visible="formVisible" :system="editing" :system-id="editing?.id || ''" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
@@ -87,6 +129,7 @@ const formVisible = ref(false);
 const editing = ref<System | null>(null);
 const search = ref('');
 const selectedIds = ref<Set<string>>(new Set());
+const viewMode = ref<'table' | 'card'>('table');
 
 const iconPalettes = [
   'linear-gradient(135deg, #4F7CFF 0%, #3D6DF7 100%)',
@@ -167,8 +210,40 @@ async function onSaved() {
 }
 .action-left { display: flex; align-items: center; gap: var(--gap-md); }
 .action-right { display: flex; align-items: center; gap: var(--gap-md); }
-.action-right .search-wrap { width: 320px; }
+.action-right .search-wrap { width: 280px; }
 
+/* 视图切换按钮 */
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+.vt-btn {
+  width: 30px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: 12px;
+}
+.vt-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+.vt-btn.active {
+  background: var(--bg-pure);
+  color: var(--primary);
+  box-shadow: var(--shadow-xs);
+}
+
+/* 表格视图 */
 .table-wrap {
   flex: 1;
   min-height: 0;
@@ -178,6 +253,7 @@ async function onSaved() {
   border-radius: var(--radius-xl);
   margin: 0 var(--page-pad) var(--page-pad);
   box-shadow: var(--shadow-sm);
+  position: relative;
 }
 
 .data-table {
@@ -192,7 +268,7 @@ async function onSaved() {
   font-weight: var(--font-medium);
   padding: 0 var(--gap-lg);
   height: var(--table-header-h);
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
   font-size: var(--text-xs);
@@ -202,27 +278,49 @@ async function onSaved() {
   top: 0;
   z-index: 1;
 }
+/* 减少checkbox列和系统名称列的间距 */
+.data-table thead th:first-child { padding-right: 0; }
+.data-table tbody td:first-child { padding-right: 0; }
+.data-table thead th:nth-child(2) { padding-left: var(--gap-sm); }
+.data-table tbody td:nth-child(2) { padding-left: var(--gap-sm); }
+
+.data-table thead th:nth-child(2),
+.data-table thead th:nth-child(3) { text-align: left; }
 .data-table tbody td {
   padding: 0 var(--gap-lg);
   height: var(--table-row-h);
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-primary);
   vertical-align: middle;
+  text-align: center;
 }
+.data-table tbody td:nth-child(2),
+.data-table tbody td:nth-child(3) { text-align: left; }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { transition: background 0.15s ease; }
-.data-table tbody tr:hover td { background: var(--surface-active); }
+.data-table tbody tr { transition: background 0.2s ease; }
+.data-table tbody tr:hover td { background: var(--surface-hover); }
+.data-table tbody tr:hover td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.data-table tbody tr:hover td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+/* URL列左对齐 */
+.url-cell { text-align: left !important; }
+.url-cell .url-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
 
 .sys-cell { display: flex; align-items: center; gap: var(--gap-md); }
 .sys-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   flex-shrink: 0;
   box-shadow: var(--shadow-xs);
 }
@@ -236,7 +334,7 @@ async function onSaved() {
 .sys-desc {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
-  margin-top: 4px;
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -253,29 +351,134 @@ async function onSaved() {
   white-space: nowrap;
 }
 
-.time-cell {
-  color: var(--text-tertiary);
-  font-size: var(--text-sm);
-}
+.time-cell { color: var(--text-tertiary); font-size: var(--text-sm); }
+.row-actions { display: flex; align-items: center; justify-content: center; gap: var(--gap-sm); }
 
-.row-actions { display: flex; align-items: center; gap: var(--gap-sm); }
-
-.empty-row {
-  text-align: center;
-  color: var(--text-tertiary);
-  padding: 64px 0;
+.empty-cell {
+  padding: 0 !important;
   height: auto !important;
 }
-.empty-row .empty-icon {
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+.empty-state i {
+  font-size: 36px;
+  margin-bottom: var(--gap-md);
+  color: var(--text-quaternary);
+}
+.empty-state p { font-size: var(--text-sm); margin: 0; }
+
+/* 卡片视图 */
+.card-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--page-pad) var(--page-pad);
+  position: relative;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--gap-lg);
+  align-content: start;
+}
+.sys-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  padding: var(--gap-lg);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+.sys-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 6px 24px rgba(79, 124, 255, 0.12);
+  transform: translateY(-2px);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--text-base);
+  box-shadow: var(--shadow-xs);
+}
+.card-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+.sys-card:hover .card-actions { opacity: 1; }
+.card-body { flex: 1; min-width: 0; }
+.card-name {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-remark {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--gap-sm);
+  border-top: 1px solid var(--border-soft);
+}
+.card-time {
+  font-size: var(--text-xs);
+  color: var(--text-quaternary);
+}
+.card-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  color: var(--text-tertiary);
+}
+.card-empty .empty-icon {
   font-size: 32px;
   color: var(--text-quaternary);
   margin-bottom: var(--gap-md);
-  display: block;
 }
-.empty-row > div { font-size: var(--text-base); color: var(--text-secondary); }
-.empty-row .empty-hint {
-  font-size: var(--text-sm);
-  color: var(--text-quaternary);
-  margin-top: var(--gap-xs);
-}
+.card-empty > div { font-size: var(--text-base); color: var(--text-secondary); }
+.card-empty .empty-hint { font-size: var(--text-sm); color: var(--text-quaternary); margin-top: var(--gap-xs); }
 </style>

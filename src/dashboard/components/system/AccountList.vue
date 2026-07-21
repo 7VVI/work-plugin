@@ -119,11 +119,12 @@ function confirmAdd() {
   if (!newAccount.value.role.trim()) { return; }
   if (!newAccount.value.username.trim()) { return; }
   if (!newAccount.value.password.trim()) { return; }
+  const hasDefault = props.accounts.some(a => a.isDefault);
   emit('add', {
     role: newAccount.value.role.trim(),
     username: newAccount.value.username.trim(),
     password: newAccount.value.password,
-    isDefault: props.accounts.length === 0,
+    isDefault: !hasDefault && props.accounts.length === 0,
   });
   cancelAdd();
 }

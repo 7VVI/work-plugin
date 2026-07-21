@@ -10,8 +10,8 @@
       </div>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" title="通知">
-        <i class="fa-regular fa-bell"></i>
+      <button class="icon-btn" @click="toggleTheme" :title="isDark ? '切换到亮色主题' : '切换到暗色主题'">
+        <i :class="isDark ? 'fa-regular fa-sun' : 'fa-regular fa-moon'"></i>
       </button>
       <button class="icon-btn" @click="$router.push('/settings')" title="设置">
         <i class="fa-solid fa-gear"></i>
@@ -22,6 +22,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { usePrefStore } from '@shared/stores/prefStore';
+
+const prefStore = usePrefStore();
+const isDark = computed(() => prefStore.theme === 'dark');
+
+function toggleTheme() {
+  prefStore.theme = isDark.value ? 'light' : 'dark';
+}
 </script>
 
 <style scoped>

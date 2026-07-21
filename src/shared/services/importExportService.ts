@@ -114,11 +114,13 @@ export const importExportService = {
       }
       const all = await systemRepo.all();
       const existing = all.find(x => x.name === s.name && x.url === s.url);
+      let systemId: string;
       if (existing) {
         await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color });
+        systemId = existing.id;
         summary.updated.systems++;
       } else {
-        await systemRepo.create({
+        systemId = await systemRepo.create({
           name: s.name,
           url: s.url,
           environment: s.environment || 'development',
@@ -129,6 +131,24 @@ export const importExportService = {
           color: s.color,
         });
         summary.created.systems++;
+      }
+      // Import accounts for this system
+      if (s.accounts && s.accounts.length > 0) {
+        const existingAccounts = await accountRepo.bySystemId(systemId);
+        for (const acc of s.accounts) {
+          if (!acc.username) continue;
+          const alreadyExists = existingAccounts.some(a => a.username === acc.username && a.role === acc.role);
+          if (!alreadyExists) {
+            const encryptedPwd = await cryptoService.encryptField(acc.password || '');
+            await accountRepo.create({
+              systemId,
+              role: acc.role || 'admin',
+              username: acc.username,
+              password: encryptedPwd,
+              isDefault: acc.isDefault ?? false,
+            });
+          }
+        }
       }
     }
 

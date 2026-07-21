@@ -23,25 +23,45 @@ async function checkTab(tab: chrome.tabs.Tab, tryAutoFill: boolean) {
       autoFilledTabs.add(tab.id);
       const match = await autoFillService.findDefaultAccountForUrl(tab.url!);
       if (match) {
-        setTimeout(async () => {
-          try {
-            await chrome.tabs.sendMessage(tab.id!, {
-              type: 'AUTO_FILL',
-              payload: {
-                systemId: match.systemId,
-                systemName: match.systemName,
-                account: match.account,
-              },
-            });
-          } catch {
-            // content script not ready / no login form
-          }
-        }, 800);
+        // Retry mechanism: try sending multiple times to handle content script injection delay
+        sendAutoFillWithRetry(tab.id, {
+          type: 'AUTO_FILL',
+          payload: {
+            systemId: match.systemId,
+            systemName: match.systemName,
+            account: match.account,
+          },
+        }, 3, 600);
       }
     }
   } catch {
     await updateBadgeForTab(tab, false);
   }
+}
+
+/**
+ * Send AUTO_FILL message with retry logic.
+ * Retries if content script is not ready or form not yet rendered.
+ */
+function sendAutoFillWithRetry(
+  tabId: number,
+  message: { type: string; payload: unknown },
+  maxRetries: number,
+  intervalMs: number,
+) {
+  let attempts = 0;
+
+  function trySend() {
+    attempts++;
+    chrome.tabs.sendMessage(tabId, message).catch(() => {
+      if (attempts < maxRetries) {
+        setTimeout(trySend, intervalMs);
+      }
+    });
+  }
+
+  // Initial delay to allow content script injection
+  setTimeout(trySend, 500);
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {

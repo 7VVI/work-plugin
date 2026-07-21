@@ -14,7 +14,7 @@
     </div>
     <div class="server-grid">
       <ServerCard v-for="s in store.filtered" :key="s.id" :server="s" @select="onSelect(s.id)" @edit="onEdit(s)" @copy-ip="store.copyIp(s.id)" @copy-ssh="store.copySshCommand(s.id)" @copy-pwd="store.copyPassword(s.id)" />
-      <div class="add-card" @click="onCreate">
+      <div v-if="store.filtered.length > 0" class="add-card" @click="onCreate">
         <div class="add-card-icon"><i class="fa-solid fa-plus"></i></div>
         <div class="add-card-title">添加服务器</div>
         <div class="add-card-desc">快速创建新的服务器连接</div>
@@ -70,6 +70,7 @@ async function onSaved() { formVisible.value = false; await store.load(); }
   min-height: 0;
   overflow-y: auto;
   align-content: start;
+  position: relative;
 }
 
 .add-card {
@@ -121,12 +122,12 @@ async function onSaved() { formVisible.value = false; await store.load(); }
 }
 
 .empty-state {
-  grid-column: 1 / -1;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 0;
   color: var(--text-tertiary);
 }
 .empty-state i {

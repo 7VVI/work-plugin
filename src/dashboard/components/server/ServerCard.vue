@@ -59,8 +59,8 @@
         <span>{{ copiedFlag === 'ip' ? '已复制' : '复制IP' }}</span>
       </button>
       <button class="card-btn" :class="{ copied: copiedFlag === 'ssh' }" @click.stop="onCopySsh">
-        <i :class="copiedFlag === 'ssh' ? 'fa-solid fa-check' : 'fa-solid fa-terminal'"></i>
-        <span>{{ copiedFlag === 'ssh' ? '已复制' : 'SSH' }}</span>
+        <i :class="copiedFlag === 'ssh' ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
+        <span>{{ copiedFlag === 'ssh' ? '已复制' : '复制服务器' }}</span>
       </button>
     </div>
   </div>
@@ -131,7 +131,7 @@ async function onCopySsh() {
 <style scoped>
 .server-card {
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
   padding: var(--gap-xl);
   transition: var(--transition);
@@ -139,11 +139,11 @@ async function onCopySsh() {
   display: flex;
   flex-direction: column;
   gap: var(--gap-md);
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 .server-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+  box-shadow: 0 6px 24px rgba(79, 124, 255, 0.12);
 }
 
 .card-top {

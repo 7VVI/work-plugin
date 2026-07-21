@@ -17,7 +17,7 @@
           :class="{ active: selectedId === g.id }"
           @click="selectGroup(g.id)"
         >
-          <i class="fa-solid fa-folder"></i>
+          <i :class="groupIcon(g.name)"></i>
           <span class="item-name">{{ g.name }}</span>
           <span class="item-count">{{ g.items.length }}</span>
           <i class="fa-solid fa-times del-btn" @click.stop="onDelete(g.id)" title="删除"></i>
@@ -32,7 +32,7 @@
         <template v-if="selected">
           <div class="right-header">
             <div class="title-wrap">
-              <i class="fa-solid fa-folder"></i>
+              <i :class="groupIcon(selected.name)"></i>
               <span class="title">{{ selected.name }}</span>
               <span class="count">{{ selected.items.length }} 项</span>
             </div>
@@ -40,46 +40,48 @@
           </div>
 
           <div class="right-body">
-            <div class="table-head">
-              <div class="col-key">字段标识</div>
-              <div class="col-label">字段名称</div>
-              <div class="col-default">默认值</div>
-              <div class="col-actions">操作</div>
-            </div>
-            <div class="table-body">
-              <div v-for="(item, idx) in editItems" :key="idx" class="table-row">
-                <input
-                  v-model="item.key"
-                  class="cell cell-key"
-                  placeholder="如：api_key"
-                  @blur="saveItem(idx)"
-                  @keyup.enter="saveItem(idx)"
-                />
-                <input
-                  v-model="item.label"
-                  class="cell cell-label"
-                  placeholder="如：API 密钥"
-                  @blur="saveItem(idx)"
-                  @keyup.enter="saveItem(idx)"
-                />
-                <input
-                  v-model="item.defaultValue"
-                  class="cell cell-default"
-                  placeholder="—"
-                  @blur="saveItem(idx)"
-                  @keyup.enter="saveItem(idx)"
-                />
-                <div class="col-actions cell-actions">
-                  <i class="fa-solid fa-copy" v-if="item.defaultValue" @click="onCopy(item.defaultValue)" title="复制默认值"></i>
-                  <i class="fa-solid fa-trash" @click="onRemoveItem(idx)" title="删除"></i>
+            <div class="field-list">
+              <div class="field-item header-row">
+                <div>字段标识</div>
+                <div>字段名称</div>
+                <div>默认值</div>
+                <div class="text-right">操作</div>
+              </div>
+              <template v-for="(item, idx) in selected.items" :key="idx">
+                <!-- 编辑态 -->
+                <div v-if="editingIdx === idx" class="field-item edit-row">
+                  <input v-model="editItem.key" class="cell-input mono" placeholder="如：api_key" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
+                  <input v-model="editItem.label" class="cell-input" placeholder="如：API 密钥" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
+                  <input v-model="editItem.defaultValue" class="cell-input mono" placeholder="默认值" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
+                  <div class="field-icons">
+                    <div class="row-action confirm" @click="confirmEdit" title="确认"><i class="fa-solid fa-check"></i></div>
+                    <div class="row-action danger" @click="cancelEdit" title="取消"><i class="fa-solid fa-xmark"></i></div>
+                  </div>
+                </div>
+                <!-- 显示态 -->
+                <div v-else class="field-item" @dblclick="startEdit(idx)">
+                  <div class="mono field-key">{{ item.key || '—' }}</div>
+                  <div>{{ item.label || '—' }}</div>
+                  <div class="mono field-value">{{ item.defaultValue || '—' }}</div>
+                  <div class="field-icons">
+                    <div class="row-action" v-if="item.defaultValue" @click="onCopy(item.defaultValue)" title="复制默认值"><i class="fa-solid fa-copy"></i></div>
+                    <div class="row-action" @click="startEdit(idx)" title="编辑"><i class="fa-solid fa-pen"></i></div>
+                    <div class="row-action danger" @click="onRemoveItem(idx)" title="删除"><i class="fa-solid fa-trash"></i></div>
+                  </div>
+                </div>
+              </template>
+              <div v-if="selected.items.length === 0 && !adding" class="empty-row">暂无字段，点击下方"添加字段"添加</div>
+              <div v-if="adding" class="field-item edit-row">
+                <input ref="addKeyRef" v-model="newItem.key" class="cell-input mono" placeholder="如：api_key" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
+                <input v-model="newItem.label" class="cell-input" placeholder="如：API 密钥" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
+                <input v-model="newItem.defaultValue" class="cell-input mono" placeholder="默认值" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
+                <div class="field-icons">
+                  <div class="row-action confirm" @click="confirmAdd" title="确认"><i class="fa-solid fa-check"></i></div>
+                  <div class="row-action danger" @click="cancelAdd" title="取消"><i class="fa-solid fa-xmark"></i></div>
                 </div>
               </div>
-              <div v-if="selected.items.length === 0" class="empty-right">
-                <i class="fa-solid fa-keyboard"></i>
-                <p>点击下方"添加字段"开始记录</p>
-              </div>
             </div>
-            <button class="add-item-btn" @click="onAddItem">
+            <button v-if="!adding" class="add-item-btn" @click="startAdd">
               <i class="fa-solid fa-plus"></i> 添加字段
             </button>
           </div>
@@ -94,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { useConfigStore } from '@shared/stores/configStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -107,7 +109,32 @@ const dialog = useDialogStore();
 
 const search = ref('');
 const selectedId = ref<string | null>(null);
-const editItems = ref<ConfigItem[]>([]);
+const editingIdx = ref<number | null>(null);
+const editItem = ref<ConfigItem>({ key: '', label: '', defaultValue: '' });
+const adding = ref(false);
+const newItem = ref<ConfigItem>({ key: '', label: '', defaultValue: '' });
+const addKeyRef = ref<HTMLInputElement | null>(null);
+
+const configIcons = [
+  'fa-solid fa-gear',
+  'fa-solid fa-database',
+  'fa-solid fa-envelope',
+  'fa-solid fa-globe',
+  'fa-solid fa-key',
+  'fa-solid fa-palette',
+  'fa-solid fa-bolt',
+  'fa-solid fa-layer-group',
+  'fa-solid fa-code',
+  'fa-solid fa-shield-halved',
+  'fa-solid fa-cloud',
+  'fa-solid fa-terminal',
+];
+
+function groupIcon(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return configIcons[Math.abs(hash) % configIcons.length];
+}
 
 onMounted(async () => { await store.load(); });
 
@@ -126,10 +153,10 @@ const filtered = computed(() => {
 
 const selected = computed(() => store.list.find(g => g.id === selectedId.value));
 
-watch(selected, (g) => {
-  if (g) editItems.value = g.items.map(it => ({ ...it }));
-  else editItems.value = [];
-}, { immediate: true });
+watch(selected, () => {
+  editingIdx.value = null;
+  adding.value = false;
+});
 
 function selectGroup(id: string) {
   selectedId.value = id;
@@ -158,31 +185,70 @@ async function onDelete(id: string) {
   toast.success('已删除');
 }
 
-function onAddItem() {
-  if (!selected.value) return;
-  editItems.value.push({ key: '', label: '', defaultValue: '' });
-  persistItems();
-}
-
-async function saveItem(_idx: number) {
-  if (!selected.value) return;
-  await persistItems();
-}
-
-async function persistItems() {
-  if (!selected.value) return;
-  const items = editItems.value.map(it => ({
+function currentItems(): ConfigItem[] {
+  return (selected.value?.items ?? []).map(it => ({
     key: it.key || '',
     label: it.label || '',
     defaultValue: it.defaultValue || '',
   }));
+}
+
+function startEdit(idx: number) {
+  const it = selected.value?.items[idx];
+  if (!it) return;
+  adding.value = false;
+  editItem.value = { key: it.key || '', label: it.label || '', defaultValue: it.defaultValue || '' };
+  editingIdx.value = idx;
+}
+
+function cancelEdit() {
+  editingIdx.value = null;
+}
+
+async function confirmEdit() {
+  if (!selected.value || editingIdx.value === null) return;
+  if (!editItem.value.key?.trim() && !editItem.value.label?.trim()) return;
+  const items = currentItems();
+  items[editingIdx.value] = {
+    key: (editItem.value.key || '').trim(),
+    label: (editItem.value.label || '').trim(),
+    defaultValue: editItem.value.defaultValue || '',
+  };
   await store.setItems(selected.value.id, items);
+  editingIdx.value = null;
+  toast.success('已保存');
+}
+
+function startAdd() {
+  editingIdx.value = null;
+  newItem.value = { key: '', label: '', defaultValue: '' };
+  adding.value = true;
+  nextTick(() => addKeyRef.value?.focus());
+}
+
+function cancelAdd() {
+  adding.value = false;
+  newItem.value = { key: '', label: '', defaultValue: '' };
+}
+
+async function confirmAdd() {
+  if (!selected.value) return;
+  if (!newItem.value.key?.trim() && !newItem.value.label?.trim()) { cancelAdd(); return; }
+  const items = currentItems();
+  items.push({
+    key: (newItem.value.key || '').trim(),
+    label: (newItem.value.label || '').trim(),
+    defaultValue: newItem.value.defaultValue || '',
+  });
+  await store.setItems(selected.value.id, items);
+  cancelAdd();
+  toast.success('已添加');
 }
 
 async function onRemoveItem(idx: number) {
   if (!selected.value) return;
-  editItems.value.splice(idx, 1);
   await store.removeItem(selected.value.id, idx);
+  if (editingIdx.value === idx) editingIdx.value = null;
   toast.success('已删除');
 }
 
@@ -246,11 +312,13 @@ async function onCopy(value: string) {
   background: var(--primary-50);
   color: var(--primary);
 }
-.left-item > i.fa-folder {
+.left-item > i:first-child {
   font-size: var(--text-sm);
   color: var(--text-quaternary);
+  width: 18px;
+  text-align: center;
 }
-.left-item.active > i.fa-folder { color: var(--primary); }
+.left-item.active > i:first-child { color: var(--primary); }
 .item-name {
   flex: 1;
   white-space: nowrap;
@@ -351,6 +419,100 @@ async function onCopy(value: string) {
   color: var(--primary);
   background: var(--primary-50);
 }
+
+/* 字段列表 */
+.field-list {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.field-item {
+  display: grid;
+  grid-template-columns: 1.2fr 1.5fr 1.5fr 120px;
+  align-items: center;
+  padding: 0 14px;
+  height: 40px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-soft);
+  gap: var(--gap-sm);
+}
+.field-item:last-child { border-bottom: none; }
+.field-item.header-row {
+  background: var(--surface-secondary);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  height: 36px;
+  letter-spacing: 0.3px;
+}
+.field-item.edit-row {
+  background: var(--primary-50);
+  height: auto;
+  padding: 8px 14px;
+}
+.field-item:not(.header-row):not(.edit-row) { cursor: default; }
+.field-item:not(.header-row):not(.edit-row):hover { background: var(--surface-hover); }
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.field-key, .field-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.text-right { text-align: right; }
+.field-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: flex-end;
+}
+.row-action {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-quaternary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: var(--transition-fast);
+  background: transparent;
+}
+.row-action:hover { background: var(--primary-50); color: var(--primary); }
+.row-action.danger:hover { background: var(--danger-light); color: var(--danger); }
+.row-action.confirm { color: var(--success); }
+.row-action.confirm:hover { background: var(--success-light); }
+.empty-row {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+.cell-input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  font-size: var(--text-sm);
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-pure);
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+  min-width: 0;
+}
+.cell-input.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+.cell-input::placeholder { color: var(--text-quaternary); }
+.cell-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
 .right-body {
   flex: 1;
   overflow-y: auto;
@@ -360,91 +522,22 @@ async function onCopy(value: string) {
   gap: var(--gap-sm);
 }
 
-.table-head {
-  display: grid;
-  grid-template-columns: 1.2fr 1.5fr 1.5fr 80px;
-  gap: var(--gap-sm);
-  padding: var(--gap-sm) var(--gap-md);
-  background: var(--surface-secondary);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  color: var(--text-tertiary);
-  margin-bottom: var(--gap-xs);
-  letter-spacing: 0.3px;
-}
-.table-body { display: flex; flex-direction: column; gap: var(--gap-sm); }
-.table-row {
-  display: grid;
-  grid-template-columns: 1.2fr 1.5fr 1.5fr 80px;
-  gap: var(--gap-sm);
-  align-items: center;
-}
-.cell {
-  height: 36px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 0 var(--gap-md);
+.add-item-btn {
+  margin-top: var(--gap-sm);
   font-size: var(--text-sm);
-  outline: none;
-  font-family: inherit;
-  background: var(--bg-pure);
-  transition: var(--transition-fast);
-  color: var(--text-primary);
-}
-.cell::placeholder { color: var(--text-quaternary); }
-.cell:hover { border-color: var(--text-quaternary); }
-.cell:focus {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-focus);
-}
-.cell-key {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-.cell-default {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-.cell-actions { display: flex; gap: var(--gap-xs); justify-content: center; }
-.cell-actions i {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  color: var(--primary);
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  font-size: 11px;
-  transition: var(--transition-fast);
-}
-.cell-actions i:hover {
-  background: var(--primary-50);
-  color: var(--primary);
-}
-.cell-actions i:last-child:hover {
-  background: var(--danger-light);
-  color: var(--danger);
-}
-
-.add-item-btn {
-  align-self: flex-start;
-  display: flex;
-  align-items: center;
   gap: var(--gap-sm);
-  height: 36px;
-  padding: 0 var(--gap-lg);
-  border-radius: var(--radius-md);
-  border: 1px dashed var(--border-strong);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
+  width: 100%;
   font-weight: var(--font-medium);
-  cursor: pointer;
   font-family: inherit;
-  margin-top: var(--gap-sm);
   transition: var(--transition-fast);
 }
 .add-item-btn:hover {
@@ -452,18 +545,6 @@ async function onCopy(value: string) {
   color: var(--primary);
   background: var(--primary-50);
 }
-
-.empty-right {
-  text-align: center;
-  padding: 40px;
-  color: var(--text-tertiary);
-}
-.empty-right i {
-  font-size: 28px;
-  margin-bottom: var(--gap-sm);
-  color: var(--text-quaternary);
-}
-.empty-right p { font-size: var(--text-sm); margin: 0; }
 
 .no-selection {
   flex: 1;

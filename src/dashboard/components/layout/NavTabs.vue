@@ -34,7 +34,7 @@ function isActive(path: string): boolean {
   display: flex;
   align-items: center;
   padding: 0 var(--page-pad);
-  gap: var(--gap-xs);
+  gap: 2px;
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -45,10 +45,10 @@ function isActive(path: string): boolean {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 16px;
   border-radius: var(--radius-md);
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--text-tertiary);
   cursor: pointer;
@@ -56,6 +56,7 @@ function isActive(path: string): boolean {
   text-decoration: none;
   white-space: nowrap;
   user-select: none;
+  position: relative;
 }
 .tab:hover {
   background: var(--surface-hover);
@@ -66,6 +67,17 @@ function isActive(path: string): boolean {
   color: var(--primary);
   font-weight: var(--font-semibold);
 }
-.tab i { font-size: var(--text-sm); opacity: 0.85; }
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+.tab i { font-size: var(--text-xs); opacity: 0.8; }
 .tab.active i { opacity: 1; }
 </style>

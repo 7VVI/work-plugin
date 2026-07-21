@@ -1,59 +1,45 @@
 <template>
-  <div class="quick-actions">
-    <template v-if="!showForm">
-      <button class="qa-btn" @click="openForm">
-        <i class="fa-solid fa-plus"></i>
-        <span>新增系统</span>
-      </button>
-      <button class="qa-btn secondary" @click="openDashboard">
-        <i class="fa-solid fa-table-columns"></i>
-        <span>管理面板</span>
-      </button>
-    </template>
-    <template v-else>
-      <div class="form-overlay">
-        <div class="form-header">
-          <span>新增系统</span>
-          <i class="fa-solid fa-xmark" @click="closeForm"></i>
-        </div>
-        <div class="form-body">
-          <div class="form-row">
-            <label>系统名称 <span class="req">*</span></label>
-            <input v-model="form.name" class="form-input" placeholder="如：内部OA系统" />
-          </div>
-          <div class="form-row">
-            <label>系统地址 <span class="req">*</span></label>
-            <input v-model="form.url" class="form-input" placeholder="https://example.com" />
-          </div>
-          <div class="form-row">
-            <label>环境分类</label>
-            <select v-model="form.environment" class="form-select">
-              <option v-for="env in ENVIRONMENTS" :key="env.value" :value="env.value">{{ env.label }}</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label>图标</label>
-            <input v-model="form.icon" class="form-input" placeholder="fa-solid fa-globe" />
-          </div>
-          <div class="form-row">
-            <label>颜色</label>
-            <input v-model="form.iconColor" class="form-input" placeholder="linear-gradient(135deg,#3b82f6,#2563eb)" />
-          </div>
-          <div class="form-row">
-            <label>标签</label>
-            <input v-model="tagsText" class="form-input" placeholder="多个标签用逗号分隔" />
-          </div>
-          <div class="form-row">
-            <label>备注</label>
-            <textarea v-model="form.remark" class="form-textarea" placeholder="备注信息..."></textarea>
-          </div>
-        </div>
-        <div class="form-footer">
-          <button class="btn-cancel" @click="closeForm">取消</button>
-          <button class="btn-save" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
-        </div>
+  <div class="form-overlay">
+    <div class="form-header">
+      <span>新增系统</span>
+      <i class="fa-solid fa-xmark" @click="close"></i>
+    </div>
+    <div class="form-body">
+      <div class="form-row">
+        <label>系统名称 <span class="req">*</span></label>
+        <input v-model="form.name" class="form-input" placeholder="如：内部OA系统" />
       </div>
-    </template>
+      <div class="form-row">
+        <label>系统地址 <span class="req">*</span></label>
+        <input v-model="form.url" class="form-input" placeholder="https://example.com" />
+      </div>
+      <div class="form-row">
+        <label>环境分类</label>
+        <select v-model="form.environment" class="form-select">
+          <option v-for="env in ENVIRONMENTS" :key="env.value" :value="env.value">{{ env.label }}</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>图标</label>
+        <input v-model="form.icon" class="form-input" placeholder="fa-solid fa-globe" />
+      </div>
+      <div class="form-row">
+        <label>颜色</label>
+        <input v-model="form.iconColor" class="form-input" placeholder="linear-gradient(135deg,#3b82f6,#2563eb)" />
+      </div>
+      <div class="form-row">
+        <label>标签</label>
+        <input v-model="tagsText" class="form-input" placeholder="多个标签用逗号分隔" />
+      </div>
+      <div class="form-row">
+        <label>备注</label>
+        <textarea v-model="form.remark" class="form-textarea" placeholder="备注信息..."></textarea>
+      </div>
+    </div>
+    <div class="form-footer">
+      <button class="btn-cancel" @click="close">取消</button>
+      <button class="btn-save" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+    </div>
   </div>
 </template>
 
@@ -65,25 +51,19 @@ import { ENVIRONMENTS } from '@shared/types/enums';
 import type { SystemInput } from '@shared/types/entities';
 import { isValidUrl } from '@shared/utils/url';
 
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; close: [] }>();
 
 const systemStore = useSystemStore();
 const toast = useToastStore();
 
-const showForm = ref(false);
 const saving = ref(false);
 const tagsText = ref('');
 const form = ref<SystemInput>({
   name: '', url: '', environment: 'development', icon: '', iconColor: '', favorite: false, sort: 0, remark: '',
 });
 
-function openForm() {
-  showForm.value = true;
-}
-
-function openDashboard() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
-  window.close();
+function close() {
+  emit('close');
 }
 
 async function save() {
@@ -113,63 +93,15 @@ async function save() {
     }
     toast.success('系统已创建');
     emit('saved');
-    closeForm();
   } catch (e) {
     toast.error((e as Error).message || '创建失败');
   } finally {
     saving.value = false;
   }
 }
-
-function closeForm() {
-  showForm.value = false;
-  form.value = { name: '', url: '', environment: 'development', icon: '', iconColor: '', favorite: false, sort: 0, remark: '' };
-  tagsText.value = '';
-}
 </script>
 
 <style scoped>
-.quick-actions {
-  padding: 0 var(--gap-md) var(--gap-md);
-}
-.qa-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-sm);
-  height: 40px;
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-lg);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  cursor: pointer;
-  font-family: inherit;
-  margin-bottom: var(--gap-sm);
-  transition: var(--transition-fast);
-  box-shadow: var(--shadow-xs);
-}
-.qa-btn:hover {
-  background: var(--primary-hover);
-  box-shadow: var(--shadow-primary);
-}
-.qa-btn:active { transform: scale(0.98); }
-.qa-btn.secondary {
-  background: var(--bg-pure);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-strong);
-  box-shadow: none;
-  margin-bottom: 0;
-}
-.qa-btn.secondary:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  border-color: var(--text-quaternary);
-  box-shadow: none;
-}
-
 .form-overlay {
   position: fixed;
   inset: 0;

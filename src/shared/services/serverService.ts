@@ -59,7 +59,15 @@ export const serverService = {
   async copySshCommand(id: string): Promise<void> {
     const server = await serverRepo.byId(id);
     if (!server) return;
-    await copyToClipboard(`ssh ${server.username}@${server.ip} -p ${server.sshPort}`);
+    const plainPwd = await cryptoService.decryptField(server.password).catch(() => '');
+    const text = [
+      `名称: ${server.name}`,
+      `地址: ${server.ip}`,
+      `端口: ${server.sshPort}`,
+      `用户: ${server.username}`,
+      `密码: ${plainPwd}`,
+    ].join('\n');
+    await copyToClipboard(text);
   },
 
   async copyPassword(id: string): Promise<void> {
