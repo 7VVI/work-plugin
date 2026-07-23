@@ -1,211 +1,346 @@
 <template>
   <teleport to="body">
-    <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
-      <div class="modal-dialog">
-        <div class="modal-header">
-          <h3>{{ system ? '编辑系统' : '新增系统' }}</h3>
-          <div class="icon-btn" @click="$emit('close')"><i class="fa-solid fa-xmark"></i></div>
-        </div>
-        <div class="detail-tabs">
-          <div class="detail-tab" :class="{ active: tab === 'basic' }" @click="tab = 'basic'">基本信息</div>
-          <div class="detail-tab" :class="{ active: tab === 'accounts' }" @click="tab = 'accounts'">账号密码 ({{ accounts.length }})</div>
-          <div class="detail-tab" :class="{ active: tab === 'remark' }" @click="tab = 'remark'">备注信息</div>
-        </div>
-        <div class="modal-body">
-          <template v-if="tab === 'basic'">
-            <div class="form-row">
-              <div class="form-label">系统名称 <span class="req">*</span></div>
-              <div class="form-field"><input v-model="form.name" class="form-input" type="text" placeholder="如：内部OA系统" /></div>
-            </div>
-            <div class="form-row">
-              <div class="form-label">系统地址 <span class="req">*</span></div>
-              <div class="form-field">
-                <div class="form-icon">
-                  <input v-model="form.url" class="form-input" type="text" placeholder="https://example.com" />
-                  <i class="fa-solid fa-copy" @click="copy(form.url)"></i>
+    <Transition name="sys-modal">
+      <div v-if="visible" class="sys-overlay" @click.self="$emit('close')">
+        <div class="sys-panel panel-solid" role="dialog" aria-modal="true">
+          <!-- Header -->
+          <div class="sys-header">
+            <h2>{{ system ? '编辑系统' : '新增系统' }}</h2>
+            <button class="ibtn" @click="$emit('close')" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+
+          <!-- Tabs (v3 .mtab) -->
+          <div class="mtab-strip">
+            <button class="mtab" :class="{ active: tab === 'basic' }" @click="tab = 'basic'">基本信息</button>
+            <button class="mtab" :class="{ active: tab === 'accounts' }" @click="tab = 'accounts'">
+              账号密码 <span class="acct-count">({{ acctRows.length }})</span>
+            </button>
+            <button class="mtab" :class="{ active: tab === 'remark' }" @click="tab = 'remark'">备注信息</button>
+          </div>
+
+          <!-- Body -->
+          <div class="sys-body">
+            <!-- ========== 基本信息 ========== -->
+            <div v-show="tab === 'basic'" class="panel-space">
+              <div class="field">
+                <label class="lbl">系统名称 <i class="fa-solid fa-asterisk req-mark"></i></label>
+                <input v-model="form.name" class="inp" type="text" placeholder="如：内部OA系统" />
+              </div>
+
+              <div class="field">
+                <label class="lbl">系统地址 <i class="fa-solid fa-asterisk req-mark"></i></label>
+                <div class="url-wrap">
+                  <input v-model="form.url" class="inp mono url-input" type="text" placeholder="https://example.com" />
+                  <button class="ibtn url-btn" title="从剪贴板粘贴" @click="pasteUrl"><i class="fa-regular fa-clipboard"></i></button>
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label class="lbl">环境分类</label>
+                  <select v-model="form.environment" class="inp">
+                    <option v-for="env in ENVIRONMENTS" :key="env.value" :value="env.value">{{ env.label }}</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="lbl">颜色</label>
+                  <div class="color-row">
+                    <button
+                      v-for="c in QUICK_COLORS"
+                      :key="c"
+                      class="color-opt"
+                      :class="{ on: c.toLowerCase() === currentColor.toLowerCase() }"
+                      :style="colorOptStyle(c)"
+                      :title="c"
+                      type="button"
+                      @click="pickColor(c)"
+                    ></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="lbl">图标</label>
+                <div class="icon-grid">
+                  <button
+                    v-for="ic in QUICK_ICONS"
+                    :key="ic"
+                    class="ibtn icon-opt"
+                    :class="{ on: ic === currentIcon }"
+                    :style="iconOptStyle(ic)"
+                    :title="ic.replace('fa-solid ', '')"
+                    type="button"
+                    @click="pickIcon(ic)"
+                  >
+                    <i :class="ic"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="lbl">标签</label>
+                <div class="tag-inp" @click.self="focusTagInput">
+                  <span v-for="(t, i) in tags" :key="t + i" class="chip tag-chip">
+                    {{ t }}
+                    <button class="tag-x" type="button" :title="`移除 ${t}`" @click="removeTag(i)">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </span>
+                  <input
+                    ref="tagInputEl"
+                    v-model="tagInput"
+                    class="tag-input"
+                    type="text"
+                    placeholder="输入标签后回车添加…"
+                    @keydown.enter.prevent="addTag"
+                    @blur="addTag"
+                  />
                 </div>
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-label">环境分类</div>
-              <div class="form-field">
-                <select v-model="form.environment" class="form-select">
-                  <option v-for="env in ENVIRONMENTS" :key="env.value" :value="env.value">{{ env.label }}</option>
-                </select>
+
+            <!-- ========== 账号密码 ========== -->
+            <div v-show="tab === 'accounts'" class="acct-panel">
+              <div class="acct-head">
+                <span>角色</span>
+                <span>用户名</span>
+                <span>密码</span>
+                <span class="ta-right">操作</span>
               </div>
-            </div>
-            <div class="form-row">
-              <div class="form-label">图标</div>
-              <div class="form-field"><input v-model="form.icon" class="form-input" type="text" placeholder="fa-solid fa-globe" /></div>
-            </div>
-            <div class="form-row">
-              <div class="form-label">颜色</div>
-              <div class="form-field">
-                <div class="color-bar-wrap">
-                  <input type="color" v-model="colorHex" class="color-picker-native" />
-                  <span class="color-hex">{{ colorHex }}</span>
+              <div class="acct-rows">
+                <div v-for="(row, idx) in acctRows" :key="row.uid" class="acct-row">
+                  <input v-model="row.role" class="inp acct-inp" placeholder="角色" />
+                  <input v-model="row.username" class="inp acct-inp" placeholder="用户名" />
+                  <div class="pwd-cell">
+                    <input
+                      v-model="row.password"
+                      :type="row.show ? 'text' : 'password'"
+                      class="inp acct-inp pwd-input"
+                      placeholder="密码"
+                    />
+                    <button class="ibtn pwd-toggle" type="button" :title="row.show ? '隐藏' : '显示'" @click="row.show = !row.show">
+                      <i :class="row.show ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'"></i>
+                    </button>
+                  </div>
+                  <div class="acct-ops">
+                    <button class="ibtn acct-confirm" type="button" title="账号已保存" @click="toast.success('账号已保存')">
+                      <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button class="ibtn danger" type="button" title="删除" @click="removeAccountRow(idx)">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
+              <button class="btn-g dashed" type="button" @click="addAccountRow()">
+                <i class="fa-solid fa-plus"></i>添加账号
+              </button>
             </div>
-            <div class="form-row">
-              <div class="form-label">标签</div>
-              <div class="form-field">
-                <div class="tag-list">
-                  <TagPill v-for="t in selectedTags" :key="t.id" :name="t.name" :color="t.color" removable @remove="removeTag(t.id)" />
-                </div>
-                <input v-model="newTag" class="form-input tag-add-input" type="text" placeholder="输入标签后回车添加..." @keyup.enter="addTag" />
-              </div>
+
+            <!-- ========== 备注 ========== -->
+            <div v-show="tab === 'remark'">
+              <textarea v-model="form.remark" rows="9" class="inp remark-area" placeholder="记录系统的使用说明、部署位置、负责人…"></textarea>
             </div>
-          </template>
-          <template v-else-if="tab === 'accounts'">
-            <AccountList :accounts="displayAccounts" :system-id="systemId || 'temp'" @add="onAddAccount" @delete="deleteAccount" @set-default="setDefault" />
-          </template>
-          <template v-else>
-            <textarea v-model="form.remark" class="form-textarea" placeholder="备注信息..."></textarea>
-          </template>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-default" @click="$emit('close')">取消</button>
-          <button class="btn btn-primary" @click="save">保存</button>
+          </div>
+
+          <!-- Footer -->
+          <div class="sys-footer">
+            <button class="btn-g" type="button" @click="$emit('close')">取消</button>
+            <button class="btn-p" type="button" @click="save"><i class="fa-solid fa-check"></i>保存</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import type { System, SystemInput, Account, EncryptedField } from '@shared/types/entities';
+import type { System, SystemInput } from '@shared/types/entities';
 import { ENVIRONMENTS } from '@shared/types/enums';
 import { useAccountStore } from '@shared/stores/accountStore';
-import { useTagStore } from '@shared/stores/tagStore';
 import { useSystemStore } from '@shared/stores/systemStore';
 import { useToastStore } from '@shared/stores/toastStore';
-import { copyToClipboard } from '@shared/utils/clipboard';
+import { systemService } from '@shared/services/systemService';
+import { tagService } from '@shared/services/tagService';
+import { accountService } from '@shared/services/accountService';
 import { isValidUrl } from '@shared/utils/url';
-import TagPill from '../common/TagPill.vue';
-import AccountList from './AccountList.vue';
 
+// ---- external contract (preserved) ----
 const props = defineProps<{ visible: boolean; system: System | null; systemId: string }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const accountStore = useAccountStore();
-const tagStore = useTagStore();
 const systemStore = useSystemStore();
 const toast = useToastStore();
 
+// ---- v3 verbatim constants ----
+const QUICK_COLORS = ['#2E6BF0', '#0EA5E9', '#0891B2', '#10B981', '#F59E0B', '#DC2626', '#7C3AED', '#111827'];
+const QUICK_ICONS = [
+  'fa-solid fa-globe', 'fa-solid fa-server', 'fa-solid fa-database', 'fa-solid fa-cloud',
+  'fa-solid fa-map-location-dot', 'fa-solid fa-truck-fast', 'fa-solid fa-chart-line', 'fa-solid fa-warehouse',
+  'fa-solid fa-mobile-screen', 'fa-solid fa-desktop', 'fa-solid fa-gear', 'fa-solid fa-shield-halved',
+  'fa-solid fa-cart-shopping', 'fa-solid fa-book', 'fa-solid fa-comments', 'fa-solid fa-calendar-check',
+  'fa-solid fa-diagram-project', 'fa-solid fa-gauge-high',
+];
+
+interface AcctRow {
+  uid: string;
+  id?: string; // present when row mirrors a persisted account (edit mode)
+  role: string;
+  username: string;
+  password: string;
+  show: boolean;
+}
+
 const tab = ref<'basic' | 'accounts' | 'remark'>('basic');
-const form = ref<SystemInput>({
-  name: '', url: '', environment: 'development', icon: '', iconColor: '', favorite: false, sort: 0, remark: '',
-});
-const colorHex = computed<string>({
-  get: () => {
-    const v = form.value.iconColor || '';
-    const m = v.match(/#([0-9a-fA-F]{6})\b/);
-    return m ? m[0] : '#007AFF';
-  },
-  set: (val: string) => { form.value.iconColor = val; },
-});
-const selectedTags = ref<Array<{ id: string; name: string; color?: string }>>([]);
-const newTag = ref('');
-const accounts = ref<Account[]>([]);
-const pendingAccounts = ref<Array<{ tempId: string; role: string; username: string; password: string; isDefault: boolean }>>([]);
+const form = ref<SystemInput>(blankForm());
+const tags = ref<string[]>([]);
+const tagInput = ref('');
+const tagInputEl = ref<HTMLInputElement | null>(null);
+const acctRows = ref<AcctRow[]>([]);
 
-const displayAccounts = computed<Account[]>(() => {
-  if (props.system) return accounts.value;
-  return pendingAccounts.value.map(a => ({
-    id: a.tempId,
-    systemId: 'temp',
-    role: a.role,
-    username: a.username,
-    password: { __encrypted: false, value: a.password } as EncryptedField,
-    isDefault: a.isDefault,
+function blankForm(): SystemInput {
+  return {
+    name: '',
+    url: '',
+    environment: 'production',
+    icon: 'fa-solid fa-globe',
+    iconColor: '#2E6BF0',
+    favorite: false,
+    sort: 0,
     remark: '',
-    createdAt: 0,
-    updatedAt: 0,
-  }));
-});
+  };
+}
 
-watch(() => props.visible, async (v) => {
-  if (!v) return;
-  tab.value = 'basic';
-  newTag.value = '';
-  pendingAccounts.value = [];
-  if (props.system) {
-    form.value = { ...props.system };
-    accounts.value = await accountStore.loadBySystem(props.system.id).then(() => accountStore.list);
-  } else {
-    form.value = { name: '', url: '', environment: 'development', icon: '', iconColor: '', favorite: false, sort: 0, remark: '' };
-    accounts.value = [];
-  }
-}, { immediate: true });
+const currentColor = computed(() => form.value.iconColor || '#2E6BF0');
+const currentIcon = computed(() => form.value.icon || 'fa-solid fa-globe');
 
+// ---------- pickers ----------
+function pickColor(c: string) {
+  form.value.iconColor = c;
+}
+function pickIcon(ic: string) {
+  form.value.icon = ic;
+}
+function colorOptStyle(c: string) {
+  const on = c.toLowerCase() === currentColor.value.toLowerCase();
+  return {
+    background: c,
+    boxShadow: on ? `0 0 0 2px var(--solid), 0 0 0 4px ${c}` : 'none',
+    transform: on ? 'scale(1.12)' : 'none',
+  } as Record<string, string>;
+}
+function iconOptStyle(ic: string) {
+  if (ic !== currentIcon.value) return { borderColor: 'var(--border)' } as Record<string, string>;
+  const color = currentColor.value;
+  return {
+    borderColor: 'transparent',
+    color: '#fff',
+    background: color,
+    boxShadow: `0 3px 10px -3px ${color}`,
+  } as Record<string, string>;
+}
+
+// ---------- tag chips ----------
+function focusTagInput() {
+  tagInputEl.value?.focus();
+}
 function addTag() {
-  if (!newTag.value.trim()) return;
-  const name = newTag.value.trim();
-  tagStore.create(name).then(id => {
-    selectedTags.value.push({ id, name });
-    newTag.value = '';
-  });
+  const v = tagInput.value.trim();
+  if (v && !tags.value.includes(v)) tags.value.push(v);
+  tagInput.value = '';
+}
+function removeTag(i: number) {
+  tags.value.splice(i, 1);
 }
 
-function removeTag(id: string) {
-  selectedTags.value = selectedTags.value.filter(t => t.id !== id);
-}
-
-async function onAddAccount(account: { role: string; username: string; password: string; isDefault: boolean }) {
-  if (props.system) {
-    await accountStore.create({
-      systemId: props.systemId,
-      role: account.role,
-      username: account.username,
-      password: account.password,
-      isDefault: account.isDefault,
-    });
-    accounts.value = accountStore.list;
-  } else {
-    if (account.isDefault) {
-      pendingAccounts.value.forEach(a => a.isDefault = false);
+// ---------- url paste ----------
+async function pasteUrl() {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (t) {
+      form.value.url = t.trim();
+      toast.info('已粘贴链接');
     }
-    pendingAccounts.value.push({
-      tempId: `temp-${Date.now()}-${Math.random()}`,
-      role: account.role,
-      username: account.username,
-      password: account.password,
-      isDefault: account.isDefault,
-    });
+  } catch {
+    toast.error('无法读取剪贴板');
   }
-  toast.success('账号已添加');
 }
 
-async function deleteAccount(id: string) {
-  if (props.system) {
-    await accountStore.remove(id, props.systemId);
-    accounts.value = accountStore.list;
-  } else {
-    pendingAccounts.value = pendingAccounts.value.filter(a => a.tempId !== id);
-  }
-  toast.success('已删除');
+// ---------- account rows ----------
+function newUid() {
+  return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+function addAccountRow(role = '', username = '', password = '', id?: string) {
+  acctRows.value.push({ uid: newUid(), id, role, username, password, show: false });
+}
+function removeAccountRow(idx: number) {
+  acctRows.value.splice(idx, 1);
 }
 
-async function setDefault(id: string) {
-  if (props.system) {
-    await accountStore.setDefault(props.systemId, id);
-    accounts.value = accountStore.list;
-  } else {
-    pendingAccounts.value.forEach(a => a.isDefault = (a.tempId === id));
-  }
-  toast.success('已设为默认账号');
-}
+// ---------- load on open ----------
+watch(
+  () => props.visible,
+  async (v) => {
+    if (!v) return;
+    tab.value = 'basic';
+    tagInput.value = '';
+    acctRows.value = [];
+    if (props.system) {
+      form.value = {
+        ...props.system,
+        icon: props.system.icon || 'fa-solid fa-globe',
+        iconColor: props.system.iconColor || props.system.color || '#2E6BF0',
+      };
+      // tags (v3 stores names; backend resolves names ↔ ids)
+      try {
+        const tagIds = await systemService.getTags(props.system.id);
+        if (tagIds.length) {
+          const all = await tagService.all();
+          const idToName = new Map(all.map(t => [t.id, t.name]));
+          tags.value = tagIds
+            .map(id => idToName.get(id))
+            .filter((n): n is string => !!n);
+        } else {
+          tags.value = [];
+        }
+      } catch {
+        tags.value = [];
+      }
+      // accounts → editable rows
+      await accountStore.loadBySystem(props.system.id);
+      for (const acc of accountStore.list) {
+        let plain = '';
+        if (!acc.password.__encrypted) {
+          plain = acc.password.value;
+        } else {
+          try {
+            const { plainPassword } = await accountService.getDecrypted(acc.id);
+            plain = plainPassword;
+          } catch {
+            plain = '';
+          }
+        }
+        addAccountRow(acc.role, acc.username, plain, acc.id);
+      }
+    } else {
+      form.value = blankForm();
+      tags.value = [];
+    }
+  },
+  { immediate: true },
+);
 
+// ---------- save (logic preserved) ----------
 async function save() {
   if (!form.value.name.trim()) {
-    toast.error('系统名称不能为空');
+    toast.error('请填写系统名称');
     tab.value = 'basic';
     return;
   }
   if (!form.value.url.trim()) {
-    toast.error('系统地址不能为空');
+    toast.error('请填写系统地址');
     tab.value = 'basic';
     return;
   }
@@ -219,250 +354,355 @@ async function save() {
     tab.value = 'basic';
     return;
   }
+
+  const tagNames = [...tags.value];
+  const rows = acctRows.value.filter(
+    a => a.role.trim() || a.username.trim() || a.password.trim(),
+  );
+
   try {
     if (props.system) {
       await systemStore.update(props.system.id, form.value);
-      await systemStore.setTags(props.system.id, selectedTags.value.map(t => t.name));
+      await systemStore.setTags(props.system.id, tagNames);
+      // diff account rows: delete removed existing, create new
+      const initialIds = accountStore.list.map(a => a.id);
+      const keptIds = new Set(rows.map(r => r.id).filter((id): id is string => !!id));
+      for (const id of initialIds) {
+        if (!keptIds.has(id)) await accountStore.remove(id, props.system.id);
+      }
+      for (const r of rows) {
+        if (!r.id) {
+          await accountStore.create({
+            systemId: props.system.id,
+            role: r.role.trim(),
+            username: r.username.trim(),
+            password: r.password,
+            isDefault: false,
+          });
+        }
+      }
       toast.success('系统已更新');
     } else {
       const id = await systemStore.create(form.value);
-      await systemStore.setTags(id, selectedTags.value.map(t => t.name));
-      for (const acc of pendingAccounts.value) {
+      await systemStore.setTags(id, tagNames);
+      for (const r of rows) {
         await accountStore.create({
           systemId: id,
-          role: acc.role,
-          username: acc.username,
-          password: acc.password,
-          isDefault: acc.isDefault,
+          role: r.role.trim(),
+          username: r.username.trim(),
+          password: r.password,
+          isDefault: false,
         });
       }
-      toast.success(`系统已创建${pendingAccounts.value.length > 0 ? `（含 ${pendingAccounts.value.length} 个账号）` : ''}`);
+      toast.success(`系统已添加${rows.length > 0 ? `（含 ${rows.length} 个账号）` : ''}`);
     }
     emit('saved');
   } catch (e) {
     toast.error((e as Error).message || '保存失败');
   }
 }
-
-function copy(text: string) { copyToClipboard(text); }
 </script>
 
 <style scoped>
-.modal-overlay {
+/* ================= 弹窗外壳（v3 panel-solid + 弹簧动画） ================= */
+.sys-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-modal);
   padding: 24px;
+  background: rgba(15, 23, 38, 0.35);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
-.modal-dialog {
-  background: var(--bg-pure);
-  border-radius: var(--radius-xl);
-  padding: 4px 0 0;
-  width: 580px;
-  max-width: 100%;
-  max-height: 88vh;
+.sys-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 512px;
+  max-height: 88vh;
   overflow: hidden;
-  box-shadow: var(--shadow-xl);
-  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 24px 70px -16px rgba(15, 23, 38, 0.3), 0 0 40px -16px var(--glow);
 }
-.modal-header {
+
+.sys-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 8px;
+  padding: 16px 20px 4px;
   flex-shrink: 0;
 }
-.modal-header h3 {
+.sys-header h2 {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: 15px;
   font-weight: var(--font-semibold);
-  color: var(--text-primary);
-  letter-spacing: -0.2px;
-}
-.icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: var(--transition-fast);
-  background: transparent;
-  border: none;
-}
-.icon-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
-.detail-tabs {
+/* tab strip — full-width, bottom border */
+.mtab-strip {
   display: flex;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border-soft);
-  margin: 8px 0 0;
-  gap: var(--gap-xs);
+  padding: 0 8px;
+  margin-top: 4px;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.detail-tab {
-  padding: 10px 14px;
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
-  cursor: pointer;
-  position: relative;
-  font-weight: var(--font-medium);
-  transition: var(--transition-fast);
-}
-.detail-tab:hover { color: var(--text-primary); }
-.detail-tab.active {
-  color: var(--primary);
-  font-weight: var(--font-semibold);
-}
-.detail-tab.active::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 14px;
-  right: 14px;
-  height: 2px;
-  background: var(--primary);
-  border-radius: 2px 2px 0 0;
+.acct-count {
+  margin-left: 2px;
+  font-size: 12px;
+  color: var(--ink3);
 }
 
-.modal-body {
+.sys-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 20px 24px 8px;
-}
-.form-row {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: var(--gap-md);
-  gap: var(--gap-md);
-}
-.form-label {
-  width: 80px;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  padding-top: 11px;
-  flex-shrink: 0;
-  font-weight: var(--font-medium);
-}
-.form-label .req { color: var(--danger); margin-left: 2px; }
-.form-field { flex: 1; min-width: 0; }
-.form-input, .form-select, .form-textarea {
-  width: 100%;
-  height: var(--control-h);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: 0 14px;
-  font-size: var(--text-sm);
-  background: var(--bg-pure);
-  outline: none;
-  font-family: inherit;
-  color: var(--text-primary);
-  transition: var(--transition-fast);
-}
-.form-input::placeholder, .form-textarea::placeholder { color: var(--text-quaternary); }
-.form-input:hover, .form-select:hover, .form-textarea:hover { border-color: var(--text-quaternary); }
-.form-input:focus, .form-select:focus, .form-textarea:focus {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-focus);
-}
-.form-textarea {
-  height: auto;
-  padding: 10px 14px;
-  resize: vertical;
-  min-height: 100px;
-  line-height: var(--leading-normal);
-}
-.form-icon { position: relative; }
-.form-icon i {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-quaternary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  transition: var(--transition-fast);
-}
-.form-icon i:hover { color: var(--primary); background: var(--primary-50); }
-
-.tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap-xs);
-  margin-bottom: var(--gap-sm);
-}
-.tag-add-input { width: 100%; }
-
-.color-bar-wrap { display: flex; align-items: center; gap: var(--gap-md); }
-.color-picker-native {
-  flex: 1;
-  height: var(--control-h);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: 4px;
-  background: var(--bg-pure);
-  cursor: pointer;
-  outline: none;
-  transition: var(--transition-fast);
-}
-.color-picker-native:hover { border-color: var(--primary); }
-.color-picker-native::-webkit-color-swatch-wrapper { padding: 0; }
-.color-picker-native::-webkit-color-swatch { border: none; border-radius: var(--radius-sm); }
-.color-hex {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-  min-width: 88px;
+  padding: 16px 20px;
 }
 
-.accounts-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  color: var(--text-tertiary);
-  text-align: center;
-}
-.accounts-hint i {
-  font-size: 32px;
-  margin-bottom: var(--gap-sm);
-  color: var(--primary);
-}
-.accounts-hint p {
-  font-size: var(--text-sm);
-  margin: 0;
-  line-height: var(--leading-normal);
-}
-
-.modal-footer {
+.sys-footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--gap-md);
-  padding: 16px 24px 20px;
-  border-top: 1px solid var(--border-soft);
-  margin-top: var(--gap-md);
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
+/* ================= v3 输入 / 按钮（本地别名，视觉与 v3 .inp/.btn-p/.btn-g 一致） ================= */
+.inp {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+[data-theme='dark'] .inp { background: var(--bg2); }
+.inp::placeholder { color: var(--ink3); }
+.inp:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+select.inp {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%238593A9' fill='none' stroke-width='1.5' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+.btn-p {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: 0.18s;
+  box-shadow: var(--shadow-primary), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-p:hover { filter: brightness(1.07); }
+.btn-p:active { transform: scale(0.97); }
+.btn-p i { font-size: 11px; }
+
+.btn-g {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--ink2);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: 0.15s;
+}
+.btn-g:hover { border-color: var(--border2); color: var(--ink); background: var(--panel2); }
+.btn-g:active { transform: scale(0.97); }
+.btn-g i { font-size: 11px; }
+
+/* ================= 基本信息面板 ================= */
+.panel-space { display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; }
+.lbl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: var(--font-medium);
+  color: var(--ink2);
+}
+.req-mark { color: var(--danger); font-size: 7px; }
+
+.url-wrap { position: relative; }
+.url-input { padding-right: 36px; }
+.url-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+}
+.url-btn i { font-size: 12px; }
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* color dot picker */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.color-opt {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+/* icon grid */
+.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.icon-opt {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  transition: 0.15s;
+}
+.icon-opt i { font-size: 12px; }
+
+/* tag chip input */
+.tag-inp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 6px 12px;
+  cursor: text;
+}
+.tag-chip { padding: 2px 7px; font-size: 11.5px; }
+.tag-x {
+  margin-left: 2px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink3);
+  cursor: pointer;
+  line-height: 1;
+}
+.tag-x:hover { color: var(--ink); }
+.tag-x i { font-size: 9px; }
+.tag-input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  font-family: inherit;
+}
+.tag-input::placeholder { color: var(--ink3); }
+
+/* ================= 账号面板 ================= */
+.acct-panel { display: flex; flex-direction: column; }
+.acct-head {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.2fr 72px;
+  gap: 8px;
+  padding: 0 4px;
+  margin-bottom: 8px;
+  font-size: 10.5px;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink3);
+}
+.ta-right { text-align: right; }
+.acct-rows { display: flex; flex-direction: column; gap: 8px; }
+.acct-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.2fr 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.acct-inp {
+  background: transparent;
+  border-color: transparent;
+  padding: 6px 8px;
+  font-size: 12px;
+  height: auto;
+}
+.acct-inp:focus { box-shadow: none; border-color: var(--accent); }
+.pwd-cell { position: relative; }
+.pwd-input { padding-right: 28px; }
+.pwd-toggle {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+}
+.pwd-toggle i { font-size: 10px; }
+.acct-ops { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.acct-ops .ibtn { width: 24px; height: 24px; }
+.acct-confirm { color: var(--ok); }
+.acct-confirm:hover { background: rgba(5, 150, 105, 0.1); color: var(--ok); }
+
+.dashed {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+  border-style: dashed;
+}
+
+/* ================= 备注 ================= */
+.remark-area {
+  height: auto;
+  resize: none;
+  line-height: var(--leading-normal);
+}
+
+/* ================= 过渡（v3 弹簧） ================= */
+.sys-modal-enter-active { transition: opacity 0.18s ease; }
+.sys-modal-leave-active { transition: opacity 0.16s ease; }
+.sys-modal-enter-active .sys-panel {
+  transition: transform 0.3s cubic-bezier(0.3, 1.3, 0.45, 1), opacity 0.3s ease;
+}
+.sys-modal-leave-active .sys-panel {
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+.sys-modal-enter-from, .sys-modal-leave-to { opacity: 0; }
+.sys-modal-enter-from .sys-panel { transform: translateY(16px) scale(0.95); opacity: 0; }
+.sys-modal-leave-to .sys-panel { transform: translateY(8px) scale(0.97); opacity: 0; }
 </style>
