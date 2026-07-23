@@ -56,15 +56,6 @@
         <i :class="copiedFlag === 'ssh' ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
         <span>{{ copiedFlag === 'ssh' ? '已复制' : '复制 SSH' }}</span>
       </button>
-      <button
-        class="btn btn-default copy-btn"
-        :class="{ copied: copiedFlag === 'pwd' }"
-        title="复制密码"
-        @click.stop="onCopyPassword"
-      >
-        <i :class="copiedFlag === 'pwd' ? 'fa-solid fa-check' : 'fa-solid fa-key'"></i>
-        <span>{{ copiedFlag === 'pwd' ? '已复制' : '复制密码' }}</span>
-      </button>
     </div>
   </div>
 </template>
@@ -75,15 +66,13 @@ import type { Server } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
 import { copyToClipboard } from '@shared/utils/clipboard';
 import { useToastStore } from '@shared/stores/toastStore';
-import { useServerStore } from '@shared/stores/serverStore';
 import EnvBadge from '../common/EnvBadge.vue';
 
 const props = defineProps<{ server: Server }>();
 defineEmits<{ select: []; edit: [] }>();
 
 const toast = useToastStore();
-const serverStore = useServerStore();
-const copiedFlag = ref<'' | 'ip' | 'ssh' | 'pwd'>('');
+const copiedFlag = ref<'' | 'ip' | 'ssh'>('');
 
 const statusKey = computed(() => props.server.status ?? 'online');
 const online = computed(() => statusKey.value !== 'offline');
@@ -126,17 +115,6 @@ async function onCopySsh() {
     toast.success('SSH 命令已复制');
     copiedFlag.value = 'ssh';
     setTimeout(() => { if (copiedFlag.value === 'ssh') copiedFlag.value = ''; }, 1200);
-  } catch {
-    toast.error('复制失败');
-  }
-}
-
-async function onCopyPassword() {
-  try {
-    await serverStore.copyPassword(props.server.id);
-    toast.success('密码已复制');
-    copiedFlag.value = 'pwd';
-    setTimeout(() => { if (copiedFlag.value === 'pwd') copiedFlag.value = ''; }, 1200);
   } catch {
     toast.error('复制失败');
   }

@@ -36,6 +36,7 @@
         </div>
 
         <div class="tag-row">
+          <EnvBadge :env="mwEnv(m)" size="sm" />
           <span v-if="m.version" class="chip">v{{ m.version }}</span>
           <span v-if="m.database" class="chip">{{ m.database }}</span>
         </div>
@@ -46,8 +47,8 @@
             <dd>{{ m.username || '—' }}</dd>
           </div>
           <div class="detail-row">
-            <dt><i class="fa-solid fa-database"></i><span>数据库</span></dt>
-            <dd>{{ m.database || '—' }}</dd>
+            <dt><i class="fa-regular fa-clock"></i><span>最后更新</span></dt>
+            <dd>{{ formatRelativeTime(m.updatedAt) }}</dd>
           </div>
         </dl>
 
@@ -59,15 +60,6 @@
           >
             <i :class="copiedFlags[m.id] === 'addr' ? 'fa-solid fa-check' : 'fa-solid fa-link'"></i>
             <span>{{ copiedFlags[m.id] === 'addr' ? '已复制' : '复制连接地址' }}</span>
-          </button>
-          <button
-            class="btn btn-default copy-btn"
-            :class="{ copied: copiedFlags[m.id] === 'pwd' }"
-            title="复制密码"
-            @click="onCopyPwd(m)"
-          >
-            <i :class="copiedFlags[m.id] === 'pwd' ? 'fa-solid fa-check' : 'fa-solid fa-key'"></i>
-            <span>{{ copiedFlags[m.id] === 'pwd' ? '已复制' : '复制密码' }}</span>
           </button>
         </div>
       </div>
@@ -94,8 +86,10 @@ import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { getMiddlewareMeta, type MiddlewareType } from '@shared/types/enums';
-import type { Middleware } from '@shared/types/entities';
+import type { Middleware, Environment } from '@shared/types/entities';
+import { formatRelativeTime } from '@shared/utils/time';
 import MiddlewareForm from '../components/middleware/MiddlewareForm.vue';
+import EnvBadge from '../components/common/EnvBadge.vue';
 
 // v3 per-type colored icon tiles. Keys match MiddlewareType values (lowercase).
 // Colors per task brief; types not listed fall back to the accent-blue cube.
@@ -116,6 +110,10 @@ function mwMeta(type: string) {
 function typeLabel(type: string) {
   return getMiddlewareMeta(type as MiddlewareType).label;
 }
+function mwEnv(m: Middleware): Environment {
+  const env = (m.extra as Record<string, unknown> | undefined)?.environment;
+  return (env as Environment) || 'development';
+}
 
 const store = useMiddlewareStore();
 const toast = useToastStore();
@@ -123,7 +121,7 @@ const dialog = useDialogStore();
 const formVisible = ref(false);
 const editing = ref<Middleware | null>(null);
 const search = ref('');
-const copiedFlags = reactive<Record<string, 'addr' | 'pwd'>>({});
+const copiedFlags = reactive<Record<string, 'addr'>>({});
 
 onMounted(async () => { await store.load(); });
 
@@ -149,16 +147,6 @@ async function onCopyAddr(m: Middleware) {
     toast.success('连接地址已复制');
     copiedFlags[m.id] = 'addr';
     setTimeout(() => { if (copiedFlags[m.id] === 'addr') delete copiedFlags[m.id]; }, 1200);
-  } catch {
-    toast.error('复制失败');
-  }
-}
-async function onCopyPwd(m: Middleware) {
-  try {
-    await store.copyPassword(m.id);
-    toast.success('密码已复制');
-    copiedFlags[m.id] = 'pwd';
-    setTimeout(() => { if (copiedFlags[m.id] === 'pwd') delete copiedFlags[m.id]; }, 1200);
   } catch {
     toast.error('复制失败');
   }
