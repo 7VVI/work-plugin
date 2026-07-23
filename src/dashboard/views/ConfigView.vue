@@ -9,7 +9,7 @@
     </div>
 
     <div class="split-body">
-      <div class="left-panel">
+      <div class="left-panel panel">
         <div
           v-for="g in filtered"
           :key="g.id"
@@ -28,7 +28,7 @@
         </div>
       </div>
 
-      <div class="right-panel">
+      <div class="right-panel panel">
         <template v-if="selected">
           <div class="right-header">
             <div class="title-wrap">
@@ -50,9 +50,9 @@
               <template v-for="(item, idx) in selected.items" :key="idx">
                 <!-- 编辑态 -->
                 <div v-if="editingIdx === idx" class="field-item edit-row">
-                  <input v-model="editItem.key" class="cell-input mono" placeholder="如：api_key" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <input v-model="editItem.label" class="cell-input" placeholder="如：API 密钥" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <input v-model="editItem.defaultValue" class="cell-input mono" placeholder="默认值" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
+                  <input v-model="editItem.key" class="finput mono" placeholder="如：api_key" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
+                  <input v-model="editItem.label" class="finput" placeholder="如：API 密钥" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
+                  <input v-model="editItem.defaultValue" class="finput mono" placeholder="默认值" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
                   <div class="field-icons">
                     <div class="row-action confirm" @click="confirmEdit" title="确认"><i class="fa-solid fa-check"></i></div>
                     <div class="row-action danger" @click="cancelEdit" title="取消"><i class="fa-solid fa-xmark"></i></div>
@@ -72,9 +72,9 @@
               </template>
               <div v-if="selected.items.length === 0 && !adding" class="empty-row">暂无字段，点击下方"添加字段"添加</div>
               <div v-if="adding" class="field-item edit-row">
-                <input ref="addKeyRef" v-model="newItem.key" class="cell-input mono" placeholder="如：api_key" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <input v-model="newItem.label" class="cell-input" placeholder="如：API 密钥" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <input v-model="newItem.defaultValue" class="cell-input mono" placeholder="默认值" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
+                <input ref="addKeyRef" v-model="newItem.key" class="finput mono" placeholder="如：api_key" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
+                <input v-model="newItem.label" class="finput" placeholder="如：API 密钥" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
+                <input v-model="newItem.defaultValue" class="finput mono" placeholder="默认值" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
                 <div class="field-icons">
                   <div class="row-action confirm" @click="confirmAdd" title="确认"><i class="fa-solid fa-check"></i></div>
                   <div class="row-action danger" @click="cancelAdd" title="取消"><i class="fa-solid fa-xmark"></i></div>
@@ -288,12 +288,8 @@ async function onCopy(value: string) {
 }
 
 .left-panel {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
   overflow-y: auto;
   padding: var(--gap-sm);
-  box-shadow: var(--shadow-sm);
 }
 .left-item {
   display: flex;
@@ -303,14 +299,19 @@ async function onCopy(value: string) {
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--ink2);
   transition: var(--transition-fast);
   margin-bottom: 2px;
 }
-.left-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.left-item:hover { background: var(--surface-hover); color: var(--ink); }
 .left-item.active {
   background: var(--primary-50);
-  color: var(--primary);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--glow);
+}
+.left-item.active:hover {
+  background: var(--primary-50);
+  color: var(--accent);
 }
 .left-item > i:first-child {
   font-size: var(--text-sm);
@@ -359,13 +360,9 @@ async function onCopy(value: string) {
 .empty-left p { font-size: var(--text-sm); margin: 0; }
 
 .right-panel {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
 }
 .right-header {
   display: flex;
@@ -493,26 +490,9 @@ async function onCopy(value: string) {
   color: var(--text-tertiary);
   font-size: var(--text-sm);
 }
-.cell-input {
-  width: 100%;
-  height: 32px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 0 10px;
-  font-size: var(--text-sm);
-  outline: none;
-  font-family: inherit;
-  background: var(--bg-pure);
-  color: var(--text-primary);
-  transition: var(--transition-fast);
-  min-width: 0;
-}
-.cell-input.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
-.cell-input::placeholder { color: var(--text-quaternary); }
-.cell-input:focus {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-focus);
-}
+/* 字段行内编辑输入：复用 tokens 的 .finput（透明底/聚焦描边） */
+.field-item input { min-width: 0; }
+.finput.mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink); }
 .right-body {
   flex: 1;
   overflow-y: auto;
