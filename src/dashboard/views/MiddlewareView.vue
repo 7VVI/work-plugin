@@ -13,7 +13,13 @@
     </div>
 
     <!-- 中间件网格 - v3 风格 -->
-    <div class="mw-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <VueDraggable
+      v-model="filtered"
+      class="mw-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+      :animation="200"
+      ghost-class="dragging"
+      @end="onDragEnd"
+    >
       <div v-for="m in filtered" :key="m.id" class="panel stat-card group p-4">
         <!-- 图标 + 环境 -->
         <div class="flex items-start justify-between">
@@ -86,7 +92,7 @@
         <i class="fa-solid fa-layer-group text-2xl t3"></i>
         <div class="mt-2 text-[13px] t3">暂无中间件，点击"新增中间件"添加</div>
       </div>
-    </div>
+    </VueDraggable>
 
     <MiddlewareForm :visible="formVisible" :middleware="editing" @close="formVisible = false" @saved="onSaved" />
   </div>
@@ -94,6 +100,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { VueDraggable } from 'vue-draggable-plus';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -164,6 +171,18 @@ async function onCopyAddr(m: Middleware) {
     toast.error('复制失败');
   }
 }
+
+async function onDragEnd(event: any) {
+  const { oldIndex, newIndex } = event;
+  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
+  const newList = [...filtered.value];
+  const [moved] = newList.splice(oldIndex, 1);
+  newList.splice(newIndex, 0, moved);
+  const orderedIds = newList.map(m => m.id);
+  await store.reorder(orderedIds);
+  await store.load();
+  toast.success('排序已更新');
+}
 </script>
 
 <style scoped>
@@ -189,5 +208,11 @@ async function onCopyAddr(m: Middleware) {
   min-height: 0;
   overflow-y: auto;
   align-content: start;
+}
+
+.dragging {
+  opacity: 0.5;
+  background: var(--accent) !important;
+  box-shadow: 0 8px 24px rgba(46, 107, 240, 0.3) !important;
 }
 </style>
