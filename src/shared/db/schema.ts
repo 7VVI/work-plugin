@@ -20,10 +20,10 @@ export class NavPortalDB extends Dexie {
   constructor() {
     super('NavPortalDB');
     this.version(1).stores({
-      systems:        'id, name, url, environment, favorite, sort, createdAt, updatedAt',
+      systems:        'id, name, url, environment, favorite, sort, sortOrder, createdAt, updatedAt',
       accounts:       'id, systemId, isDefault, createdAt',
-      servers:        'id, name, ip, environment, favorite, createdAt',
-      middlewares:    'id, type, name, host, favorite, createdAt',
+      servers:        'id, name, ip, environment, favorite, sortOrder, createdAt',
+      middlewares:    'id, type, name, host, favorite, sortOrder, createdAt',
       tags:           'id, name, createdAt',
       systemTags:     '[systemId+tagId], systemId, tagId',
       serverTags:     '[serverId+tagId], serverId, tagId',

@@ -17,6 +17,7 @@ export interface System {
   color?: string;
   favorite: boolean;
   sort: number;
+  sortOrder?: number;
   remark?: string;
   createdAt: number;
   updatedAt: number;
@@ -47,6 +48,7 @@ export interface Server {
   purpose?: string;
   remark?: string;
   favorite: boolean;
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -64,6 +66,7 @@ export interface Middleware {
   extra?: Record<string, unknown>;
   remark?: string;
   favorite: boolean;
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }
