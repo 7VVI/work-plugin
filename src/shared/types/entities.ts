@@ -17,6 +17,7 @@ export interface System {
   color?: string;
   favorite: boolean;
   sort: number;
+  sortOrder?: number;
   remark?: string;
   createdAt: number;
   updatedAt: number;
@@ -47,6 +48,7 @@ export interface Server {
   purpose?: string;
   remark?: string;
   favorite: boolean;
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -64,6 +66,7 @@ export interface Middleware {
   extra?: Record<string, unknown>;
   remark?: string;
   favorite: boolean;
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -87,29 +90,50 @@ export interface Recent {
   role?: string;
 }
 
-// 配置三级结构（与 v3 dashboard.html 对齐）：项目 → 配置 → 字段
-// 项目(ConfigProject) 对应 v3 左侧项目列表；配置(ConfigDef) 对应 v3 右侧 chips；字段(ConfigField) 对应 v3 表格行
-export interface ConfigField {
+export interface ConfigItem {
   key: string;
   label?: string;
+  defaultValue?: string;
   value?: string;
 }
 
-export interface ConfigDef {
+export interface ConfigGroup {
   id: string;
   name: string;
-  fields: ConfigField[];
-}
-
-export interface ConfigProject {
-  id: string;
-  name: string;
-  configs: ConfigDef[];
+  items: ConfigItem[];
   createdAt: number;
   updatedAt: number;
 }
 
+export type ConfigGroupInput = Omit<ConfigGroup, 'id' | 'createdAt' | 'updatedAt'>;
+
+// v3 三级结构：项目 → 配置 → 字段
+export interface ConfigProject {
+  id: string;
+  name: string;
+  sortOrder?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ConfigDef {
+  id: string;
+  projectId: string;
+  name: string;
+  fields: ConfigField[];
+  sortOrder?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ConfigField {
+  key: string;
+  label: string;
+  value: string;
+}
+
 export type ConfigProjectInput = Omit<ConfigProject, 'id' | 'createdAt' | 'updatedAt'>;
+export type ConfigDefInput = Omit<ConfigDef, 'id' | 'createdAt' | 'updatedAt' | 'fields'>;
 
 export interface MetaEntry {
   key: string;

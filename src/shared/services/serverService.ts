@@ -88,4 +88,8 @@ export const serverService = {
   async search(query: string): Promise<Server[]> {
     return serverRepo.search(query);
   },
+
+  async reorder(orderedIds: string[]): Promise<void> {
+    await serverRepo.reorder(orderedIds);
+  },
 };
