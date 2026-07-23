@@ -1,89 +1,87 @@
 <template>
-  <div class="server-card stat-card" @click="$emit('select')">
-    <div class="card-head">
-      <span class="status-dot" :class="online ? 'on' : 'off'" :title="statusLabel">
-        <span class="ping"></span>
+  <div class="panel stat-card group p-4" @click="$emit('select')">
+    <!-- 状态点 + 操作 -->
+    <div class="flex items-center justify-between">
+      <span class="inline-flex items-center gap-1.5 text-[11px] font-medium" :style="statusColor">
+        <span class="relative flex h-1.5 w-1.5">
+          <span v-if="online" class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" :style="{ background: statusColor.background }"></span>
+          <span class="relative inline-flex h-1.5 w-1.5 rounded-full" :style="dotStyle"></span>
+        </span>
+        {{ statusLabel }}
       </span>
-      <button class="row-action edit" @click.stop="$emit('edit')" title="编辑">
-        <i class="fa-solid fa-pen"></i>
-      </button>
-    </div>
-
-    <div class="card-identity">
-      <div class="server-icon">
-        <i :class="iconClass"></i>
-      </div>
-      <div class="identity-text">
-        <div class="server-name">{{ server.name }}</div>
-        <div class="server-ip">{{ server.ip }}{{ server.sshPort ? `:${server.sshPort}` : '' }}</div>
+      <div class="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
+        <button class="ibtn !h-6 !w-6" title="终端" @click.stop="onCopySsh">
+          <i class="fa-solid fa-terminal text-[11px]"></i>
+        </button>
+        <button class="ibtn danger !h-6 !w-6" title="删除" @click.stop="$emit('delete')">
+          <i class="fa-regular fa-trash-can text-[11px]"></i>
+        </button>
       </div>
     </div>
 
-    <div class="tag-row">
-      <EnvBadge :env="server.environment" size="sm" />
+    <!-- 图标 + 名称 -->
+    <div class="mt-3 flex items-center gap-3">
+      <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl text-base text-white" style="background:#F59E0B;box-shadow:0 5px 14px -4px #F59E0B">
+        <i class="fa-solid fa-server"></i>
+      </span>
+      <div class="min-w-0">
+        <div class="truncate text-[14px] font-semibold t1">{{ server.name }}</div>
+        <div class="mono truncate text-xs t3">{{ server.ip }}:{{ server.sshPort || 22 }}</div>
+      </div>
+    </div>
+
+    <!-- 环境徽章 -->
+    <div class="mt-2.5 flex items-center gap-1.5">
+      <EnvBadge :env="server.environment" />
       <span v-if="server.purpose" class="chip">{{ server.purpose }}</span>
     </div>
 
-    <dl class="detail">
-      <div class="detail-row">
-        <dt><i class="fa-solid fa-user"></i><span>账号</span></dt>
-        <dd>{{ server.username || '—' }}</dd>
+    <!-- 详情列表 -->
+    <dl class="mt-3 space-y-1.5 pt-3 text-xs" style="border-top:1px solid var(--border)">
+      <div class="flex justify-between">
+        <dt class="t3">
+          <i class="fa-regular fa-user mr-1.5 w-3 text-center"></i>账号
+        </dt>
+        <dd class="mono t2">{{ server.username || '—' }}</dd>
       </div>
-      <div class="detail-row">
-        <dt><i class="fa-solid fa-plug"></i><span>SSH 端口</span></dt>
-        <dd>{{ server.sshPort || '—' }}</dd>
+      <div class="flex justify-between">
+        <dt class="t3">
+          <i class="fa-solid fa-plug mr-1.5 w-3 text-center"></i>SSH 端口
+        </dt>
+        <dd class="mono t2">{{ server.sshPort || 22 }}</dd>
       </div>
-      <div class="detail-row">
-        <dt><i class="fa-regular fa-clock"></i><span>最后更新</span></dt>
-        <dd>{{ formatRelativeTime(server.updatedAt) }}</dd>
+      <div class="flex justify-between">
+        <dt class="t3">
+          <i class="fa-regular fa-clock mr-1.5 w-3 text-center"></i>最后更新
+        </dt>
+        <dd class="t2">{{ formatRelativeTime(server.updatedAt) }}</dd>
       </div>
     </dl>
 
-    <div class="card-actions">
-      <button
-        class="btn btn-default copy-btn"
-        :class="{ copied: copiedFlag === 'ip' }"
-        @click.stop="onCopyIp"
-      >
-        <i :class="copiedFlag === 'ip' ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
-        <span>{{ copiedFlag === 'ip' ? '已复制' : '复制 IP' }}</span>
+    <!-- 操作按钮 -->
+    <div class="mt-3 flex gap-2">
+      <button class="btn-g flex-1 justify-center !py-1.5 !text-xs" @click.stop="onCopyIp">
+        <i class="fa-regular fa-copy text-[10px]"></i>复制 IP
       </button>
-      <button
-        class="btn btn-default copy-btn"
-        :class="{ copied: copiedFlag === 'ssh' }"
-        @click.stop="onCopySsh"
-      >
-        <i :class="copiedFlag === 'ssh' ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
-        <span>{{ copiedFlag === 'ssh' ? '已复制' : '复制 SSH' }}</span>
-      </button>
-      <button
-        class="btn btn-default copy-btn"
-        :class="{ copied: copiedFlag === 'pwd' }"
-        title="复制密码"
-        @click.stop="onCopyPassword"
-      >
-        <i :class="copiedFlag === 'pwd' ? 'fa-solid fa-check' : 'fa-solid fa-key'"></i>
-        <span>{{ copiedFlag === 'pwd' ? '已复制' : '复制密码' }}</span>
+      <button class="btn-g flex-1 justify-center !py-1.5 !text-xs" @click.stop="onCopySsh">
+        <i class="fa-solid fa-terminal text-[10px]"></i>复制 SSH
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import type { Server } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
 import { copyToClipboard } from '@shared/utils/clipboard';
 import { useToastStore } from '@shared/stores/toastStore';
-import { useServerStore } from '@shared/stores/serverStore';
 import EnvBadge from '../common/EnvBadge.vue';
 
 const props = defineProps<{ server: Server }>();
-defineEmits<{ select: []; edit: [] }>();
+defineEmits<{ select: []; delete: [] }>();
 
 const toast = useToastStore();
-const serverStore = useServerStore();
-const copiedFlag = ref<'' | 'ip' | 'ssh' | 'pwd'>('');
 
 const statusKey = computed(() => props.server.status ?? 'online');
 const online = computed(() => statusKey.value !== 'offline');
@@ -93,15 +91,14 @@ const statusLabel = computed(() => ({
   offline: '离线',
 }[statusKey.value as string] ?? '在线'));
 
-const iconClass = computed(() => {
-  const purpose = (props.server.purpose || '').toLowerCase();
-  if (purpose.includes('redis')) return 'fa-solid fa-bolt';
-  if (purpose.includes('mysql') || purpose.includes('数据库') || purpose.includes('database')) return 'fa-solid fa-database';
-  if (purpose.includes('git') || purpose.includes('gitlab')) return 'fa-brands fa-gitlab';
-  if (purpose.includes('backup') || purpose.includes('备份')) return 'fa-solid fa-archive';
-  if (purpose.includes('cache') || purpose.includes('缓存')) return 'fa-solid fa-bolt';
-  return 'fa-solid fa-server';
-});
+const statusColor = computed(() => ({
+  background: online.value ? 'var(--ok)' : 'var(--ink3)',
+}));
+
+const dotStyle = computed(() => ({
+  background: online.value ? 'var(--ok)' : 'var(--ink3)',
+  boxShadow: online.value ? '0 0 8px var(--ok)' : 'transparent',
+}));
 
 function buildSshCommand() {
   const user = props.server.username || 'root';
@@ -113,8 +110,6 @@ async function onCopyIp() {
   try {
     await copyToClipboard(props.server.ip);
     toast.success('IP 已复制');
-    copiedFlag.value = 'ip';
-    setTimeout(() => { if (copiedFlag.value === 'ip') copiedFlag.value = ''; }, 1200);
   } catch {
     toast.error('复制失败');
   }
@@ -124,19 +119,6 @@ async function onCopySsh() {
   try {
     await copyToClipboard(buildSshCommand());
     toast.success('SSH 命令已复制');
-    copiedFlag.value = 'ssh';
-    setTimeout(() => { if (copiedFlag.value === 'ssh') copiedFlag.value = ''; }, 1200);
-  } catch {
-    toast.error('复制失败');
-  }
-}
-
-async function onCopyPassword() {
-  try {
-    await serverStore.copyPassword(props.server.id);
-    toast.success('密码已复制');
-    copiedFlag.value = 'pwd';
-    setTimeout(() => { if (copiedFlag.value === 'pwd') copiedFlag.value = ''; }, 1200);
   } catch {
     toast.error('复制失败');
   }
@@ -144,144 +126,5 @@ async function onCopyPassword() {
 </script>
 
 <style scoped>
-.server-card {
-  padding: var(--gap-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-md);
-  cursor: pointer;
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 22px;
-}
-
-/* v3 在线呼吸点 —— 必须与 .ping 同处一个 scoped 块（Vue 会重命名 @keyframes） */
-.status-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; }
-.status-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-.status-dot.on .ping {
-  position: absolute; inset: 0; border-radius: 50%;
-  background: var(--ok);
-  animation: ping 1.6s cubic-bezier(0, 0, .2, 1) infinite;
-  opacity: .6;
-}
-.status-dot.off { background: var(--ink3); }
-@keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
-
-.card-head .row-action {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--ink3);
-  cursor: pointer;
-  transition: var(--transition-fast);
-  font-size: 11px;
-}
-.card-head .row-action:hover {
-  background: var(--panel2);
-  color: var(--accent);
-}
-
-.card-identity {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-md);
-}
-.server-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: var(--text-base);
-  flex-shrink: 0;
-  background: #F59E0B;
-  box-shadow: 0 5px 14px -4px #F59E0B;
-}
-.identity-text { min-width: 0; flex: 1; }
-.server-name {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  color: var(--ink);
-  line-height: var(--leading-tight);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.server-ip {
-  font-size: var(--text-xs);
-  color: var(--ink3);
-  margin-top: 4px;
-  font-family: var(--font-mono);
-}
-
-.tag-row {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  flex-wrap: wrap;
-}
-
-.detail {
-  margin: 0;
-  padding: var(--gap-md) 0;
-  border-top: 1px solid var(--border-soft);
-  border-bottom: 1px solid var(--border-soft);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-sm);
-}
-.detail-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: var(--text-sm);
-}
-.detail-row dt {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  color: var(--ink3);
-  font-weight: normal;
-}
-.detail-row dt i {
-  font-size: 11px;
-  color: var(--ink3);
-  width: 14px;
-  text-align: center;
-}
-.detail-row dd {
-  margin: 0;
-  color: var(--ink);
-  font-weight: var(--font-medium);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-}
-.copy-btn {
-  flex: 1;
-  height: 34px;
-  padding: 0 var(--gap-sm);
-  font-size: var(--text-sm);
-}
-.copy-btn.copied {
-  border-color: var(--ok);
-  color: var(--ok);
-  background: var(--panel2);
-}
+/* 使用 components.css 中的 panel stat-card 基类 */
 </style>
