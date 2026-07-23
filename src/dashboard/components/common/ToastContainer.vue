@@ -39,15 +39,15 @@ function iconFor(type: string) {
   align-items: center;
   gap: var(--gap-sm);
   padding: 12px 16px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--bg-pure);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 0 24px -10px var(--glow);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--text-primary);
   cursor: pointer;
-  animation: slideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideIn .3s cubic-bezier(.3,1.2,.4,1);
   min-width: 220px;
   max-width: 360px;
 }
@@ -60,7 +60,7 @@ function iconFor(type: string) {
 .toast.info i { color: var(--primary); }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateY(14px) scale(.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
 }
 </style>
