@@ -8,7 +8,7 @@
 
   --bg: #EDF1F8; --bg2: #E4EAF4;
   --panel: #FFFFFF; --panel2: #F4F7FC;
-  --solid: #FFFFFF; --card-bg: #FFFFFF;
+  --solid: #FFFFFF; --card-bg: #FFFFFF; --bg-pure: #FFFFFF;
   --surface: #FFFFFF; --surface-secondary: #F4F7FC;
   --surface-hover: rgba(46,107,240,.04); --surface-active: rgba(46,107,240,.06);
 
@@ -71,7 +71,7 @@ input, select, textarea { font-family: inherit; }
 [data-theme="dark"] {
   --bg: #060A11; --bg2: #0A0F19;
   --panel: rgba(148,178,255,.05); --panel2: rgba(148,178,255,.09);
-  --solid: #0C1322; --card-bg: #0C1322;
+  --solid: #0C1322; --card-bg: #0C1322; --bg-pure: #0C1322;
   --surface: #0C1322; --surface-secondary: rgba(148,178,255,.09);
   --surface-hover: rgba(148,178,255,.08);
   --accent: #3D7FFF; --accent2: #22D3EE; --glow: rgba(61,127,255,.4);
