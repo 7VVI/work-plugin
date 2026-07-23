@@ -41,9 +41,17 @@
             <th class="col-actions">操作</th>
           </tr>
         </thead>
-        <tbody>
+        <VueDraggable
+          v-model="filteredSystems"
+          tag="tbody"
+          :animation="200"
+          ghost-class="dragging"
+          handle=".drag-handle"
+          @end="onDragEnd"
+        >
           <tr v-for="s in filteredSystems" :key="s.id" class="row-group">
             <td class="col-check">
+              <i class="fa-solid fa-grip-vertical drag-handle drag-icon"></i>
               <input type="checkbox" class="row-checkbox" style="accent-color:var(--accent)" :checked="selectedIds.has(s.id)" @change="toggleOne(s.id)" />
             </td>
             <td class="col-name">
@@ -87,12 +95,19 @@
               <div class="empty-text t3">{{ search ? '未找到匹配的系统' : '暂无系统，点击"新增系统"创建' }}</div>
             </td>
           </tr>
-        </tbody>
+        </VueDraggable>
       </table>
     </div>
 
     <!-- 网格视图 - v3 风格 -->
-    <div v-else class="systems-grid rise d2">
+    <VueDraggable
+      v-else
+      v-model="filteredSystems"
+      class="systems-grid rise d2"
+      :animation="200"
+      ghost-class="dragging"
+      @end="onDragEnd"
+    >
       <div v-for="s in filteredSystems" :key="s.id" class="panel stat-card grid-card" @click="onOpen(s)">
         <div class="grid-card-top">
           <span class="grid-icon" :style="iconStyle(s)">
@@ -117,7 +132,7 @@
         <i class="fa-regular fa-folder-open empty-icon t3"></i>
         <div class="empty-text t3">{{ search ? '未找到匹配的系统' : '暂无系统，点击"新增系统"创建' }}</div>
       </div>
-    </div>
+    </VueDraggable>
 
     <SystemForm v-if="formVisible" :visible="formVisible" :system="editing" :system-id="editing?.id || ''" @close="formVisible = false" @saved="onSaved" />
   </div>
@@ -125,6 +140,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { VueDraggable } from 'vue-draggable-plus';
 import { useSystemStore } from '@shared/stores/systemStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -246,6 +262,18 @@ async function copyUrl(url: string) {
   } catch {
     toast.error('复制失败');
   }
+}
+
+async function onDragEnd(event: any) {
+  const { oldIndex, newIndex } = event;
+  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
+  const newList = [...filteredSystems.value];
+  const [moved] = newList.splice(oldIndex, 1);
+  newList.splice(newIndex, 0, moved);
+  const orderedIds = newList.map(s => s.id);
+  await store.reorder(orderedIds);
+  await store.load();
+  toast.success('排序已更新');
 }
 </script>
 
@@ -577,5 +605,25 @@ async function copyUrl(url: string) {
   justify-content: center;
   padding: 80px 0;
   color: var(--text-tertiary);
+}
+
+/* 拖拽 */
+.dragging {
+  opacity: 0.5;
+  background: var(--accent) !important;
+  box-shadow: 0 8px 24px rgba(46, 107, 240, 0.3) !important;
+}
+.drag-handle {
+  cursor: move;
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-right: 8px;
+}
+.drag-icon {
+  font-size: 11px;
+  color: var(--ink3);
+}
+.row-group:hover .drag-handle {
+  opacity: 1;
 }
 </style>
