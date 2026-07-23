@@ -1,39 +1,80 @@
 <template>
   <div class="ie-view">
-    <div class="ie-section">
-      <h3>导出数据</h3>
-      <label class="checkbox-label">
-        <input v-model="includePasswords" type="checkbox" />
-        包含明文密码
+    <!-- 导出 -->
+    <section class="panel ie-section">
+      <h3 class="section-title">
+        <i class="fa-solid fa-upload section-icon"></i>
+        导出数据
+      </h3>
+      <label class="check-label">
+        <input v-model="includePasswords" type="checkbox" class="form-check" />
+        <span>包含明文密码</span>
       </label>
-      <button class="ie-btn" @click="onExportMarkdown"><i class="fa-brands fa-markdown"></i> 导出为 Markdown (.md)</button>
-      <button class="ie-btn green" @click="onExportJSON"><i class="fa-solid fa-code"></i> 导出为 JSON (.json)</button>
-    </div>
+      <button class="btn btn-default full" @click="onExportMarkdown">
+        <i class="fa-brands fa-markdown"></i> 导出为 Markdown (.md)
+      </button>
+      <button class="btn btn-default full" @click="onExportJSON">
+        <i class="fa-solid fa-code"></i> 导出为 JSON (.json)
+      </button>
+    </section>
 
-    <div class="ie-section">
-      <h3>导入数据</h3>
+    <!-- 导入 -->
+    <section class="panel ie-section">
+      <h3 class="section-title">
+        <i class="fa-solid fa-download section-icon"></i>
+        导入数据
+      </h3>
       <div class="import-mode">
-        <label>模式:</label>
+        <label class="row-label">模式:</label>
         <select v-model="importMode" class="form-select">
           <option value="merge">合并（推荐）</option>
           <option value="replace">替换（清空后导入）</option>
         </select>
       </div>
-      <input ref="fileInput" type="file" accept=".md,.json" @change="onFileSelected" style="display:none" />
-      <button class="ie-btn" @click="fileInput?.click()"><i class="fa-solid fa-file-import"></i> 选择文件导入</button>
-    </div>
+      <input ref="fileInput" type="file" accept=".md,.json" @change="onFileSelected" class="file-hidden" />
+      <div
+        class="drop-zone"
+        :class="{ dragover: isDragOver }"
+        @click="fileInput?.click()"
+        @dragover.prevent="isDragOver = true"
+        @dragenter.prevent="isDragOver = true"
+        @dragleave.prevent="isDragOver = false"
+        @drop.prevent="onDrop"
+      >
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        <p class="drop-text">拖拽文件到此处，或点击选择</p>
+        <p class="drop-hint">支持 .md / .json</p>
+      </div>
+      <button class="btn btn-default full" @click="fileInput?.click()">
+        <i class="fa-solid fa-file-import"></i> 选择文件导入
+      </button>
+    </section>
 
-    <div class="ie-section">
-      <h3>Markdown 预览</h3>
+    <!-- 预览 -->
+    <section class="panel ie-section">
+      <h3 class="section-title">
+        <i class="fa-solid fa-eye section-icon"></i>
+        Markdown 预览
+      </h3>
       <pre class="md-preview">{{ preview }}</pre>
-    </div>
+    </section>
 
-    <div v-if="summary" class="ie-section summary">
-      <h3>导入结果</h3>
-      <p>新增系统: {{ summary.created.systems }}</p>
-      <p>更新系统: {{ summary.updated.systems }}</p>
-      <p>新增服务器: {{ summary.created.servers }}</p>
-      <p>跳过: {{ summary.skipped.count }}</p>
+    <!-- 导入结果 -->
+    <section v-if="summary" class="panel ie-section summary">
+      <h3 class="section-title">
+        <i class="fa-solid fa-circle-check section-icon ok"></i>
+        导入结果
+      </h3>
+      <p><span class="summary-label">新增系统</span><span class="summary-value">{{ summary.created.systems }}</span></p>
+      <p><span class="summary-label">更新系统</span><span class="summary-value">{{ summary.updated.systems }}</span></p>
+      <p><span class="summary-label">新增服务器</span><span class="summary-value">{{ summary.created.servers }}</span></p>
+      <p><span class="summary-label">跳过</span><span class="summary-value">{{ summary.skipped.count }}</span></p>
+    </section>
+
+    <!-- 安全警示 -->
+    <div class="warn-bar">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span>导出包含明文密码的文件请妥善保管；替换模式导入会先清空现有数据，请谨慎操作。</span>
     </div>
   </div>
 </template>
@@ -49,6 +90,7 @@ const importMode = ref<'merge' | 'replace'>('merge');
 const preview = ref('');
 const summary = ref<ImportSummary | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const isDragOver = ref(false);
 
 async function onExportMarkdown() {
   try {
@@ -67,9 +109,7 @@ async function onExportJSON() {
   toast.success('JSON 导出成功');
 }
 
-async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
+async function processFile(file: File) {
   const text = await file.text();
   try {
     if (file.name.endsWith('.md')) {
@@ -82,6 +122,19 @@ async function onFileSelected(e: Event) {
     toast.error(`导入失败: ${(err as Error).message}`);
   }
   if (fileInput.value) fileInput.value.value = '';
+}
+
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  await processFile(file);
+}
+
+async function onDrop(e: DragEvent) {
+  isDragOver.value = false;
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  await processFile(file);
 }
 
 function downloadFile(content: string, filename: string, mime: string) {
@@ -103,70 +156,86 @@ function downloadFile(content: string, filename: string, mime: string) {
   overflow-y: auto;
 }
 .ie-section {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
   padding: var(--gap-xl);
   margin-bottom: var(--gap-lg);
-  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
 }
-.ie-section h3 {
-  margin: 0 0 var(--gap-lg);
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin: 0;
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
   letter-spacing: -0.2px;
 }
-.checkbox-label {
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-50);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+.section-icon.ok { background: var(--success-light); color: var(--success); }
+
+.check-label {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
   font-size: var(--text-sm);
-  margin-bottom: var(--gap-md);
   cursor: pointer;
   color: var(--text-secondary);
   user-select: none;
 }
-.checkbox-label input { width: 16px; height: 16px; }
-.ie-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-sm);
-  width: 100%;
-  height: var(--control-h);
-  background: var(--bg-pure);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
+.row-label {
   font-size: var(--text-sm);
+  color: var(--text-secondary);
   font-weight: var(--font-medium);
-  cursor: pointer;
-  margin-bottom: var(--gap-sm);
-  font-family: inherit;
-  transition: var(--transition-fast);
+  flex-shrink: 0;
 }
-.ie-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-50);
-}
-.ie-btn.green:hover {
-  border-color: var(--success);
-  color: var(--success);
-  background: var(--success-light);
-}
+.btn.full { width: 100%; }
+.file-hidden { display: none; }
+
 .import-mode {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  margin-bottom: var(--gap-md);
 }
-.import-mode label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  font-weight: var(--font-medium);
+.import-mode .form-select { max-width: 260px; }
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-xs);
+  padding: var(--gap-xl) var(--gap-lg);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  text-align: center;
+  transition: var(--transition-fast);
 }
+.drop-zone:hover,
+.drop-zone.dragover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--primary-50);
+}
+.drop-zone i { font-size: var(--text-xl); }
+.drop-text { margin: 0; font-size: var(--text-sm); font-weight: var(--font-medium); }
+.drop-hint { margin: 0; font-size: var(--text-xs); color: var(--text-quaternary); }
+
 .md-preview {
   background: var(--surface-secondary);
   border: 1px solid var(--border-soft);
@@ -180,13 +249,37 @@ function downloadFile(content: string, filename: string, mime: string) {
   word-break: break-all;
   color: var(--text-primary);
   line-height: var(--leading-normal);
+  margin: 0;
 }
+
 .summary p {
-  margin: var(--gap-xs) 0;
+  margin: 0;
+  padding: var(--gap-sm) var(--gap-md);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-soft);
 }
-.summary p::before { content: ""; }
+.summary p:last-child { border-bottom: none; }
+.summary-label { color: var(--text-secondary); }
+.summary-value {
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+  font-family: var(--font-mono);
+}
+
+.warn-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: var(--gap-md) var(--gap-lg);
+  border: 1px solid rgba(180, 83, 9, 0.28);
+  border-radius: var(--radius-md);
+  background: rgba(251, 191, 36, 0.07);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.warn-bar i { color: var(--warning); flex-shrink: 0; }
 </style>

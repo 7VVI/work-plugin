@@ -1,9 +1,16 @@
 <template>
   <div class="settings-view">
-    <div class="settings-section">
-      <h3>主密码</h3>
+    <!-- 主密码 -->
+    <section class="panel settings-section">
+      <h3 class="section-title">
+        <i class="fa-solid fa-shield-halved section-icon"></i>
+        主密码
+      </h3>
       <div v-if="!cryptoStore.enabled" class="crypto-section">
-        <p class="status">状态: 未设置</p>
+        <p class="status">
+          <span class="status-dot"></span>
+          状态: 未设置
+        </p>
         <div class="form-row">
           <input v-model="setupPassword" type="password" placeholder="设置主密码" class="form-input" />
           <button class="btn btn-primary" @click="onSetup">设置主密码</button>
@@ -11,51 +18,111 @@
         <p class="hint">设置后，所有密码类字段将被 AES-GCM 加密存储。请牢记主密码，丢失后数据无法恢复。</p>
       </div>
       <div v-else class="crypto-section">
-        <p class="status">状态: {{ cryptoStore.unlocked ? '已解锁' : '已锁定' }}</p>
+        <p class="status">
+          <span class="status-dot" :class="{ on: cryptoStore.unlocked }"></span>
+          状态: {{ cryptoStore.unlocked ? '已解锁' : '已锁定' }}
+        </p>
         <div v-if="!cryptoStore.unlocked" class="form-row">
           <input v-model="unlockPassword" type="password" placeholder="输入主密码" class="form-input" />
           <button class="btn btn-primary" @click="onUnlock">解锁</button>
         </div>
         <div v-else class="button-group">
-          <button class="btn btn-default" @click="cryptoStore.lock()">锁定</button>
-          <button class="btn btn-default" @click="onChangePassword">修改密码</button>
-          <button class="btn btn-danger" @click="onDisable">禁用主密码</button>
+          <button class="btn btn-default" @click="cryptoStore.lock()"><i class="fa-solid fa-lock"></i> 锁定</button>
+          <button class="btn btn-default" @click="onChangePassword"><i class="fa-solid fa-key"></i> 修改密码</button>
+          <button class="btn btn-danger" @click="onDisable"><i class="fa-solid fa-ban"></i> 禁用主密码</button>
         </div>
         <div class="form-row">
-          <label>自动锁定 (分钟):</label>
+          <label class="row-label">自动锁定 (分钟):</label>
           <input v-model.number="prefStore.autoLockMinutes" type="number" min="1" max="60" class="form-input small" />
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="settings-section">
-      <h3>偏好</h3>
+    <!-- 偏好 -->
+    <section class="panel settings-section">
+      <h3 class="section-title">
+        <i class="fa-solid fa-sliders section-icon"></i>
+        偏好
+      </h3>
       <div class="form-row">
-        <label>主题:</label>
-        <select v-model="prefStore.theme" class="form-select">
-          <option value="light">浅色</option>
-          <option value="dark">深色</option>
-        </select>
+        <label class="row-label">主题:</label>
+        <div class="seg-group">
+          <button
+            class="seg-btn"
+            :class="{ on: prefStore.theme === 'light' }"
+            @click="prefStore.theme = 'light'"
+          >
+            <i class="fa-solid fa-sun"></i> 浅色
+          </button>
+          <button
+            class="seg-btn"
+            :class="{ on: prefStore.theme === 'dark' }"
+            @click="prefStore.theme = 'dark'"
+          >
+            <i class="fa-solid fa-moon"></i> 深色
+          </button>
+        </div>
       </div>
       <div class="form-row">
-        <label>默认环境:</label>
+        <label class="row-label">默认环境:</label>
         <select v-model="prefStore.defaultEnvironment" class="form-select">
           <option v-for="env in ENVIRONMENTS" :key="env.value" :value="env.value">{{ env.label }}</option>
         </select>
       </div>
       <div class="form-row">
-        <label>Popup 布局:</label>
+        <label class="row-label">Popup 布局:</label>
         <select v-model="prefStore.popupLayout" class="form-select">
           <option value="compact">紧凑</option>
           <option value="expanded">展开</option>
         </select>
       </div>
-    </div>
+    </section>
 
-    <div class="settings-section danger-zone">
-      <h3>危险区</h3>
-      <button class="btn btn-danger" @click="onClearAll">清空所有数据</button>
-    </div>
+    <!-- 快捷键 -->
+    <section class="panel settings-section">
+      <h3 class="section-title">
+        <i class="fa-solid fa-keyboard section-icon"></i>
+        快捷键
+      </h3>
+      <ul class="kbd-list">
+        <li>
+          <span class="kbd-label">快速搜索</span>
+          <span class="kbd-group"><span class="kbd">Ctrl</span><span class="kbd">K</span></span>
+        </li>
+        <li>
+          <span class="kbd-label">关闭弹层</span>
+          <span class="kbd-group"><span class="kbd">Esc</span></span>
+        </li>
+        <li>
+          <span class="kbd-label">切换条目</span>
+          <span class="kbd-group"><span class="kbd">↑</span><span class="kbd">↓</span></span>
+        </li>
+        <li>
+          <span class="kbd-label">确认选择</span>
+          <span class="kbd-group"><span class="kbd">Enter</span></span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 关于 -->
+    <section class="panel settings-section about-card">
+      <div class="about-logo">D</div>
+      <div class="about-info">
+        <div class="about-name">Dock for Chrome</div>
+        <div class="about-version mono">v3.0.0 · Manifest V3</div>
+      </div>
+    </section>
+
+    <!-- 危险区 -->
+    <section class="panel settings-section danger-zone">
+      <h3 class="section-title">
+        <i class="fa-solid fa-triangle-exclamation section-icon danger"></i>
+        危险区
+      </h3>
+      <button class="btn btn-danger" @click="onClearAll">
+        <i class="fa-solid fa-trash"></i> 清空所有数据
+      </button>
+    </section>
   </div>
 </template>
 
@@ -135,20 +202,33 @@ async function onClearAll() {
   overflow-y: auto;
 }
 .settings-section {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
   padding: var(--gap-xl);
   margin-bottom: var(--gap-lg);
-  box-shadow: var(--shadow-sm);
 }
-.settings-section h3 {
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
   margin: 0 0 var(--gap-lg);
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
   letter-spacing: -0.2px;
 }
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-50);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+.section-icon.danger { background: var(--danger-light); color: var(--danger); }
+
 .crypto-section .status {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -157,12 +237,16 @@ async function onClearAll() {
   align-items: center;
   gap: var(--gap-sm);
 }
-.crypto-section .status::before {
-  content: "";
+.status-dot {
   width: 6px;
   height: 6px;
   border-radius: var(--radius-pill);
   background: var(--text-quaternary);
+  flex-shrink: 0;
+}
+.crypto-section .status-dot.on {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
 }
 .form-row {
   display: flex;
@@ -170,7 +254,8 @@ async function onClearAll() {
   gap: var(--gap-md);
   margin-bottom: var(--gap-md);
 }
-.form-row label {
+.form-row:last-child { margin-bottom: 0; }
+.row-label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
   width: 120px;
@@ -188,11 +273,62 @@ async function onClearAll() {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   margin-top: var(--gap-sm);
+  margin-bottom: 0;
   line-height: var(--leading-normal);
 }
+
+.kbd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+.kbd-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding: var(--gap-xs) 0;
+}
+.kbd-label { color: var(--text-secondary); }
+.kbd-group { display: inline-flex; align-items: center; gap: 4px; }
+
+.about-card {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+}
+.about-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--primary-hover));
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  box-shadow: 0 5px 14px -4px var(--glow);
+  flex-shrink: 0;
+}
+.about-info { display: flex; flex-direction: column; gap: 2px; }
+.about-name {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+.about-version {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 .danger-zone {
   border-color: var(--danger-light);
-  background: linear-gradient(180deg, rgba(254, 226, 226, 0.3) 0%, var(--card-bg) 60%);
+  background: linear-gradient(180deg, var(--danger-light) 0%, var(--panel) 65%);
 }
-.danger-zone h3 { color: var(--danger-text); }
+.danger-zone .section-title { color: var(--danger-text); }
 </style>
