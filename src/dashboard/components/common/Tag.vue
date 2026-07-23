@@ -95,4 +95,15 @@ void envVariantMap;
 .tag-env-prod { background: var(--env-prod-bg); color: var(--env-prod-fg); }
 .tag-env-test { background: var(--env-test-bg); color: var(--env-test-fg); }
 .tag-env-staging { background: var(--env-staging-bg); color: var(--env-staging-fg); }
+
+/* v3 环境徽章发光圆点 */
+.tag[class*="tag-env-"]::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  flex: none;
+}
 </style>
