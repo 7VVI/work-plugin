@@ -1,17 +1,12 @@
 <template>
-  <div class="server-card" :class="[`status-${statusKey}`, `icon-${iconColorKey}`]" @click="$emit('select')">
-    <div class="card-top">
-      <span class="status">
-        <span class="status-text">{{ statusLabel }}</span>
+  <div class="server-card stat-card" :class="{ online }" @click="$emit('select')">
+    <div class="card-head">
+      <span class="status-dot" :class="online ? 'on' : 'off'" :title="statusLabel">
+        <span class="ping"></span>
       </span>
-      <div class="card-top-right">
-        <button class="menu-btn" @click.stop="$emit('edit')" title="编辑">
-          <i class="fa-solid fa-pen"></i>
-        </button>
-        <button class="menu-btn" @click.stop="$emit('copyPwd')" title="复制密码">
-          <i class="fa-solid fa-key"></i>
-        </button>
-      </div>
+      <button class="row-action edit" @click.stop="$emit('edit')" title="编辑">
+        <i class="fa-solid fa-pen"></i>
+      </button>
     </div>
 
     <div class="card-identity">
@@ -25,42 +20,41 @@
     </div>
 
     <div class="tag-row">
-      <span class="tag" :class="`tag-${envKey}`">{{ envLabel }}</span>
-      <span v-if="server.purpose" class="tag tag-default">{{ server.purpose }}</span>
+      <EnvBadge :env="server.environment" size="sm" />
+      <span v-if="server.purpose" class="chip">{{ server.purpose }}</span>
     </div>
 
-    <div class="info-list">
-      <div class="info-row">
-        <div class="info-left">
-          <i class="fa-solid fa-user"></i>
-          <span>账号</span>
-        </div>
-        <div class="info-right">{{ server.username || '—' }}</div>
+    <dl class="detail">
+      <div class="detail-row">
+        <dt><i class="fa-solid fa-user"></i><span>账号</span></dt>
+        <dd>{{ server.username || '—' }}</dd>
       </div>
-      <div class="info-row">
-        <div class="info-left">
-          <i class="fa-solid fa-plug"></i>
-          <span>SSH 端口</span>
-        </div>
-        <div class="info-right">{{ server.sshPort }}</div>
+      <div class="detail-row">
+        <dt><i class="fa-solid fa-plug"></i><span>SSH 端口</span></dt>
+        <dd>{{ server.sshPort || '—' }}</dd>
       </div>
-      <div class="info-row">
-        <div class="info-left">
-          <i class="fa-regular fa-clock"></i>
-          <span>最后更新</span>
-        </div>
-        <div class="info-right" style="font-family: inherit;">{{ formatRelativeTime(server.updatedAt) }}</div>
+      <div class="detail-row">
+        <dt><i class="fa-regular fa-clock"></i><span>最后更新</span></dt>
+        <dd>{{ formatRelativeTime(server.updatedAt) }}</dd>
       </div>
-    </div>
+    </dl>
 
     <div class="card-actions">
-      <button class="card-btn" :class="{ copied: copiedFlag === 'ip' }" @click.stop="onCopyIp">
+      <button
+        class="btn btn-default copy-btn"
+        :class="{ copied: copiedFlag === 'ip' }"
+        @click.stop="onCopyIp"
+      >
         <i :class="copiedFlag === 'ip' ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
-        <span>{{ copiedFlag === 'ip' ? '已复制' : '复制IP' }}</span>
+        <span>{{ copiedFlag === 'ip' ? '已复制' : '复制 IP' }}</span>
       </button>
-      <button class="card-btn" :class="{ copied: copiedFlag === 'ssh' }" @click.stop="onCopySsh">
+      <button
+        class="btn btn-default copy-btn"
+        :class="{ copied: copiedFlag === 'ssh' }"
+        @click.stop="onCopySsh"
+      >
         <i :class="copiedFlag === 'ssh' ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
-        <span>{{ copiedFlag === 'ssh' ? '已复制' : '复制服务器' }}</span>
+        <span>{{ copiedFlag === 'ssh' ? '已复制' : '复制 SSH' }}</span>
       </button>
     </div>
   </div>
@@ -70,40 +64,23 @@
 import { ref, computed } from 'vue';
 import type { Server } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
+import { copyToClipboard } from '@shared/utils/clipboard';
+import { useToastStore } from '@shared/stores/toastStore';
+import EnvBadge from '../common/EnvBadge.vue';
 
 const props = defineProps<{ server: Server }>();
-const emit = defineEmits<{ select: []; edit: []; copyIp: []; copySsh: []; copyPwd: [] }>();
+defineEmits<{ select: []; edit: [] }>();
 
+const toast = useToastStore();
 const copiedFlag = ref<'' | 'ip' | 'ssh'>('');
 
 const statusKey = computed(() => props.server.status ?? 'online');
+const online = computed(() => statusKey.value !== 'offline');
 const statusLabel = computed(() => ({
   online: '在线',
   warn: '告警',
   offline: '离线',
 }[statusKey.value as string] ?? '在线'));
-
-const envKey = computed(() => ({
-  production: 'prod',
-  development: 'dev',
-  test: 'test',
-  staging: 'test',
-}[props.server.environment as string] ?? 'default'));
-
-const envLabel = computed(() => ({
-  production: '生产',
-  development: '开发',
-  test: '测试',
-  staging: '预发布',
-}[props.server.environment as string] ?? props.server.environment));
-
-const iconColorKey = computed(() => {
-  const colors = ['teal', 'purple', 'orange', 'blue', 'amber', 'red', 'indigo', 'gray'];
-  let hash = 0;
-  const name = props.server.name || '';
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return colors[Math.abs(hash) % colors.length];
-});
 
 const iconClass = computed(() => {
   const purpose = (props.server.purpose || '').toLowerCase();
@@ -115,83 +92,80 @@ const iconClass = computed(() => {
   return 'fa-solid fa-server';
 });
 
+function buildSshCommand() {
+  const user = props.server.username || 'root';
+  const port = props.server.sshPort || 22;
+  return `ssh ${user}@${props.server.ip} -p ${port}`;
+}
+
 async function onCopyIp() {
-  emit('copyIp');
-  copiedFlag.value = 'ip';
-  setTimeout(() => { copiedFlag.value = ''; }, 1200);
+  try {
+    await copyToClipboard(props.server.ip);
+    toast.success('IP 已复制');
+    copiedFlag.value = 'ip';
+    setTimeout(() => { if (copiedFlag.value === 'ip') copiedFlag.value = ''; }, 1200);
+  } catch {
+    toast.error('复制失败');
+  }
 }
 
 async function onCopySsh() {
-  emit('copySsh');
-  copiedFlag.value = 'ssh';
-  setTimeout(() => { copiedFlag.value = ''; }, 1200);
+  try {
+    await copyToClipboard(buildSshCommand());
+    toast.success('SSH 命令已复制');
+    copiedFlag.value = 'ssh';
+    setTimeout(() => { if (copiedFlag.value === 'ssh') copiedFlag.value = ''; }, 1200);
+  } catch {
+    toast.error('复制失败');
+  }
 }
 </script>
 
 <style scoped>
 .server-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  padding: var(--gap-xl);
-  transition: var(--transition);
-  cursor: pointer;
+  padding: var(--gap-lg);
   display: flex;
   flex-direction: column;
   gap: var(--gap-md);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-}
-.server-card:hover {
-  border-color: var(--primary);
-  box-shadow: 0 6px 24px rgba(79, 124, 255, 0.12);
+  cursor: pointer;
 }
 
-.card-top {
+.card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 28px;
+  min-height: 22px;
 }
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  color: var(--text-tertiary);
-}
-.status::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--success);
-}
-.status-warn::before { background: var(--warning); }
-.status-offline::before { background: var(--text-quaternary); }
 
-.card-top-right {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-xs);
+/* v3 在线呼吸点 —— 必须与 .ping 同处一个 scoped 块（Vue 会重命名 @keyframes） */
+.status-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; }
+.status-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.status-dot.on .ping {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: var(--ok);
+  animation: ping 1.6s cubic-bezier(0, 0, .2, 1) infinite;
+  opacity: .6;
 }
-.menu-btn {
-  width: 28px;
-  height: 28px;
+.status-dot.off { background: var(--ink3); }
+@keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
+
+.card-head .row-action {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--ink3);
   cursor: pointer;
   transition: var(--transition-fast);
   font-size: 11px;
-  background: transparent;
-  border: none;
-  color: var(--text-quaternary);
 }
-.menu-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
+.card-head .row-action:hover {
+  background: var(--panel2);
+  color: var(--accent);
 }
 
 .card-identity {
@@ -200,8 +174,8 @@ async function onCopySsh() {
   gap: var(--gap-md);
 }
 .server-icon {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -209,22 +183,14 @@ async function onCopySsh() {
   color: #fff;
   font-size: var(--text-base);
   flex-shrink: 0;
-  box-shadow: var(--shadow-xs);
+  background: #F59E0B;
+  box-shadow: 0 5px 14px -4px #F59E0B;
 }
-.icon-teal .server-icon { background: linear-gradient(135deg, #34D399 0%, #10B981 100%); }
-.icon-purple .server-icon { background: linear-gradient(135deg, #A78BFA 0%, #8B5CF6 100%); }
-.icon-orange .server-icon { background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%); }
-.icon-blue .server-icon { background: linear-gradient(135deg, #4F7CFF 0%, #3D6DF7 100%); }
-.icon-gray .server-icon { background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%); }
-.icon-amber .server-icon { background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%); }
-.icon-red .server-icon { background: linear-gradient(135deg, #F87171 0%, #EF4444 100%); }
-.icon-indigo .server-icon { background: linear-gradient(135deg, #818CF8 0%, #6366F1 100%); }
-
 .identity-text { min-width: 0; flex: 1; }
 .server-name {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: var(--leading-tight);
   white-space: nowrap;
   overflow: hidden;
@@ -232,7 +198,7 @@ async function onCopySsh() {
 }
 .server-ip {
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
+  color: var(--ink3);
   margin-top: 4px;
   font-family: var(--font-mono);
 }
@@ -243,50 +209,38 @@ async function onCopySsh() {
   gap: var(--gap-sm);
   flex-wrap: wrap;
 }
-.tag {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  line-height: 1;
-  white-space: nowrap;
-}
-.tag-dev { background: var(--env-dev-bg); color: var(--env-dev-fg); }
-.tag-test { background: var(--env-test-bg); color: var(--env-test-fg); }
-.tag-prod { background: var(--env-prod-bg); color: var(--env-prod-fg); }
-.tag-default { background: var(--surface-secondary); color: var(--text-secondary); }
 
-.info-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-sm);
+.detail {
+  margin: 0;
   padding: var(--gap-md) 0;
   border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
 }
-.info-row {
+.detail-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: var(--text-sm);
 }
-.info-left {
+.detail-row dt {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  color: var(--text-tertiary);
+  color: var(--ink3);
+  font-weight: normal;
 }
-.info-left i {
+.detail-row dt i {
   font-size: 11px;
-  color: var(--text-quaternary);
+  color: var(--ink3);
   width: 14px;
   text-align: center;
 }
-.info-right {
-  color: var(--text-primary);
+.detail-row dd {
+  margin: 0;
+  color: var(--ink);
   font-weight: var(--font-medium);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -297,33 +251,15 @@ async function onCopySsh() {
   align-items: center;
   gap: var(--gap-sm);
 }
-.card-btn {
+.copy-btn {
   flex: 1;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: var(--surface-secondary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  height: 34px;
+  padding: 0 var(--gap-sm);
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  cursor: pointer;
-  transition: var(--transition-fast);
-  font-family: inherit;
 }
-.card-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-50);
+.copy-btn.copied {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: var(--panel2);
 }
-.card-btn.copied {
-  background: var(--success-light);
-  border-color: var(--success);
-  color: var(--success-text);
-}
-.card-btn i { font-size: 11px; }
 </style>
-
