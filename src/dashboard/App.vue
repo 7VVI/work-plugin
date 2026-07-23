@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue';
+import { onMounted, onBeforeUnmount, watch } from 'vue';
 import PageHeader from './components/layout/PageHeader.vue';
 import NavTabs from './components/layout/NavTabs.vue';
 import ToastContainer from './components/common/ToastContainer.vue';
@@ -28,14 +28,33 @@ import { useCryptoStore } from '@shared/stores/cryptoStore';
 const prefStore = usePrefStore();
 const cryptoStore = useCryptoStore();
 
-function applyTheme(theme: string) {
-  document.documentElement.dataset.theme = theme;
+function resolveTheme(theme: string): 'light' | 'dark' {
+  if (theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return theme === 'dark' ? 'dark' : 'light';
 }
+
+function applyTheme(theme: string) {
+  document.documentElement.dataset.theme = resolveTheme(theme);
+}
+
+function onSystemThemeChange() {
+  if (prefStore.theme === 'system') applyTheme('system');
+}
+
+let mq: MediaQueryList | null = null;
 
 onMounted(async () => {
   await prefStore.load();
   applyTheme(prefStore.theme);
+  mq = window.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', onSystemThemeChange);
   await cryptoStore.checkStatus();
+});
+
+onBeforeUnmount(() => {
+  mq?.removeEventListener('change', onSystemThemeChange);
 });
 
 watch(() => prefStore.theme, (t) => applyTheme(t));

@@ -35,9 +35,16 @@ const refreshKey = ref(0);
 const showAddForm = ref(false);
 const systemCount = ref(0);
 
+function resolveTheme(theme: string): 'light' | 'dark' {
+  if (theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return theme === 'dark' ? 'dark' : 'light';
+}
+
 onMounted(async () => {
   await prefStore.load();
-  document.documentElement.dataset.theme = prefStore.theme;
+  document.documentElement.dataset.theme = resolveTheme(prefStore.theme);
   await cryptoStore.checkStatus();
 });
 

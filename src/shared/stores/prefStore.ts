@@ -3,7 +3,7 @@ import { ref, watch } from 'vue';
 import type { Environment } from '../types/entities';
 
 interface Prefs {
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'system';
   autoLockMinutes: number;
   defaultEnvironment: Environment;
   popupLayout: 'compact' | 'expanded';
