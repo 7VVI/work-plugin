@@ -11,58 +11,85 @@
         </div>
       </div>
     </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:50px;">类型</th>
-            <th style="width:25%;">名称 / 版本</th>
-            <th style="width:30%;">连接地址</th>
-            <th style="width:80px;">端口</th>
-            <th style="width:120px;">账号</th>
-            <th style="width:140px;">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in filtered" :key="m.id">
-            <td>
-              <div class="type-icon" :style="{ background: getMeta(m.type).color }">
-                <i :class="'fa-solid ' + getMeta(m.type).icon"></i>
-              </div>
-            </td>
-            <td>
-              <div class="mw-name">{{ m.name }}</div>
-              <div v-if="m.version" class="mw-version">v{{ m.version }}</div>
-            </td>
-            <td><span class="mono">{{ m.host }}</span></td>
-            <td><span class="mono">{{ m.port }}</span></td>
-            <td><span class="mono">{{ m.username || '—' }}</span></td>
-            <td>
-              <div class="row-actions">
-                <button class="row-action row-action-sm" @click="store.copyConnectionString(m.id)" title="复制连接串"><i class="fa-solid fa-link"></i></button>
-                <button class="row-action row-action-sm" @click="store.copyPassword(m.id)" title="复制密码"><i class="fa-solid fa-key"></i></button>
-                <button class="row-action row-action-sm edit" @click="onEdit(m)" title="编辑"><i class="fa-solid fa-pen"></i></button>
-                <button class="row-action row-action-sm danger" @click="onDelete(m.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="filtered.length === 0">
-            <td colspan="6" class="empty-cell">
-              <div class="empty-state">
-                <i class="fa-solid fa-layer-group"></i>
-                <p>暂无中间件，点击“新增中间件”添加</p>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+
+    <div class="mw-grid">
+      <div v-for="m in filtered" :key="m.id" class="mw-card stat-card">
+        <div class="card-head">
+          <span class="chip type-chip">{{ typeLabel(m.type) }}</span>
+          <div class="head-actions">
+            <button class="row-action edit" @click="onEdit(m)" title="编辑"><i class="fa-solid fa-pen"></i></button>
+            <button class="row-action danger" @click="onDelete(m.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+
+        <div class="card-identity">
+          <div
+            class="mw-icon"
+            :style="{ background: mwMeta(m.type).color, boxShadow: '0 5px 14px -4px ' + mwMeta(m.type).color }"
+          >
+            <i :class="mwMeta(m.type).icon"></i>
+          </div>
+          <div class="identity-text">
+            <div class="mw-name">{{ m.name }}</div>
+            <div class="mw-addr mono t3">{{ m.host }}:{{ m.port }}</div>
+          </div>
+        </div>
+
+        <div class="tag-row">
+          <span v-if="m.version" class="chip">v{{ m.version }}</span>
+          <span v-if="m.database" class="chip">{{ m.database }}</span>
+        </div>
+
+        <dl class="detail">
+          <div class="detail-row">
+            <dt><i class="fa-solid fa-user"></i><span>账号</span></dt>
+            <dd>{{ m.username || '—' }}</dd>
+          </div>
+          <div class="detail-row">
+            <dt><i class="fa-solid fa-database"></i><span>数据库</span></dt>
+            <dd>{{ m.database || '—' }}</dd>
+          </div>
+        </dl>
+
+        <div class="card-actions">
+          <button
+            class="btn btn-default copy-btn"
+            :class="{ copied: copiedFlags[m.id] === 'addr' }"
+            @click="onCopyAddr(m)"
+          >
+            <i :class="copiedFlags[m.id] === 'addr' ? 'fa-solid fa-check' : 'fa-solid fa-link'"></i>
+            <span>{{ copiedFlags[m.id] === 'addr' ? '已复制' : '复制连接地址' }}</span>
+          </button>
+          <button
+            class="btn btn-default copy-btn"
+            :class="{ copied: copiedFlags[m.id] === 'pwd' }"
+            title="复制密码"
+            @click="onCopyPwd(m)"
+          >
+            <i :class="copiedFlags[m.id] === 'pwd' ? 'fa-solid fa-check' : 'fa-solid fa-key'"></i>
+            <span>{{ copiedFlags[m.id] === 'pwd' ? '已复制' : '复制密码' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <button v-if="filtered.length > 0" class="add-card" @click="onCreate">
+        <i class="fa-solid fa-plus"></i>
+        <span>添加中间件</span>
+        <span class="hint">Redis · MySQL · MongoDB · ES</span>
+      </button>
+
+      <div v-if="filtered.length === 0" class="empty-state">
+        <i class="fa-solid fa-layer-group"></i>
+        <p>暂无中间件，点击“新增中间件”添加</p>
+      </div>
     </div>
+
     <MiddlewareForm :visible="formVisible" :middleware="editing" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, reactive, onMounted } from 'vue';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -70,12 +97,33 @@ import { getMiddlewareMeta, type MiddlewareType } from '@shared/types/enums';
 import type { Middleware } from '@shared/types/entities';
 import MiddlewareForm from '../components/middleware/MiddlewareForm.vue';
 
+// v3 per-type colored icon tiles. Keys match MiddlewareType values (lowercase).
+// Colors per task brief; types not listed fall back to the accent-blue cube.
+const MW_TYPES: Record<string, { icon: string; color: string }> = {
+  redis: { icon: 'fa-solid fa-bolt', color: '#DC382D' },
+  mysql: { icon: 'fa-solid fa-database', color: '#00758F' },
+  postgresql: { icon: 'fa-solid fa-database', color: '#336791' },
+  mongodb: { icon: 'fa-solid fa-leaf', color: '#47A248' },
+  elasticsearch: { icon: 'fa-solid fa-magnifying-glass', color: '#B7791F' },
+  rabbitmq: { icon: 'fa-solid fa-message', color: '#FF6600' },
+  kafka: { icon: 'fa-solid fa-stream', color: '#4B5563' },
+  nginx: { icon: 'fa-solid fa-server', color: '#009639' },
+  minio: { icon: 'fa-solid fa-cube', color: '#C72E49' },
+};
+function mwMeta(type: string) {
+  return MW_TYPES[type] || { icon: 'fa-solid fa-cube', color: '#2E6BF0' };
+}
+function typeLabel(type: string) {
+  return getMiddlewareMeta(type as MiddlewareType).label;
+}
+
 const store = useMiddlewareStore();
 const toast = useToastStore();
 const dialog = useDialogStore();
 const formVisible = ref(false);
 const editing = ref<Middleware | null>(null);
 const search = ref('');
+const copiedFlags = reactive<Record<string, 'addr' | 'pwd'>>({});
 
 onMounted(async () => { await store.load(); });
 
@@ -85,7 +133,6 @@ const filtered = computed(() => {
   return store.list.filter(m => m.name.toLowerCase().includes(q) || m.host.toLowerCase().includes(q));
 });
 
-function getMeta(type: string) { return getMiddlewareMeta(type as MiddlewareType); }
 function onCreate() { editing.value = null; formVisible.value = true; }
 function onEdit(m: Middleware) { editing.value = m; formVisible.value = true; }
 async function onDelete(id: string) {
@@ -95,6 +142,27 @@ async function onDelete(id: string) {
   toast.success('已删除');
 }
 async function onSaved() { formVisible.value = false; await store.load(); }
+
+async function onCopyAddr(m: Middleware) {
+  try {
+    await store.copyConnectionString(m.id);
+    toast.success('连接地址已复制');
+    copiedFlags[m.id] = 'addr';
+    setTimeout(() => { if (copiedFlags[m.id] === 'addr') delete copiedFlags[m.id]; }, 1200);
+  } catch {
+    toast.error('复制失败');
+  }
+}
+async function onCopyPwd(m: Middleware) {
+  try {
+    await store.copyPassword(m.id);
+    toast.success('密码已复制');
+    copiedFlags[m.id] = 'pwd';
+    setTimeout(() => { if (copiedFlags[m.id] === 'pwd') delete copiedFlags[m.id]; }, 1200);
+  } catch {
+    toast.error('复制失败');
+  }
+}
 </script>
 
 <style scoped>
@@ -111,93 +179,169 @@ async function onSaved() { formVisible.value = false; await store.load(); }
 .action-left, .action-right { display: flex; align-items: center; gap: var(--gap-md); }
 .action-right .search-wrap { width: 320px; }
 
-.table-wrap {
+.mw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--gap-lg);
+  padding: 0 var(--page-pad) var(--page-pad);
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  margin: 0 var(--page-pad) var(--page-pad);
-  box-shadow: var(--shadow-sm);
+  overflow-y: auto;
+  align-content: start;
   position: relative;
 }
 
-.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); }
-.data-table thead th {
-  background: var(--surface-secondary);
-  color: var(--text-tertiary);
-  font-weight: var(--font-medium);
-  padding: 0 var(--gap-lg);
-  height: var(--table-header-h);
-  text-align: center;
-  border-bottom: 1px solid var(--border-soft);
-  white-space: nowrap;
-  font-size: var(--text-xs);
-  letter-spacing: 0.3px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-/* 名称/版本列左对齐 */
-.data-table thead th:nth-child(2) { text-align: left; }
-.data-table tbody td {
-  padding: 0 var(--gap-lg);
-  height: var(--table-row-h);
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-primary);
-  vertical-align: middle;
-  text-align: center;
-}
-/* 名称/版本列左对齐 */
-.data-table tbody td:nth-child(2) { text-align: left; }
-.data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { transition: background 0.2s ease, box-shadow 0.2s ease; }
-.data-table tbody tr:hover td {
-  background: var(--surface-hover);
-}
-.data-table tbody tr:hover td:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-}
-.data-table tbody tr:hover td:last-child {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+.mw-card {
+  padding: var(--gap-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
 }
 
-.type-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+  gap: var(--gap-sm);
+}
+.type-chip {
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10px;
+}
+.head-actions { display: flex; align-items: center; gap: var(--gap-xs); }
+.card-head .row-action {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: var(--text-sm);
-  box-shadow: var(--shadow-xs);
+  border: none;
+  background: transparent;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: 11px;
 }
+.card-head .row-action.edit:hover { background: var(--primary-50); color: var(--accent); }
+.card-head .row-action.danger:hover { background: rgba(220, 38, 38, .08); color: var(--danger); }
+
+.card-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+}
+.mw-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--text-base);
+  flex-shrink: 0;
+}
+.identity-text { min-width: 0; flex: 1; }
 .mw-name {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: var(--leading-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.mw-version {
+.mw-addr {
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
   margin-top: 4px;
 }
-.mono {
-  font-family: var(--font-mono);
+
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+}
+
+.detail {
+  margin: 0;
+  padding: var(--gap-md) 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+.detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: var(--text-sm);
-  color: var(--text-primary);
+}
+.detail-row dt {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  color: var(--ink3);
+  font-weight: normal;
+}
+.detail-row dt i {
+  font-size: 11px;
+  color: var(--ink3);
+  width: 14px;
+  text-align: center;
+}
+.detail-row dd {
+  margin: 0;
+  color: var(--ink);
   font-weight: var(--font-medium);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 
-.row-actions { display: flex; align-items: center; justify-content: center; gap: var(--gap-sm); }
-
-.empty-cell {
-  padding: 0 !important;
-  height: auto !important;
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
 }
+.copy-btn {
+  flex: 1;
+  height: 34px;
+  padding: 0 var(--gap-sm);
+  font-size: var(--text-sm);
+}
+.copy-btn.copied {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: var(--panel2);
+}
+
+/* 末位虚线添加卡（复用 Task 11 .add-card 模式） */
+.add-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 220px;
+  width: 100%;
+  border-radius: var(--radius-xl);
+  border: 2px dashed var(--border-strong);
+  background: transparent;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-family: inherit;
+  padding: var(--gap-xl);
+}
+.add-card i { font-size: 20px; }
+.add-card > span:not(.hint) { font-size: var(--text-sm); font-weight: var(--font-medium); }
+.add-card:hover { border-color: var(--accent); color: var(--accent); }
+.add-card .hint { font-size: 11px; }
+
 .empty-state {
   position: absolute;
   inset: 0;
