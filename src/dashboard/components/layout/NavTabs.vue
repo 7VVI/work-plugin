@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { dockPathFor, subtitleFor, type DockStats } from '../../utils/dockPath';
 import { useSystemStore } from '@shared/stores/systemStore';
@@ -74,6 +74,8 @@ function onTabClick(path: string) {
   try { localStorage.setItem('dock-v3-tab', path); } catch { /* ignore */ }
   nextTick(moveInk);
 }
+
+watch(() => route.path, () => nextTick(moveInk));
 
 let ro: ResizeObserver | undefined;
 onMounted(() => {
