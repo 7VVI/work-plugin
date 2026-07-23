@@ -36,6 +36,11 @@ export const useServerStore = defineStore('server', () => {
   async function copySshCommand(id: string) { await serverService.copySshCommand(id); }
   async function copyPassword(id: string) { await serverService.copyPassword(id); }
 
+  async function reorder(orderedIds: string[]) {
+    await serverService.reorder(orderedIds);
+    await load();
+  }
+
   const filtered = computed(() => {
     if (!searchQuery.value.trim()) return list.value;
     const q = searchQuery.value.toLowerCase();
@@ -48,7 +53,7 @@ export const useServerStore = defineStore('server', () => {
 
   return {
     list, loading, selectedId, searchQuery, filtered, selected,
-    load, create, update, remove,
+    load, create, update, remove, reorder,
     copyIp, copySshCommand, copyPassword,
   };
 });

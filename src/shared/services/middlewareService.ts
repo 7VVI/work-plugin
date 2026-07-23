@@ -96,4 +96,8 @@ export const middlewareService = {
   async search(query: string): Promise<Middleware[]> {
     return middlewareRepo.search(query);
   },
+
+  async reorder(orderedIds: string[]): Promise<void> {
+    await middlewareRepo.reorder(orderedIds);
+  },
 };
