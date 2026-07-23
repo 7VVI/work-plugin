@@ -37,8 +37,8 @@
       </div>
     </div>
     <div class="form-footer">
-      <button class="btn-cancel" @click="close">取消</button>
-      <button class="btn-save" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+      <button class="btn-default" @click="close">取消</button>
+      <button class="btn-primary" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
     </div>
   </div>
 </template>
@@ -191,8 +191,8 @@ async function save() {
   border-top: 1px solid var(--border-soft);
   flex-shrink: 0;
 }
-.form-footer .btn-cancel,
-.form-footer .btn-save {
+.form-footer .btn-default,
+.form-footer .btn-primary {
   flex: 1;
   height: var(--control-h);
   border-radius: var(--radius-lg);
@@ -203,26 +203,30 @@ async function save() {
   font-family: inherit;
   transition: var(--transition-fast);
 }
-.form-footer .btn-cancel {
-  background: var(--surface-secondary);
+.form-footer .btn-default {
+  background: var(--panel);
   color: var(--text-secondary);
   border-color: var(--border-strong);
 }
-.form-footer .btn-cancel:hover {
-  background: var(--surface-hover);
+.form-footer .btn-default:hover {
+  background: var(--panel2);
   color: var(--text-primary);
+  border-color: var(--border-strong);
 }
-.form-footer .btn-save {
-  background: var(--primary);
-  color: white;
+.form-footer .btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 14px -4px var(--glow), inset 0 1px 0 rgba(255, 255, 255, .2);
 }
-.form-footer .btn-save:hover {
+.form-footer .btn-primary:hover {
   background: var(--primary-hover);
-  box-shadow: var(--shadow-primary);
+  filter: brightness(1.07);
+  box-shadow: 0 6px 20px -4px var(--glow), inset 0 1px 0 rgba(255, 255, 255, .2);
 }
-.form-footer .btn-save:disabled {
+.form-footer .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
+  filter: none;
 }
 </style>

@@ -11,7 +11,7 @@
       @keydown.down.prevent="onArrowDown"
       @keydown.up.prevent="onArrowUp"
     />
-    <span class="shortcut">{{ shortcutKey }}</span>
+    <span class="kbd shortcut-kbd">{{ shortcutKey }}</span>
   </div>
   <div v-if="results.length > 0" class="results">
     <div
@@ -139,24 +139,30 @@ function typeLabel(type: string) {
 .search-box input::placeholder { color: var(--text-quaternary); }
 .search-box input:hover { border-color: var(--text-quaternary); }
 .search-box input:focus {
-  border-color: var(--primary);
+  border-color: var(--accent);
   box-shadow: var(--shadow-focus);
+  background: #fff;
 }
-.search-box:focus-within .search-icon { color: var(--primary); }
+.search-box:focus-within .search-icon { color: var(--accent); }
 
-.shortcut {
+.shortcut-kbd {
   position: absolute;
   right: 26px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
-  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--border);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  border-bottom-width: 2px;
+  border-radius: 5px;
   background: var(--surface-secondary);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: var(--font-medium);
+  color: var(--text-tertiary);
   letter-spacing: 0.5px;
+  pointer-events: none;
 }
 
 .results {
@@ -171,10 +177,16 @@ function typeLabel(type: string) {
   padding: var(--gap-sm) var(--gap-sm);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: background .12s;
+  border: 1px solid transparent;
 }
-.result-item:hover, .result-item.active {
+.result-item:hover {
+  background: var(--panel2);
+}
+.result-item.active {
   background: var(--primary-50);
+  border-color: rgba(46, 107, 240, .3);
+  box-shadow: 0 2px 12px -4px var(--glow);
 }
 .result-icon {
   width: 28px;
@@ -203,6 +215,7 @@ function typeLabel(type: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
+  font-family: var(--font-mono);
 }
 .result-type {
   font-size: 10px;
