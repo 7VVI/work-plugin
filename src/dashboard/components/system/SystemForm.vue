@@ -357,7 +357,7 @@ async function save() {
 
   const tagNames = [...tags.value];
   const rows = acctRows.value.filter(
-    a => a.role.trim() || a.username.trim() || a.password.trim(),
+    a => a.role.trim() && a.username.trim() && a.password.trim(),
   );
 
   try {
