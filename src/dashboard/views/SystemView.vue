@@ -81,7 +81,7 @@
     <!-- 卡片视图 -->
     <div v-else class="card-wrap">
       <div class="card-grid">
-        <div v-for="s in filteredSystems" :key="s.id" class="sys-card" @click="onOpen(s)">
+        <div v-for="s in filteredSystems" :key="s.id" class="sys-card stat-card" @click="onOpen(s)">
           <div class="card-header">
             <div class="card-icon" :style="iconStyle(s)">
               <i :class="s.icon || 'fa-solid fa-globe'"></i>
@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useSystemStore } from '@shared/stores/systemStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -129,7 +129,11 @@ const formVisible = ref(false);
 const editing = ref<System | null>(null);
 const search = ref('');
 const selectedIds = ref<Set<string>>(new Set());
-const viewMode = ref<'table' | 'card'>('table');
+const VIEW_KEY = 'dock-v3-system-view';
+const viewMode = ref<'table' | 'card'>(
+  (typeof localStorage !== 'undefined' && (localStorage.getItem(VIEW_KEY) as 'table' | 'card')) || 'table',
+);
+watch(viewMode, (v) => { try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } });
 
 const iconPalettes = [
   'linear-gradient(135deg, #4F7CFF 0%, #3D6DF7 100%)',
@@ -141,9 +145,9 @@ const iconPalettes = [
 ];
 
 function iconStyle(s: System) {
-  if (s.iconColor) return { background: s.iconColor };
-  const hash = s.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0);
-  return { background: iconPalettes[Math.abs(hash) % iconPalettes.length] };
+  const bg = s.iconColor || iconPalettes[Math.abs(s.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) % iconPalettes.length];
+  const solid = s.iconColor || '#2E6BF0';
+  return { background: bg, boxShadow: `0 5px 14px -4px ${solid}66` };
 }
 
 onMounted(async () => { await store.load(); });
@@ -248,11 +252,11 @@ async function onSaved() {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--card-bg);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   margin: 0 var(--page-pad) var(--page-pad);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
   position: relative;
 }
 
@@ -263,17 +267,17 @@ async function onSaved() {
   font-size: var(--text-sm);
 }
 .data-table thead th {
-  background: var(--surface-secondary);
-  color: var(--text-tertiary);
+  background: var(--panel2);
+  color: var(--ink3);
   font-weight: var(--font-medium);
   padding: 0 var(--gap-lg);
   height: var(--table-header-h);
   text-align: center;
   border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
-  font-size: var(--text-xs);
-  letter-spacing: 0.3px;
-  text-transform: none;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -328,7 +332,7 @@ async function onSaved() {
 .sys-name {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: var(--leading-tight);
 }
 .sys-desc {
@@ -345,6 +349,7 @@ async function onSaved() {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
+  color: var(--ink2);
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -370,7 +375,7 @@ async function onSaved() {
 .empty-state i {
   font-size: 36px;
   margin-bottom: var(--gap-md);
-  color: var(--text-quaternary);
+  color: var(--ink3);
 }
 .empty-state p { font-size: var(--text-sm); margin: 0; }
 
@@ -394,16 +399,12 @@ async function onSaved() {
   border-radius: var(--radius-xl);
   padding: var(--gap-lg);
   cursor: pointer;
-  transition: var(--transition);
   display: flex;
   flex-direction: column;
   gap: var(--gap-md);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 .sys-card:hover {
   border-color: var(--primary);
-  box-shadow: 0 6px 24px rgba(79, 124, 255, 0.12);
-  transform: translateY(-2px);
 }
 .card-header {
   display: flex;
@@ -432,7 +433,7 @@ async function onSaved() {
 .card-name {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  color: var(--text-primary);
+  color: var(--ink);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -441,7 +442,7 @@ async function onSaved() {
 .card-url {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--primary);
+  color: var(--ink3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
