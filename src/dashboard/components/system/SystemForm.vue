@@ -473,67 +473,8 @@ async function save() {
   flex-shrink: 0;
 }
 
-/* ================= v3 输入 / 按钮（本地别名，视觉与 v3 .inp/.btn-p/.btn-g 一致） ================= */
-.inp {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--ink);
-  outline: none;
-  font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-[data-theme='dark'] .inp { background: var(--bg2); }
-.inp::placeholder { color: var(--ink3); }
-.inp:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
-select.inp {
-  appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%238593A9' fill='none' stroke-width='1.5' stroke-linecap='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
-  cursor: pointer;
-}
-
-.btn-p {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 8px 15px;
-  font-size: 13px;
-  font-weight: var(--font-medium);
-  cursor: pointer;
-  transition: 0.18s;
-  box-shadow: var(--shadow-primary), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-.btn-p:hover { filter: brightness(1.07); }
-.btn-p:active { transform: scale(0.97); }
-.btn-p i { font-size: 11px; }
-
-.btn-g {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--ink2);
-  border-radius: var(--radius-md);
-  padding: 8px 14px;
-  font-size: 13px;
-  font-weight: var(--font-medium);
-  cursor: pointer;
-  transition: 0.15s;
-}
-.btn-g:hover { border-color: var(--border2); color: var(--ink); background: var(--panel2); }
-.btn-g:active { transform: scale(0.97); }
-.btn-g i { font-size: 11px; }
+/* v3 .inp / .btn-p / .btn-g / .btn-d 已提升为全局类（见 tokens.css）。
+   此处仅保留弹窗自身布局/选择器/Tab 相关的局部样式。 */
 
 /* ================= 基本信息面板 ================= */
 .panel-space { display: flex; flex-direction: column; gap: 16px; }
