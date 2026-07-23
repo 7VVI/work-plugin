@@ -10,7 +10,6 @@ const PATH_MAP: Record<string, string> = {
   '/servers': 'dock://servers',
   '/middlewares': 'dock://middleware',
   '/configs': 'dock://configs',
-  '/tags': 'dock://tags',
   '/import-export': 'dock://io',
   '/settings': 'dock://settings',
 };

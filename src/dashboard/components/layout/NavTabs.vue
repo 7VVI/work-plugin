@@ -37,7 +37,6 @@ const tabs = [
   { path: '/servers', label: '服务器', icon: 'fa-solid fa-server' },
   { path: '/middlewares', label: '中间件', icon: 'fa-solid fa-cubes' },
   { path: '/configs', label: '配置', icon: 'fa-solid fa-sliders' },
-  { path: '/tags', label: '标签', icon: 'fa-solid fa-tags' },
   { path: '/import-export', label: '导入 / 导出', icon: 'fa-solid fa-arrow-right-arrow-left' },
   { path: '/settings', label: '设置', icon: 'fa-solid fa-gear' },
 ];
