@@ -87,7 +87,7 @@ async function onSelect(r: SearchResult) {
 
 function getColor(type: string) {
   const colors: Record<string, string> = {
-    system: 'linear-gradient(135deg,#4F7CFF,#3D6DF7)',
+    system: 'linear-gradient(135deg, var(--accent), var(--accent2))',
     server: 'linear-gradient(135deg,#34D399,#10B981)',
     middleware: 'linear-gradient(135deg,#FBBF24,#F59E0B)',
   };
@@ -141,7 +141,7 @@ function typeLabel(type: string) {
 .search-box input:focus {
   border-color: var(--accent);
   box-shadow: var(--shadow-focus);
-  background: #fff;
+  background: var(--bg-pure);
 }
 .search-box:focus-within .search-icon { color: var(--accent); }
 

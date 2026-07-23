@@ -279,7 +279,7 @@ function downloadFile(content: string, filename: string, mime: string) {
   align-items: center;
   gap: var(--gap-sm);
   padding: var(--gap-md) var(--gap-lg);
-  border: 1px solid rgba(180, 83, 9, 0.28);
+  border: 1px solid var(--warning-light);
   border-radius: var(--radius-md);
   background: rgba(251, 191, 36, 0.07);
   color: var(--warning);

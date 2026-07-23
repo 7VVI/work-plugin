@@ -10,7 +10,7 @@
       >
         <div
           class="popup-icon"
-          :style="{ background: s.iconColor || 'linear-gradient(135deg,#4F7CFF,#3D6DF7)', boxShadow: `0 4px 12px -3px ${iconShadow(s)}` }"
+          :style="{ background: s.iconColor || 'linear-gradient(135deg, var(--accent), var(--accent2))', boxShadow: `0 4px 12px -3px ${iconShadow(s)}` }"
         >
           <i :class="s.icon || 'fa-solid fa-globe'"></i>
         </div>
