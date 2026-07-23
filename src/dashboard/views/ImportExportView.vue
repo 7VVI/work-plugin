@@ -1,145 +1,101 @@
 <template>
   <div class="ie-view">
-    <!-- 导出 -->
-    <section class="panel ie-section">
-      <h3 class="section-title">
-        <i class="fa-solid fa-upload section-icon"></i>
-        导出数据
-      </h3>
-      <label class="check-label">
-        <input v-model="includePasswords" type="checkbox" class="form-check" />
-        <span>包含明文密码</span>
-      </label>
-      <button class="btn btn-default full" @click="onExportMarkdown">
-        <i class="fa-brands fa-markdown"></i> 导出为 Markdown (.md)
-      </button>
-      <button class="btn btn-default full" @click="onExportJSON">
-        <i class="fa-solid fa-code"></i> 导出为 JSON (.json)
-      </button>
-    </section>
+    <div class="ie-grid">
+      <!-- 导出 -->
+      <section class="panel ie-card">
+        <div class="io-icon export"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+        <h3 class="io-title">导出数据</h3>
+        <p class="io-desc">将全部资产数据导出为 JSON 备份文件，可用于迁移或存档。</p>
+        <div class="scope-list">
+          <label class="scope-item"><input type="checkbox" v-model="scope.systems" class="form-check" /><span>系统（含账号密码）</span></label>
+          <label class="scope-item"><input type="checkbox" v-model="scope.servers" class="form-check" /><span>服务器</span></label>
+          <label class="scope-item"><input type="checkbox" v-model="scope.middlewares" class="form-check" /><span>中间件</span></label>
+          <label class="scope-item"><input type="checkbox" v-model="scope.configs" class="form-check" /><span>配置（项目 / 字段）</span></label>
+        </div>
+        <button class="btn btn-primary io-btn" @click="onExport"><i class="fa-solid fa-download"></i> 导出 JSON</button>
+      </section>
 
-    <!-- 导入 -->
-    <section class="panel ie-section">
-      <h3 class="section-title">
-        <i class="fa-solid fa-download section-icon"></i>
-        导入数据
-      </h3>
-      <div class="import-mode">
-        <label class="row-label">模式:</label>
-        <select v-model="importMode" class="form-select">
-          <option value="merge">合并（推荐）</option>
-          <option value="replace">替换（清空后导入）</option>
-        </select>
-      </div>
-      <input ref="fileInput" type="file" accept=".md,.json" @change="onFileSelected" class="file-hidden" />
-      <div
-        class="drop-zone"
-        :class="{ dragover: isDragOver }"
-        @click="fileInput?.click()"
-        @dragover.prevent="isDragOver = true"
-        @dragenter.prevent="isDragOver = true"
-        @dragleave.prevent="isDragOver = false"
-        @drop.prevent="onDrop"
-      >
-        <i class="fa-solid fa-cloud-arrow-up"></i>
-        <p class="drop-text">拖拽文件到此处，或点击选择</p>
-        <p class="drop-hint">支持 .md / .json</p>
-      </div>
-      <button class="btn btn-default full" @click="fileInput?.click()">
-        <i class="fa-solid fa-file-import"></i> 选择文件导入
-      </button>
-    </section>
+      <!-- 导入 -->
+      <section class="panel ie-card">
+        <div class="io-icon import"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+        <h3 class="io-title">导入数据</h3>
+        <p class="io-desc">从 JSON 备份文件恢复数据，导入前会自动校验文件格式。</p>
+        <div
+          class="drop-zone"
+          :class="{ over: dragOver }"
+          @click="fileInput?.click()"
+          @dragover.prevent="dragOver = true"
+          @dragleave.prevent="dragOver = false"
+          @drop.prevent="onDrop"
+        >
+          <i class="fa-solid fa-file-import"></i>
+          <span class="dz-text">拖拽文件到此处，或点击选择文件</span>
+          <span class="dz-ext mono">.json</span>
+        </div>
+        <input ref="fileInput" type="file" accept=".json,application/json" class="hidden-input" @change="onFileChange" />
+      </section>
+    </div>
 
-    <!-- 预览 -->
-    <section class="panel ie-section">
-      <h3 class="section-title">
-        <i class="fa-solid fa-eye section-icon"></i>
-        Markdown 预览
-      </h3>
-      <pre class="md-preview">{{ preview }}</pre>
-    </section>
-
-    <!-- 导入结果 -->
-    <section v-if="summary" class="panel ie-section summary">
-      <h3 class="section-title">
-        <i class="fa-solid fa-circle-check section-icon ok"></i>
-        导入结果
-      </h3>
-      <p><span class="summary-label">新增系统</span><span class="summary-value">{{ summary.created.systems }}</span></p>
-      <p><span class="summary-label">更新系统</span><span class="summary-value">{{ summary.updated.systems }}</span></p>
-      <p><span class="summary-label">新增服务器</span><span class="summary-value">{{ summary.created.servers }}</span></p>
-      <p><span class="summary-label">跳过</span><span class="summary-value">{{ summary.skipped.count }}</span></p>
-    </section>
-
-    <!-- 安全警示 -->
+    <!-- 琥珀警示 -->
     <div class="warn-bar">
       <i class="fa-solid fa-triangle-exclamation"></i>
-      <span>导出包含明文密码的文件请妥善保管；替换模式导入会先清空现有数据，请谨慎操作。</span>
+      <span>数据仅保存在浏览器本地（chrome.storage.local）。导出的备份文件包含<strong>明文账号密码</strong>，请妥善保管，不要上传到公共网盘或群聊。</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { importExportService, type ImportSummary } from '@shared/services/importExportService';
+import { importExportService } from '@shared/services/importExportService';
+import { useConfigStore } from '@shared/stores/configStore';
 import { useToastStore } from '@shared/stores/toastStore';
 
 const toast = useToastStore();
-const includePasswords = ref(true);
-const importMode = ref<'merge' | 'replace'>('merge');
-const preview = ref('');
-const summary = ref<ImportSummary | null>(null);
+const configStore = useConfigStore();
+
+const scope = ref({ systems: true, servers: true, middlewares: true, configs: true });
+const dragOver = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
-const isDragOver = ref(false);
 
-async function onExportMarkdown() {
+async function onExport() {
   try {
-    const md = await importExportService.exportMarkdown({ includePasswords: includePasswords.value });
-    preview.value = md;
-    downloadFile(md, 'nav-portal-backup.md', 'text/markdown');
-    toast.success('Markdown 导出成功');
+    const full = JSON.parse(await importExportService.exportJSON());
+    const out: Record<string, unknown> = { app: 'Dock', version: '3.0.0', exportedAt: new Date().toISOString() };
+    if (scope.value.systems) out.systems = full.systems ?? [];
+    if (scope.value.servers) out.servers = full.servers ?? [];
+    if (scope.value.middlewares) out.middlewares = full.middlewares ?? [];
+    if (scope.value.configs) out.configs = configStore.list ?? [];
+    downloadFile(JSON.stringify(out, null, 2), `dock-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    toast.success('备份文件已导出');
   } catch (e) {
-    toast.error((e as Error).message);
+    toast.error((e as Error).message || '导出失败');
   }
 }
 
-async function onExportJSON() {
-  const json = await importExportService.exportJSON();
-  downloadFile(json, 'nav-portal-backup.json', 'application/json');
-  toast.success('JSON 导出成功');
+function onDrop(e: DragEvent) {
+  dragOver.value = false;
+  const file = e.dataTransfer?.files?.[0];
+  if (file) importFile(file);
 }
 
-async function processFile(file: File) {
-  if (!file.name.endsWith('.md') && !file.name.endsWith('.json')) {
-    toast.error('仅支持 .md / .json 文件');
-    if (fileInput.value) fileInput.value.value = '';
-    return;
-  }
-  const text = await file.text();
-  try {
-    if (file.name.endsWith('.md')) {
-      summary.value = await importExportService.importMarkdown(text, { mode: importMode.value });
-    } else if (file.name.endsWith('.json')) {
-      summary.value = await importExportService.importJSON(text, { mode: importMode.value });
-    }
-    toast.success('导入成功');
-  } catch (err) {
-    toast.error(`导入失败: ${(err as Error).message}`);
-  }
+function onFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (file) importFile(file);
   if (fileInput.value) fileInput.value.value = '';
 }
 
-async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  await processFile(file);
-}
-
-async function onDrop(e: DragEvent) {
-  isDragOver.value = false;
-  const file = e.dataTransfer?.files?.[0];
-  if (!file) return;
-  await processFile(file);
+async function importFile(file: File) {
+  if (!file.name.endsWith('.json')) {
+    toast.error('仅支持 .json 备份文件');
+    return;
+  }
+  try {
+    const text = await file.text();
+    await importExportService.importJSON(text, { mode: 'merge' });
+    toast.success(`导入完成：${file.name}`);
+  } catch (e) {
+    toast.error('文件格式不正确，导入失败');
+  }
 }
 
 function downloadFile(content: string, filename: string, mime: string) {
@@ -156,135 +112,90 @@ function downloadFile(content: string, filename: string, mime: string) {
 <style scoped>
 .ie-view {
   padding: var(--gap-lg) var(--page-pad) var(--page-pad);
-  max-width: 760px;
+  max-width: 880px;
   height: 100%;
   overflow-y: auto;
 }
-.ie-section {
-  padding: var(--gap-xl);
-  margin-bottom: var(--gap-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-md);
+.ie-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap-lg);
 }
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  margin: 0;
-  font-size: var(--text-lg);
+@media (max-width: 720px) {
+  .ie-grid { grid-template-columns: 1fr; }
+}
+.ie-card { padding: var(--gap-xl); }
+.io-icon {
+  width: 40px; height: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+}
+.io-icon.export { background: rgba(46,107,240,.09); color: var(--accent); box-shadow: inset 0 0 0 1px rgba(46,107,240,.2); }
+.io-icon.import { background: rgba(5,150,105,.08); color: var(--success); box-shadow: inset 0 0 0 1px rgba(5,150,105,.2); }
+.io-title {
+  margin: var(--gap-md) 0 var(--gap-xs);
+  font-size: var(--text-md);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
-  letter-spacing: -0.2px;
 }
-.section-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  background: var(--primary-50);
-  color: var(--primary);
-  font-size: var(--text-sm);
-  flex-shrink: 0;
-}
-.section-icon.ok { background: var(--success-light); color: var(--success); }
-
-.check-label {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  color: var(--text-secondary);
-  user-select: none;
-}
-.row-label {
+.io-desc {
+  margin: 0 0 var(--gap-md);
   font-size: var(--text-sm);
   color: var(--text-secondary);
-  font-weight: var(--font-medium);
-  flex-shrink: 0;
+  line-height: var(--leading-normal);
 }
-.btn.full { width: 100%; }
-.file-hidden { display: none; }
-
-.import-mode {
+.scope-list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--gap-sm);
+  margin-bottom: var(--gap-lg);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
 }
-.import-mode .form-select { max-width: 260px; }
+.scope-item {
+  display: flex; align-items: center; gap: var(--gap-sm);
+  cursor: pointer; user-select: none;
+}
+.io-btn { width: 100%; justify-content: center; }
 
 .drop-zone {
+  margin-top: var(--gap-sm);
+  height: 144px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--gap-xs);
-  padding: var(--gap-xl) var(--gap-lg);
+  gap: var(--gap-sm);
   border: 2px dashed var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
   color: var(--text-tertiary);
   cursor: pointer;
-  text-align: center;
   transition: var(--transition-fast);
 }
-.drop-zone:hover,
-.drop-zone.dragover {
+.drop-zone:hover, .drop-zone.over {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--primary-50);
 }
 .drop-zone i { font-size: var(--text-xl); }
-.drop-text { margin: 0; font-size: var(--text-sm); font-weight: var(--font-medium); }
-.drop-hint { margin: 0; font-size: var(--text-xs); color: var(--text-quaternary); }
-
-.md-preview {
-  background: var(--surface-secondary);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  padding: var(--gap-md) var(--gap-lg);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  max-height: 280px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: var(--text-primary);
-  line-height: var(--leading-normal);
-  margin: 0;
-}
-
-.summary p {
-  margin: 0;
-  padding: var(--gap-sm) var(--gap-md);
-  font-size: var(--text-sm);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border-soft);
-}
-.summary p:last-child { border-bottom: none; }
-.summary-label { color: var(--text-secondary); }
-.summary-value {
-  color: var(--text-primary);
-  font-weight: var(--font-semibold);
-  font-family: var(--font-mono);
-}
+.dz-text { font-size: var(--text-sm); }
+.dz-ext { font-size: var(--text-xs); color: var(--text-quaternary); }
+.hidden-input { display: none; }
 
 .warn-bar {
+  margin-top: var(--gap-lg);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--gap-sm);
   padding: var(--gap-md) var(--gap-lg);
-  border: 1px solid var(--warning-light);
   border-radius: var(--radius-md);
-  background: rgba(251, 191, 36, 0.07);
+  border: 1px solid var(--warning-light);
+  background: var(--warning-light);
   color: var(--warning);
-  font-size: var(--text-sm);
+  font-size: 12.5px;
   line-height: var(--leading-normal);
 }
-.warn-bar i { color: var(--warning); flex-shrink: 0; }
+.warn-bar i { margin-top: 3px; flex-shrink: 0; }
+.warn-bar strong { font-weight: var(--font-semibold); }
 </style>
