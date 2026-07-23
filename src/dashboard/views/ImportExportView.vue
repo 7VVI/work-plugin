@@ -110,6 +110,11 @@ async function onExportJSON() {
 }
 
 async function processFile(file: File) {
+  if (!file.name.endsWith('.md') && !file.name.endsWith('.json')) {
+    toast.error('仅支持 .md / .json 文件');
+    if (fileInput.value) fileInput.value.value = '';
+    return;
+  }
   const text = await file.text();
   try {
     if (file.name.endsWith('.md')) {
