@@ -1,94 +1,192 @@
 <template>
   <div class="config-view">
+    <!-- 操作栏 -->
     <div class="action-bar">
-      <button class="btn btn-primary" @click="onCreate"><i class="fa-solid fa-plus"></i> 新增配置</button>
-      <div class="search-wrap">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input v-model="search" class="search-input" placeholder="搜索配置..." />
+      <button class="btn-p" @click="startAddProject">
+        <i class="fa-solid fa-plus text-[11px]"></i>新增项目
+      </button>
+      <div class="flex-1"></div>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
+        <input v-model="search" class="inp w-72 !pl-8" placeholder="搜索项目、配置…" />
       </div>
     </div>
 
     <div class="split-body">
-      <div class="left-panel panel">
-        <div
-          v-for="g in filtered"
-          :key="g.id"
-          class="left-item"
-          :class="{ active: selectedId === g.id }"
-          @click="selectGroup(g.id)"
-        >
-          <i :class="groupIcon(g.name)"></i>
-          <span class="item-name">{{ g.name }}</span>
-          <span class="item-count">{{ g.items.length }}</span>
-          <i class="fa-solid fa-times del-btn" @click.stop="onDelete(g.id)" title="删除"></i>
-        </div>
-        <div v-if="filtered.length === 0" class="empty-left">
-          <i class="fa-solid fa-folder-open"></i>
-          <p>{{ search ? '未找到匹配' : '暂无配置' }}</p>
+      <!-- 左侧项目列表 -->
+      <div class="w-60 flex-none">
+        <div class="panel p-2">
+          <div class="flex items-center justify-between px-2 pb-1.5 pt-1">
+            <span class="text-[10px] font-semibold tracking-widest t3">项目</span>
+            <button class="ibtn !h-5 !w-5" title="新增项目" @click="startAddProject">
+              <i class="fa-solid fa-plus text-[10px]"></i>
+            </button>
+          </div>
+          <VueDraggable
+            v-model="filteredProjects"
+            class="space-y-0.5"
+            :animation="200"
+            ghost-class="dragging"
+            @end="onProjectDragEnd"
+          >
+            <div
+              v-for="p in filteredProjects"
+              :key="p.id"
+              class="group flex cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-2 transition"
+              :class="{ 't2': p.id !== store.selectedProjectId }"
+              :style="p.id === store.selectedProjectId ? 'background:rgba(46,107,240,.09);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(46,107,240,.25)' : ''"
+              @click="store.selectProject(p.id)"
+            >
+              <i class="fa-regular fa-folder text-xs" :style="{ color: p.id === store.selectedProjectId ? 'var(--accent)' : 'var(--ink3)' }"></i>
+              <span class="flex-1 truncate text-[13px] font-medium">{{ p.name }}</span>
+              <span class="mono text-[10px] t3">{{ store.configs.length }}</span>
+              <button class="ibtn !h-5 !w-5 opacity-0 transition group-hover:opacity-100" title="重命名" @click.stop="startRenameProject(p)">
+                <i class="fa-solid fa-pen text-[9px]"></i>
+              </button>
+              <button class="ibtn danger !h-5 !w-5 opacity-0 transition group-hover:opacity-100" title="删除" @click.stop="onDeleteProject(p.id)">
+                <i class="fa-solid fa-xmark text-[10px]"></i>
+              </button>
+            </div>
+          </VueDraggable>
+          <div v-if="addingProject" class="px-1 py-1">
+            <input
+              v-model="newProjectName"
+              class="inp !py-1.5 !text-xs"
+              placeholder="项目名称 · 回车创建"
+              @keyup.enter="commitAddProject"
+              @keyup.escape="cancelAddProject"
+              @blur="commitAddProject"
+            />
+          </div>
+          <div v-if="filteredProjects.length === 0 && !addingProject" class="px-3 py-6 text-center text-xs t3">暂无项目</div>
         </div>
       </div>
 
-      <div class="right-panel panel">
-        <template v-if="selected">
-          <div class="right-header">
-            <div class="title-wrap">
-              <i :class="groupIcon(selected.name)"></i>
-              <span class="title">{{ selected.name }}</span>
-              <span class="count">{{ selected.items.length }} 项</span>
-            </div>
-            <i class="fa-solid fa-pen rename-btn" @click="onRename(selected)" title="重命名"></i>
+      <!-- 右侧配置详情 -->
+      <div class="panel min-h-[340px] flex-1 p-5">
+        <template v-if="store.selectedProject">
+          <div class="flex items-center gap-2.5">
+            <span class="flex h-8 w-8 items-center justify-center rounded-[10px]" style="background:rgba(46,107,240,.09);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(46,107,240,.2)">
+              <i class="fa-regular fa-folder-open text-xs"></i>
+            </span>
+            <span class="text-[15px] font-semibold t1">{{ store.selectedProject.name }}</span>
+            <span v-if="showSaveHint" class="ml-1 inline-flex items-center gap-1 text-[11px] font-medium" style="color:var(--ok)">
+              <i class="fa-solid fa-check text-[9px]"></i>已自动保存
+            </span>
+            <div class="flex-1"></div>
           </div>
 
-          <div class="right-body">
-            <div class="field-list">
-              <div class="field-item header-row">
-                <div>字段标识</div>
-                <div>字段名称</div>
-                <div>默认值</div>
-                <div class="text-right">操作</div>
-              </div>
-              <template v-for="(item, idx) in selected.items" :key="idx">
-                <!-- 编辑态 -->
-                <div v-if="editingIdx === idx" class="field-item edit-row">
-                  <input v-model="editItem.key" class="finput mono" placeholder="如：api_key" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <input v-model="editItem.label" class="finput" placeholder="如：API 密钥" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <input v-model="editItem.defaultValue" class="finput mono" placeholder="默认值" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <div class="field-icons">
-                    <div class="row-action confirm" @click="confirmEdit" title="确认"><i class="fa-solid fa-check"></i></div>
-                    <div class="row-action danger" @click="cancelEdit" title="取消"><i class="fa-solid fa-xmark"></i></div>
-                  </div>
-                </div>
-                <!-- 显示态 -->
-                <div v-else class="field-item" @dblclick="startEdit(idx)">
-                  <div class="mono field-key">{{ item.key || '—' }}</div>
-                  <div>{{ item.label || '—' }}</div>
-                  <div class="mono field-value">{{ item.defaultValue || '—' }}</div>
-                  <div class="field-icons">
-                    <div class="row-action" v-if="item.defaultValue" @click="onCopy(item.defaultValue)" title="复制默认值"><i class="fa-solid fa-copy"></i></div>
-                    <div class="row-action" @click="startEdit(idx)" title="编辑"><i class="fa-solid fa-pen"></i></div>
-                    <div class="row-action danger" @click="onRemoveItem(idx)" title="删除"><i class="fa-solid fa-trash"></i></div>
-                  </div>
-                </div>
-              </template>
-              <div v-if="selected.items.length === 0 && !adding" class="empty-row">暂无字段，点击下方"添加字段"添加</div>
-              <div v-if="adding" class="field-item edit-row">
-                <input ref="addKeyRef" v-model="newItem.key" class="finput mono" placeholder="如：api_key" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <input v-model="newItem.label" class="finput" placeholder="如：API 密钥" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <input v-model="newItem.defaultValue" class="finput mono" placeholder="默认值" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <div class="field-icons">
-                  <div class="row-action confirm" @click="confirmAdd" title="确认"><i class="fa-solid fa-check"></i></div>
-                  <div class="row-action danger" @click="cancelAdd" title="取消"><i class="fa-solid fa-xmark"></i></div>
-                </div>
-              </div>
-            </div>
-            <button v-if="!adding" class="add-item-btn" @click="startAdd">
-              <i class="fa-solid fa-plus"></i> 添加字段
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <VueDraggable
+              v-model="store.configs"
+              class="flex flex-wrap items-center gap-2"
+              :animation="200"
+              ghost-class="dragging"
+              @end="onConfigDragEnd"
+            >
+              <span
+                v-for="c in store.configs"
+                :key="c.id"
+                class="group inline-flex cursor-pointer items-center gap-1.5 rounded-lg border py-1.5 pl-3 pr-2 text-[12.5px] transition"
+                :class="{ 'font-medium': c.id === store.selectedConfigId, 't2': c.id !== store.selectedConfigId }"
+                :style="c.id === store.selectedConfigId ? 'border-color:rgba(46,107,240,.4);background:rgba(46,107,240,.08);color:var(--accent)' : 'border-color:var(--border);background:var(--panel)'"
+                @click="store.selectConfig(c.id)"
+              >
+                {{ c.name }}
+                <span class="mono text-[10px] t3">{{ c.fields.length }}</span>
+                <button class="ibtn !h-4 !w-4 opacity-0 transition group-hover:opacity-100" title="重命名" @click.stop="startRenameConfig(c)">
+                  <i class="fa-solid fa-pen text-[8px]"></i>
+                </button>
+                <button class="ibtn danger !h-4 !w-4 opacity-0 transition group-hover:opacity-100" title="删除" @click.stop="onDeleteConfig(c.id)">
+                  <i class="fa-solid fa-xmark text-[9px]"></i>
+                </button>
+              </span>
+            </VueDraggable>
+            <button
+              v-if="!addingConfig"
+              class="inline-flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1.5 text-[12px] t3 transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              style="border-color:var(--border2)"
+              @click="startAddConfig"
+            >
+              <i class="fa-solid fa-plus text-[9px]"></i>新增配置
             </button>
+            <span v-else class="inline-flex items-center gap-1.5 rounded-lg border py-1.5 pl-3 pr-2 text-[12.5px]" style="border-color:var(--border);background:var(--panel)">
+              <input
+                v-model="newConfigName"
+                class="inp !w-28 !py-0.5 !text-xs"
+                placeholder="配置名 · 回车"
+                @keyup.enter="commitAddConfig"
+                @keyup.escape="cancelAddConfig"
+                @blur="commitAddConfig"
+              />
+            </span>
+          </div>
+
+          <div v-if="store.selectedConfig" class="mt-4">
+            <table class="w-full">
+              <thead>
+                <tr class="text-left text-[10.5px] font-semibold uppercase tracking-widest t3" style="border-bottom:1px solid var(--border)">
+                  <th class="py-2 pr-4 font-semibold">字段标识</th>
+                  <th class="px-4 py-2 font-semibold">字段名称</th>
+                  <th class="px-4 py-2 font-semibold">默认值</th>
+                  <th class="w-20 py-2 text-right font-semibold">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(f, i) in store.selectedConfig.fields"
+                  :key="i"
+                  class="group"
+                  style="border-bottom:1px solid var(--border)"
+                >
+                  <td class="py-1 pr-4">
+                    <input class="finput mono" :value="f.key" @blur="onFieldBlur(i, 'key', $event)" @keydown="fieldEnter($event, $event.target)" />
+                  </td>
+                  <td class="px-4 py-1">
+                    <input class="finput" :value="f.label" @blur="onFieldBlur(i, 'label', $event)" @keydown="fieldEnter($event, $event.target)" />
+                  </td>
+                  <td class="px-4 py-1">
+                    <input class="finput mono" :value="f.value" @blur="onFieldBlur(i, 'value', $event)" @keydown="fieldEnter($event, $event.target)" />
+                  </td>
+                  <td class="py-1 text-right">
+                    <div class="flex justify-end gap-0.5 opacity-0 transition group-hover:opacity-100">
+                      <button class="ibtn !h-6 !w-6" title="复制值" @click="onCopy(f.value)">
+                        <i class="fa-regular fa-copy text-[10px]"></i>
+                      </button>
+                      <button class="ibtn danger !h-6 !w-6" title="删除" @click="onDeleteField(i)">
+                        <i class="fa-regular fa-trash-can text-[10px]"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border)">
+                  <td class="py-1 pr-4">
+                    <input ref="nfKeyRef" v-model="nfKey" class="finput mono" placeholder="+ 字段标识" @blur="onNfBlur" @keydown="newFieldEnter($event, nfLabelRef)" />
+                  </td>
+                  <td class="px-4 py-1">
+                    <input ref="nfLabelRef" v-model="nfLabel" class="finput" placeholder="字段名称" @blur="onNfBlur" @keydown="newFieldEnter($event, nfValueRef)" />
+                  </td>
+                  <td class="px-4 py-1">
+                    <input ref="nfValueRef" v-model="nfValue" class="finput mono" placeholder="默认值 · 回车保存" @blur="onNfBlur" @keydown="newFieldEnter($event, null)" />
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="mt-2 text-[11px] t3">
+              <i class="fa-regular fa-lightbulb mr-1"></i>末行输入后回车 / 失焦即自动保存 · 点击任意单元格直接修改，失焦自动保存
+            </div>
+          </div>
+
+          <div v-else class="mt-8 flex flex-col items-center justify-center py-10 t3">
+            <i class="fa-regular fa-file-lines text-2xl"></i>
+            <div class="mt-2 text-[13px]">点击上方「新增配置」创建第一组字段</div>
           </div>
         </template>
-        <div v-else class="no-selection">
-          <i class="fa-solid fa-hand-pointer"></i>
-          <p>请选择左侧配置，或点击"新增配置"</p>
+
+        <div v-else class="flex h-full min-h-[300px] flex-col items-center justify-center t3">
+          <i class="fa-regular fa-folder-open text-2xl"></i>
+          <div class="mt-2 text-[13px]">选择左侧项目，或点击「新增项目」开始</div>
         </div>
       </div>
     </div>
@@ -96,448 +194,238 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
-import { useConfigStore } from '@shared/stores/configStore';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
+import { VueDraggable } from 'vue-draggable-plus';
+import { useConfigStoreV3 } from '@shared/stores/configStoreV3';
 import { useToastStore } from '@shared/stores/toastStore';
-import { useDialogStore } from '@shared/stores/dialogStore';
-import { configService } from '@shared/services/configService';
-import type { ConfigGroup, ConfigItem } from '@shared/types/entities';
+import type { ConfigProject, ConfigDef } from '@shared/types/entities';
 
-const store = useConfigStore();
+const store = useConfigStoreV3();
 const toast = useToastStore();
-const dialog = useDialogStore();
 
 const search = ref('');
-const selectedId = ref<string | null>(null);
-const editingIdx = ref<number | null>(null);
-const editItem = ref<ConfigItem>({ key: '', label: '', defaultValue: '' });
-const adding = ref(false);
-const newItem = ref<ConfigItem>({ key: '', label: '', defaultValue: '' });
-const addKeyRef = ref<HTMLInputElement | null>(null);
 
-const configIcons = [
-  'fa-solid fa-gear',
-  'fa-solid fa-database',
-  'fa-solid fa-envelope',
-  'fa-solid fa-globe',
-  'fa-solid fa-key',
-  'fa-solid fa-palette',
-  'fa-solid fa-bolt',
-  'fa-solid fa-layer-group',
-  'fa-solid fa-code',
-  'fa-solid fa-shield-halved',
-  'fa-solid fa-cloud',
-  'fa-solid fa-terminal',
-];
+// 项目：inline 新建 / 重命名
+const addingProject = ref(false);
+const newProjectName = ref('');
+const renamingProjectId = ref<string | null>(null);
+const renamingProjectName = ref('');
 
-function groupIcon(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return configIcons[Math.abs(hash) % configIcons.length];
+// 配置：inline 新建 / 重命名
+const addingConfig = ref(false);
+const newConfigName = ref('');
+const renamingConfigId = ref<string | null>(null);
+const renamingConfigName = ref('');
+
+// 新增字段行
+const nfKey = ref('');
+const nfLabel = ref('');
+const nfValue = ref('');
+const nfKeyRef = ref<HTMLInputElement | null>(null);
+const nfLabelRef = ref<HTMLInputElement | null>(null);
+const nfValueRef = ref<HTMLInputElement | null>(null);
+
+// 自动保存提示
+const showSaveHint = ref(false);
+let saveTimer: number | undefined;
+function showSave() {
+  showSaveHint.value = true;
+  if (saveTimer) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => { showSaveHint.value = false; }, 1400);
 }
 
-onMounted(async () => { await store.load(); });
+onMounted(async () => { await store.loadProjects(); });
 
-const filtered = computed(() => {
-  if (!search.value.trim()) return store.list;
-  const q = search.value.toLowerCase();
-  return store.list.filter(g =>
-    g.name.toLowerCase().includes(q) ||
-    g.items.some(it =>
-      (it.key || '').toLowerCase().includes(q) ||
-      (it.label || '').toLowerCase().includes(q) ||
-      (it.value || '').toLowerCase().includes(q)
-    )
+const filteredProjects = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return store.projects;
+  return store.projects.filter(p =>
+    p.name.toLowerCase().includes(q)
   );
 });
 
-const selected = computed(() => store.list.find(g => g.id === selectedId.value));
+// 切换项目 / 配置时重置 inline 编辑态
+watch(() => store.selectedProjectId, resetInline);
+watch(() => store.selectedConfigId, () => { resetNf(); });
 
-watch(selected, () => {
-  editingIdx.value = null;
-  adding.value = false;
-});
-
-function selectGroup(id: string) {
-  selectedId.value = id;
+function resetInline() {
+  addingProject.value = false;
+  newProjectName.value = '';
+  renamingProjectId.value = null;
+  addingConfig.value = false;
+  newConfigName.value = '';
+  renamingConfigId.value = null;
+  resetNf();
 }
 
-async function onCreate() {
-  const name = await dialog.prompt('新增配置', '如：域名映射、开发邮箱、短信配置');
-  if (!name?.trim()) return;
-  const id = await store.create(name.trim());
-  selectedId.value = id;
+function resetNf() {
+  nfKey.value = '';
+  nfLabel.value = '';
+  nfValue.value = '';
+}
+
+/* ---------- 项目拖拽 ---------- */
+async function onProjectDragEnd(event: any) {
+  const { oldIndex, newIndex } = event;
+  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
+  const newList = [...filteredProjects.value];
+  const [moved] = newList.splice(oldIndex, 1);
+  newList.splice(newIndex, 0, moved);
+  const orderedIds = newList.map(p => p.id);
+  await store.reorderProjects(orderedIds);
+  toast.success('项目排序已更新');
+}
+
+/* ---------- 配置拖拽 ---------- */
+async function onConfigDragEnd(event: any) {
+  const { oldIndex, newIndex } = event;
+  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
+  const newList = [...store.configs];
+  const [moved] = newList.splice(oldIndex, 1);
+  newList.splice(newIndex, 0, moved);
+  const orderedIds = newList.map(c => c.id);
+  if (store.selectedProjectId) {
+    await store.reorderConfigs(store.selectedProjectId, orderedIds);
+    toast.success('配置排序已更新');
+  }
+}
+
+/* ---------- 项目 ---------- */
+function startAddProject() {
+  addingProject.value = true;
+  newProjectName.value = '';
+  nextTick(() => {});
+}
+async function commitAddProject() {
+  if (!addingProject.value) return;
+  const name = newProjectName.value.trim();
+  addingProject.value = false;
+  newProjectName.value = '';
+  if (!name) return;
+  await store.createProject(name);
+  toast.success('项目已创建');
+}
+function cancelAddProject() { addingProject.value = false; newProjectName.value = ''; }
+
+function startRenameProject(p: ConfigProject) {
+  renamingProjectId.value = p.id;
+  renamingProjectName.value = p.name;
+}
+async function onDeleteProject(id: string) {
+  await store.deleteProject(id);
+  toast.success('项目已删除');
+}
+
+/* ---------- 配置 ---------- */
+function startAddConfig() {
+  if (!store.selectedProject) { toast.error('请先创建一个项目'); return; }
+  addingConfig.value = true;
+  newConfigName.value = '';
+}
+async function commitAddConfig() {
+  if (!addingConfig.value) return;
+  const name = newConfigName.value.trim();
+  addingConfig.value = false;
+  newConfigName.value = '';
+  if (!name || !store.selectedProject) return;
+  await store.addConfig(store.selectedProject.id, name);
   toast.success('配置已创建');
 }
+function cancelAddConfig() { addingConfig.value = false; newConfigName.value = ''; }
 
-async function onRename(g: ConfigGroup) {
-  const name = await dialog.prompt('重命名', '', g.name);
-  if (!name?.trim() || name === g.name) return;
-  await store.rename(g.id, name.trim());
-  toast.success('已重命名');
+function startRenameConfig(c: ConfigDef) {
+  renamingConfigId.value = c.id;
+  renamingConfigName.value = c.name;
+}
+async function onDeleteConfig(id: string) {
+  await store.deleteConfig(id);
+  toast.success('配置已删除');
 }
 
-async function onDelete(id: string) {
-  const ok = await dialog.confirm('确认删除', '确认删除该配置及其所有字段？');
-  if (!ok) return;
-  if (selectedId.value === id) selectedId.value = null;
-  await store.remove(id);
-  toast.success('已删除');
+/* ---------- 字段（自动保存） ---------- */
+async function onFieldBlur(i: number, prop: 'key' | 'label' | 'value', e: Event) {
+  const cfg = store.selectedConfig;
+  if (!cfg) return;
+  const val = (e.target as HTMLInputElement).value;
+  const cur = cfg.fields[i];
+  if (!cur || (cur as any)[prop] === val) return;
+  const fields = cfg.fields.map(f => ({ ...f }));
+  (fields[i] as any)[prop] = val;
+  await store.setFields(cfg.id, fields);
+  showSave();
 }
-
-function currentItems(): ConfigItem[] {
-  return (selected.value?.items ?? []).map(it => ({
-    key: it.key || '',
-    label: it.label || '',
-    defaultValue: it.defaultValue || '',
-  }));
+function fieldEnter(e: KeyboardEvent, el: EventTarget | null) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    (el as HTMLInputElement | null)?.blur();
+  }
 }
-
-function startEdit(idx: number) {
-  const it = selected.value?.items[idx];
-  if (!it) return;
-  adding.value = false;
-  editItem.value = { key: it.key || '', label: it.label || '', defaultValue: it.defaultValue || '' };
-  editingIdx.value = idx;
+function newFieldEnter(e: KeyboardEvent, next: HTMLInputElement | null) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (next) { next.focus(); return; }
+  commitNewField(true);
 }
-
-function cancelEdit() {
-  editingIdx.value = null;
+function onNfBlur() {
+  window.setTimeout(() => {
+    const ae = document.activeElement;
+    if (ae === nfKeyRef.value || ae === nfLabelRef.value || ae === nfValueRef.value) return;
+    commitNewField(false);
+  }, 0);
 }
-
-async function confirmEdit() {
-  if (!selected.value || editingIdx.value === null) return;
-  if (!editItem.value.key?.trim() && !editItem.value.label?.trim()) return;
-  const items = currentItems();
-  items[editingIdx.value] = {
-    key: (editItem.value.key || '').trim(),
-    label: (editItem.value.label || '').trim(),
-    defaultValue: editItem.value.defaultValue || '',
-  };
-  await store.setItems(selected.value.id, items);
-  editingIdx.value = null;
-  toast.success('已保存');
+async function commitNewField(refocus: boolean) {
+  const key = nfKey.value.trim();
+  const cfg = store.selectedConfig;
+  resetNf();
+  if (!key || !cfg) return;
+  const fields = [...cfg.fields, { key, label: nfLabel.value.trim(), value: nfValue.value }];
+  await store.setFields(cfg.id, fields);
+  showSave();
+  if (refocus) nextTick(() => nfKeyRef.value?.focus());
 }
-
-function startAdd() {
-  editingIdx.value = null;
-  newItem.value = { key: '', label: '', defaultValue: '' };
-  adding.value = true;
-  nextTick(() => addKeyRef.value?.focus());
+async function onDeleteField(i: number) {
+  const cfg = store.selectedConfig;
+  if (!cfg) return;
+  const fields = cfg.fields.filter((_, idx) => idx !== i);
+  await store.setFields(cfg.id, fields);
+  showSave();
 }
-
-function cancelAdd() {
-  adding.value = false;
-  newItem.value = { key: '', label: '', defaultValue: '' };
-}
-
-async function confirmAdd() {
-  if (!selected.value) return;
-  if (!newItem.value.key?.trim() && !newItem.value.label?.trim()) { cancelAdd(); return; }
-  const items = currentItems();
-  items.push({
-    key: (newItem.value.key || '').trim(),
-    label: (newItem.value.label || '').trim(),
-    defaultValue: newItem.value.defaultValue || '',
-  });
-  await store.setItems(selected.value.id, items);
-  cancelAdd();
-  toast.success('已添加');
-}
-
-async function onRemoveItem(idx: number) {
-  if (!selected.value) return;
-  await store.removeItem(selected.value.id, idx);
-  if (editingIdx.value === idx) editingIdx.value = null;
-  toast.success('已删除');
-}
-
-async function onCopy(value: string) {
+async function onCopy(value?: string) {
   if (!value) return;
-  await configService.copyValue(value);
-  toast.success('已复制');
+  await store.copyValue(value);
+  toast.success('字段值已复制');
 }
 </script>
 
 <style scoped>
 .config-view {
-  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
-  gap: var(--gap-lg);
+  padding: 16px 24px calc(32px + 24px);
+  gap: 16px;
 }
 
 .action-bar {
   display: flex;
   align-items: center;
-  gap: var(--gap-md);
+  gap: 12px;
   flex-shrink: 0;
 }
-.action-bar .search-wrap { width: 280px; margin-left: auto; }
 
 .split-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: var(--gap-lg);
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
   overflow: hidden;
 }
 
-.left-panel {
-  overflow-y: auto;
-  padding: var(--gap-sm);
+.dragging {
+  opacity: 0.5;
+  background: var(--accent) !important;
+  box-shadow: 0 8px 24px rgba(46, 107, 240, 0.3) !important;
 }
-.left-item {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-md);
-  padding: 10px var(--gap-md);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--ink2);
-  transition: var(--transition-fast);
-  margin-bottom: 2px;
-}
-.left-item:hover { background: var(--surface-hover); color: var(--ink); }
-.left-item.active {
-  background: var(--primary-50);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--glow);
-}
-.left-item.active:hover {
-  background: var(--primary-50);
-  color: var(--accent);
-}
-.left-item > i:first-child {
-  font-size: var(--text-sm);
-  color: var(--text-quaternary);
-  width: 18px;
-  text-align: center;
-}
-.left-item.active > i:first-child { color: var(--primary); }
-.item-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: var(--font-medium);
-}
-.item-count {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  background: var(--surface-secondary);
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  font-weight: var(--font-medium);
-}
-.left-item.active .item-count {
-  background: var(--bg-pure);
-  color: var(--primary);
-}
-.del-btn {
-  font-size: 11px;
-  color: var(--text-quaternary);
-  padding: 4px;
-  opacity: 0;
-  transition: var(--transition-fast);
-  border-radius: var(--radius-xs);
-}
-.del-btn:hover { color: var(--danger); background: var(--danger-light); }
-.left-item:hover .del-btn { opacity: 1; }
-.left-item.active .del-btn { color: var(--primary); opacity: 0.6; }
-
-.empty-left {
-  text-align: center;
-  padding: 48px var(--gap-md);
-  color: var(--text-tertiary);
-}
-.empty-left i { font-size: 28px; margin-bottom: var(--gap-sm); color: var(--text-quaternary); }
-.empty-left p { font-size: var(--text-sm); margin: 0; }
-
-.right-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.right-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--gap-lg) var(--gap-xl);
-  border-bottom: 1px solid var(--border-soft);
-  flex-shrink: 0;
-}
-.title-wrap { display: flex; align-items: center; gap: var(--gap-md); }
-.title-wrap > i {
-  color: var(--primary);
-  font-size: var(--text-base);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--primary-50);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.title {
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
-  color: var(--text-primary);
-}
-.count {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  background: var(--surface-secondary);
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  font-weight: var(--font-medium);
-}
-.rename-btn {
-  color: var(--text-tertiary);
-  cursor: pointer;
-  padding: var(--gap-sm);
-  font-size: var(--text-sm);
-  border-radius: var(--radius-md);
-  transition: var(--transition-fast);
-  border: none;
-  background: transparent;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.rename-btn:hover {
-  color: var(--primary);
-  background: var(--primary-50);
-}
-
-/* 字段列表 */
-.field-list {
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.field-item {
-  display: grid;
-  grid-template-columns: 1.2fr 1.5fr 1.5fr 120px;
-  align-items: center;
-  padding: 0 14px;
-  height: 40px;
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-soft);
-  gap: var(--gap-sm);
-}
-.field-item:last-child { border-bottom: none; }
-.field-item.header-row {
-  background: var(--surface-secondary);
-  color: var(--text-tertiary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  height: 36px;
-  letter-spacing: 0.3px;
-}
-.field-item.edit-row {
-  background: var(--primary-50);
-  height: auto;
-  padding: 8px 14px;
-}
-.field-item:not(.header-row):not(.edit-row) { cursor: default; }
-.field-item:not(.header-row):not(.edit-row):hover { background: var(--surface-hover); }
-.mono {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-.field-key, .field-value {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.text-right { text-align: right; }
-.field-icons {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  justify-content: flex-end;
-}
-.row-action {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-quaternary);
-  cursor: pointer;
-  font-size: 11px;
-  transition: var(--transition-fast);
-  background: transparent;
-}
-.row-action:hover { background: var(--primary-50); color: var(--primary); }
-.row-action.danger:hover { background: var(--danger-light); color: var(--danger); }
-.row-action.confirm { color: var(--success); }
-.row-action.confirm:hover { background: var(--success-light); }
-.empty-row {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-tertiary);
-  font-size: var(--text-sm);
-}
-/* 字段行内编辑输入：复用 tokens 的 .finput（透明底/聚焦描边） */
-.field-item input { min-width: 0; }
-.finput.mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink); }
-.right-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--gap-lg) var(--gap-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-sm);
-}
-
-.add-item-btn {
-  margin-top: var(--gap-sm);
-  font-size: var(--text-sm);
-  color: var(--primary);
-  background: none;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 8px 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-sm);
-  width: 100%;
-  font-weight: var(--font-medium);
-  font-family: inherit;
-  transition: var(--transition-fast);
-}
-.add-item-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-50);
-}
-
-.no-selection {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-  gap: var(--gap-md);
-}
-.no-selection i {
-  font-size: 40px;
-  color: var(--text-quaternary);
-}
-.no-selection p { font-size: var(--text-sm); margin: 0; }
 </style>

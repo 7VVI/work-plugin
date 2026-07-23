@@ -107,6 +107,34 @@ export interface ConfigGroup {
 
 export type ConfigGroupInput = Omit<ConfigGroup, 'id' | 'createdAt' | 'updatedAt'>;
 
+// v3 三级结构：项目 → 配置 → 字段
+export interface ConfigProject {
+  id: string;
+  name: string;
+  sortOrder?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ConfigDef {
+  id: string;
+  projectId: string;
+  name: string;
+  fields: ConfigField[];
+  sortOrder?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ConfigField {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export type ConfigProjectInput = Omit<ConfigProject, 'id' | 'createdAt' | 'updatedAt'>;
+export type ConfigDefInput = Omit<ConfigDef, 'id' | 'createdAt' | 'updatedAt' | 'fields'>;
+
 export interface MetaEntry {
   key: string;
   value: unknown;
