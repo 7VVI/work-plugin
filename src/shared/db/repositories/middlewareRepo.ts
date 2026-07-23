@@ -43,4 +43,12 @@ export const middlewareRepo = {
       (m.remark ?? '').toLowerCase().includes(q)
     );
   },
+
+  async reorder(orderedIds: string[]): Promise<void> {
+    await db.transaction('rw', db.middlewares, async () => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await db.middlewares.update(orderedIds[i], { sortOrder: i, updatedAt: Date.now() });
+      }
+    });
+  },
 };

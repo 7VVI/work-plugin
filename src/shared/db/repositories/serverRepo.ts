@@ -39,4 +39,12 @@ export const serverRepo = {
       (s.remark ?? '').toLowerCase().includes(q)
     );
   },
+
+  async reorder(orderedIds: string[]): Promise<void> {
+    await db.transaction('rw', db.servers, async () => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await db.servers.update(orderedIds[i], { sortOrder: i, updatedAt: Date.now() });
+      }
+    });
+  },
 };
