@@ -1,110 +1,117 @@
 <template>
   <div class="system-view">
+    <!-- 操作栏 - v3 风格 -->
     <div class="action-bar">
-      <div class="action-left">
-        <button class="btn btn-dark" @click="onCreate"><i class="fa-solid fa-plus"></i> 新增系统</button>
-        <button class="btn btn-danger" :disabled="selectedIds.size === 0" @click="onBulkDelete">
-          <i class="fa-solid fa-trash"></i> 删除选中
+      <button class="btn-p" @click="onCreate"><i class="fa-solid fa-plus text-[11px]"></i>新增系统</button>
+      <button v-if="selectedIds.size > 0" class="btn-d" @click="onBulkDelete">
+        <i class="fa-regular fa-trash-can text-[11px]"></i>删除选中（{{ selectedIds.size }}）
+      </button>
+      <div class="flex-1"></div>
+      <!-- 视图切换 - v3 风格 -->
+      <div class="view-toggle">
+        <button class="view-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'" title="列表视图">
+          <i class="fa-solid fa-list text-xs"></i>
+        </button>
+        <button class="view-btn" :class="{ active: viewMode === 'card' }" @click="viewMode = 'card'" title="网格视图">
+          <i class="fa-solid fa-table-cells-large text-xs"></i>
         </button>
       </div>
-      <div class="action-right">
-        <div class="view-toggle">
-          <button class="vt-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'" title="列表视图">
-            <i class="fa-solid fa-list"></i>
-          </button>
-          <button class="vt-btn" :class="{ active: viewMode === 'card' }" @click="viewMode = 'card'" title="卡片视图">
-            <i class="fa-solid fa-grip"></i>
-          </button>
-        </div>
-        <div class="search-wrap">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input v-model="search" class="search-input" type="text" placeholder="搜索系统名称、URL..." />
-        </div>
+      <!-- 搜索框 - v3 风格 -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
+        <input v-model="search" class="inp w-72 !pl-8" placeholder="搜索系统名称、URL、标签…" />
       </div>
     </div>
 
-    <!-- 列表视图 -->
-    <div v-if="viewMode === 'table'" class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:48px;"><input type="checkbox" class="form-check" :checked="allChecked" @change="toggleAll" /></th>
-            <th style="width:28%;">系统名称</th>
-            <th style="width:32%;">URL</th>
-            <th style="width:80px;">环境</th>
-            <th style="width:120px;">最近更新</th>
-            <th style="width:140px;">操作</th>
+    <!-- 列表视图 - v3 风格 -->
+    <div v-if="viewMode === 'table'" class="systems-list panel">
+      <table class="w-full">
+        <thead style="border-bottom:1px solid var(--border);background:var(--panel2)">
+          <tr class="text-left text-[10.5px] font-semibold uppercase tracking-widest t3">
+            <th class="w-10 py-2.5 pl-4 pr-2">
+              <input type="checkbox" class="h-3.5 w-3.5 cursor-pointer" style="accent-color:var(--accent)" :checked="allChecked" @change="toggleAll" />
+            </th>
+            <th class="px-4 py-2.5 font-semibold">系统名称</th>
+            <th class="px-4 py-2.5 font-semibold">URL</th>
+            <th class="w-24 px-4 py-2.5 font-semibold">环境</th>
+            <th class="w-24 px-4 py-2.5 font-semibold">账号</th>
+            <th class="w-28 px-4 py-2.5 font-semibold">最近更新</th>
+            <th class="w-32 px-4 py-2.5 pr-4 text-right font-semibold">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="s in filteredSystems" :key="s.id">
-            <td><input type="checkbox" class="form-check" :checked="selectedIds.has(s.id)" @change="toggleOne(s.id)" /></td>
-            <td>
-              <div class="sys-cell">
-                <div class="sys-icon" :style="iconStyle(s)">
+          <tr v-for="s in filteredSystems" :key="s.id" class="row-h group transition" style="border-bottom:1px solid var(--border)">
+            <td class="py-3 pl-4 pr-2">
+              <input type="checkbox" class="h-3.5 w-3.5 cursor-pointer" style="accent-color:var(--accent)" :checked="selectedIds.has(s.id)" @change="toggleOne(s.id)" />
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-3">
+                <span class="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] text-[13px] text-white" :style="iconStyle(s)">
                   <i :class="s.icon || 'fa-solid fa-globe'"></i>
-                </div>
-                <div class="sys-text">
-                  <div class="sys-name">{{ s.name }}</div>
-                  <div v-if="s.remark" class="sys-desc">{{ s.remark }}</div>
-                </div>
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-[13.5px] font-medium t1">{{ s.name }}</span>
+                </span>
               </div>
             </td>
-            <td class="url-cell">
-              <a class="url-link" @click.stop="onOpen(s)" :title="s.url">
-                <i class="fa-solid fa-globe"></i>
-                <span class="url-text">{{ s.url }}</span>
-              </a>
+            <td class="px-4 py-3">
+              <span class="flex items-center gap-1.5 mono text-xs t2">
+                <i class="fa-solid fa-link text-[10px] t3"></i>
+                <span class="max-w-[340px] truncate">{{ s.url }}</span>
+                <button class="ibtn !h-5 !w-5 opacity-0 transition group-hover:opacity-100" title="复制链接" @click="copyUrl(s.url)">
+                  <i class="fa-regular fa-copy text-[10px]"></i>
+                </button>
+              </span>
             </td>
-            <td><EnvBadge :env="s.environment" /></td>
-            <td><span class="time-cell">{{ formatRelativeTime(s.updatedAt) }}</span></td>
-            <td>
-              <div class="row-actions">
-                <button class="row-action row-action-sm edit" @click.stop="onEdit(s)" title="编辑"><i class="fa-solid fa-pen"></i></button>
-                <button class="row-action row-action-sm" @click.stop="onOpen(s)" title="打开"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
-                <button class="row-action row-action-sm danger" @click.stop="onDelete(s.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
+            <td class="px-4 py-3"><EnvBadge :env="s.environment" /></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center gap-1 text-xs t2">
+                <i class="fa-solid fa-key text-[10px] t3"></i>{{ acctCounts[s.id] ?? 0 }} 个
+              </span>
+            </td>
+            <td class="px-4 py-3 text-xs t3">{{ formatRelativeTime(s.updatedAt) }}</td>
+            <td class="py-3 pl-4 pr-4 text-right">
+              <div class="flex justify-end gap-0.5 opacity-50 transition group-hover:opacity-100">
+                <button class="ibtn" title="编辑" @click.stop="onEdit(s)"><i class="fa-solid fa-pen text-xs"></i></button>
+                <button class="ibtn" title="打开系统" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></button>
+                <button class="ibtn danger" title="删除" @click.stop="onDelete(s.id)"><i class="fa-regular fa-trash-can text-xs"></i></button>
               </div>
             </td>
           </tr>
           <tr v-if="filteredSystems.length === 0">
-            <td colspan="6" class="empty-cell">
-              <div class="empty-state">
-                <i class="fa-solid fa-globe"></i>
-                <p>暂无系统，点击“新增系统”添加</p>
-              </div>
+            <td colspan="7" class="py-16 text-center">
+              <i class="fa-regular fa-folder-open text-2xl t3"></i>
+              <div class="mt-2 text-[13px] t3">暂无系统，点击"新增系统"创建</div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- 卡片视图 -->
-    <div v-else class="card-wrap">
-      <div class="card-grid">
-        <div v-for="s in filteredSystems" :key="s.id" class="sys-card stat-card" @click="onOpen(s)">
-          <div class="card-header">
-            <div class="card-icon" :style="iconStyle(s)">
-              <i :class="s.icon || 'fa-solid fa-globe'"></i>
-            </div>
-            <div class="card-actions" @click.stop>
-              <button class="row-action row-action-sm edit" @click="onEdit(s)" title="编辑"><i class="fa-solid fa-pen"></i></button>
-              <button class="row-action row-action-sm danger" @click="onDelete(s.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="card-name">{{ s.name }}</div>
-            <div class="card-url" :title="s.url">{{ s.url }}</div>
-            <div v-if="s.remark" class="card-remark">{{ s.remark }}</div>
-          </div>
-          <div class="card-footer">
-            <EnvBadge :env="s.environment" />
-            <span class="card-time">{{ formatRelativeTime(s.updatedAt) }}</span>
+    <!-- 网格视图 - v3 风格 -->
+    <div v-else class="systems-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div v-for="s in filteredSystems" :key="s.id" class="panel stat-card group p-4">
+        <div class="flex items-start justify-between">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl text-base text-white" :style="iconStyle(s)">
+            <i :class="s.icon || 'fa-solid fa-globe'"></i>
+          </span>
+          <EnvBadge :env="s.environment" />
+        </div>
+        <div class="mt-3 text-[14px] font-semibold t1">{{ s.name }}</div>
+        <div class="mono mt-0.5 truncate text-xs t3">{{ s.url }}</div>
+        <div class="mt-3 flex items-center justify-between pt-3 text-xs t3" style="border-top:1px solid var(--border)">
+          <span>
+            <i class="fa-solid fa-key mr-1 text-[10px]"></i>{{ acctCounts[s.id] ?? 0 }} 个账号 · {{ formatRelativeTime(s.updatedAt) }}
+          </span>
+          <div class="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
+            <button class="ibtn !h-6 !w-6" @click="onEdit(s)"><i class="fa-solid fa-pen text-[11px]"></i></button>
+            <button class="ibtn danger !h-6 !w-6" @click="onDelete(s.id)"><i class="fa-regular fa-trash-can text-[11px]"></i></button>
           </div>
         </div>
-        <div v-if="filteredSystems.length === 0" class="empty-state">
-          <i class="fa-solid fa-globe"></i>
-          <p>暂无系统，点击“新增系统”添加</p>
-        </div>
+      </div>
+      <div v-if="filteredSystems.length === 0" class="py-16 text-center">
+        <i class="fa-regular fa-folder-open text-2xl t3"></i>
+        <div class="mt-2 text-[13px] t3">暂无系统，点击"新增系统"创建</div>
       </div>
     </div>
 
@@ -119,6 +126,8 @@ import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import type { System } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
+import { accountService } from '@shared/services/accountService';
+import { copyToClipboard } from '@shared/utils/clipboard';
 import EnvBadge from '../components/common/EnvBadge.vue';
 import SystemForm from '../components/system/SystemForm.vue';
 
@@ -129,6 +138,7 @@ const formVisible = ref(false);
 const editing = ref<System | null>(null);
 const search = ref('');
 const selectedIds = ref<Set<string>>(new Set());
+const acctCounts = ref<Record<string, number>>({});
 const VIEW_KEY = 'dock-v3-system-view';
 const viewMode = ref<'table' | 'card'>(
   (typeof localStorage !== 'undefined' && (localStorage.getItem(VIEW_KEY) as 'table' | 'card')) || 'table',
@@ -150,12 +160,29 @@ function iconStyle(s: System) {
   return { background: bg, boxShadow: `0 5px 14px -4px ${solid}66` };
 }
 
-onMounted(async () => { await store.load(); });
+async function loadAcctCounts() {
+  const counts: Record<string, number> = {};
+  await Promise.all(
+    store.list.map(async (s) => {
+      const accounts = await accountService.bySystemId(s.id);
+      counts[s.id] = accounts.length;
+    }),
+  );
+  acctCounts.value = counts;
+}
+
+onMounted(async () => {
+  await store.load();
+  await loadAcctCounts();
+});
 
 const filteredSystems = computed(() => {
   if (!search.value.trim()) return store.list;
   const q = search.value.toLowerCase();
-  return store.list.filter(s => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
+  return store.list.filter(s =>
+    s.name.toLowerCase().includes(q) ||
+    s.url.toLowerCase().includes(q)
+  );
 });
 
 const allChecked = computed(() => filteredSystems.value.length > 0 && filteredSystems.value.every(s => selectedIds.value.has(s.id)));
@@ -183,6 +210,7 @@ async function onDelete(id: string) {
   const ok = await dialog.confirm('确认删除', '确认删除该系统？');
   if (!ok) return;
   await store.remove(id);
+  await loadAcctCounts();
   toast.success('已删除');
 }
 
@@ -192,294 +220,81 @@ async function onBulkDelete() {
   if (!ok) return;
   for (const id of ids) await store.remove(id);
   selectedIds.value.clear();
+  await loadAcctCounts();
   toast.success(`已删除 ${ids.length} 个系统`);
 }
 
 async function onSaved() {
   formVisible.value = false;
   await store.load();
+  await loadAcctCounts();
+}
+
+async function copyUrl(url: string) {
+  try {
+    await copyToClipboard(url);
+    toast.success('链接已复制');
+  } catch {
+    toast.error('复制失败');
+  }
 }
 </script>
 
 <style scoped>
-.system-view { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.system-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
 
 .action-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--gap-lg) var(--page-pad);
-  gap: var(--gap-lg);
+  gap: 12px;
+  padding: 16px 24px;
   flex-shrink: 0;
 }
-.action-left { display: flex; align-items: center; gap: var(--gap-md); }
-.action-right { display: flex; align-items: center; gap: var(--gap-md); }
-.action-right .search-wrap { width: 280px; }
 
-/* 视图切换按钮 */
 .view-toggle {
   display: flex;
   align-items: center;
-  background: var(--surface-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px;
   gap: 2px;
-}
-.vt-btn {
-  width: 30px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: var(--transition-fast);
-  font-size: 12px;
-}
-.vt-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
-.vt-btn.active {
-  background: var(--bg-pure);
-  color: var(--primary);
-  box-shadow: var(--shadow-xs);
-}
-
-/* 表格视图 */
-.table-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  background: var(--panel);
+  border-radius: 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  margin: 0 var(--page-pad) var(--page-pad);
-  box-shadow: var(--shadow-xs);
-  position: relative;
+  background: var(--bg2);
+  padding: 2px;
 }
-
-.data-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: var(--text-sm);
-}
-.data-table thead th {
-  background: var(--panel2);
-  color: var(--ink3);
-  font-weight: var(--font-medium);
-  padding: 0 var(--gap-lg);
-  height: var(--table-header-h);
-  text-align: center;
-  border-bottom: 1px solid var(--border-soft);
-  white-space: nowrap;
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-/* 减少checkbox列和系统名称列的间距 */
-.data-table thead th:first-child { padding-right: 0; }
-.data-table tbody td:first-child { padding-right: 0; }
-.data-table thead th:nth-child(2) { padding-left: var(--gap-sm); }
-.data-table tbody td:nth-child(2) { padding-left: var(--gap-sm); }
-
-.data-table thead th:nth-child(2),
-.data-table thead th:nth-child(3) { text-align: left; }
-.data-table tbody td {
-  padding: 0 var(--gap-lg);
-  height: var(--table-row-h);
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-primary);
-  vertical-align: middle;
-  text-align: center;
-}
-.data-table tbody td:nth-child(2),
-.data-table tbody td:nth-child(3) { text-align: left; }
-.data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { transition: background 0.2s ease; }
-.data-table tbody tr:hover td { background: var(--surface-hover); }
-.data-table tbody tr:hover td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.data-table tbody tr:hover td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-
-/* URL列左对齐 */
-.url-cell { text-align: left !important; }
-.url-cell .url-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-}
-
-.sys-cell { display: flex; align-items: center; gap: var(--gap-md); }
-.sys-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
+.view-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: var(--text-sm);
-  flex-shrink: 0;
-  box-shadow: var(--shadow-xs);
-}
-.sys-text { min-width: 0; }
-.sys-name {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  color: var(--ink);
-  line-height: var(--leading-tight);
-}
-.sys-desc {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
-}
-
-.url-text {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  color: var(--ink2);
-  max-width: 320px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.time-cell { color: var(--text-tertiary); font-size: var(--text-sm); }
-.row-actions { display: flex; align-items: center; justify-content: center; gap: var(--gap-sm); }
-
-.empty-cell {
-  padding: 0 !important;
-  height: auto !important;
-}
-.empty-state {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-}
-.empty-state i {
-  font-size: 36px;
-  margin-bottom: var(--gap-md);
+  width: 30px;
+  height: 26px;
+  border-radius: 7px;
   color: var(--ink3);
+  cursor: pointer;
+  transition: .15s;
+  border: none;
+  background: transparent;
 }
-.empty-state p { font-size: var(--text-sm); margin: 0; }
+.view-btn.active {
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--border), 0 2px 8px -2px rgba(15, 23, 38, .1);
+}
 
-/* 卡片视图 */
-.card-wrap {
+.systems-list {
+  margin: 0 24px 16px;
+  overflow: hidden;
+}
+
+.systems-grid {
+  padding: 0 24px 24px;
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  padding: 0 var(--page-pad) var(--page-pad);
-  position: relative;
-}
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--gap-lg);
+  overflow-y: auto;
   align-content: start;
 }
-.sys-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  padding: var(--gap-lg);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-md);
-}
-.sys-card:hover {
-  border-color: var(--primary);
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: var(--text-base);
-  box-shadow: var(--shadow-xs);
-}
-.card-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: var(--transition-fast);
-}
-.sys-card:hover .card-actions { opacity: 1; }
-.card-body { flex: 1; min-width: 0; }
-.card-name {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  color: var(--ink);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-url {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-remark {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  margin-top: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: var(--gap-sm);
-  border-top: 1px solid var(--border-soft);
-}
-.card-time {
-  font-size: var(--text-xs);
-  color: var(--text-quaternary);
-}
-.card-empty {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 0;
-  color: var(--text-tertiary);
-}
-.card-empty .empty-icon {
-  font-size: 32px;
-  color: var(--text-quaternary);
-  margin-bottom: var(--gap-md);
-}
-.card-empty > div { font-size: var(--text-base); color: var(--text-secondary); }
-.card-empty .empty-hint { font-size: var(--text-sm); color: var(--text-quaternary); margin-top: var(--gap-xs); }
 </style>
