@@ -1,0 +1,82 @@
+/* === Design Tokens (v3) === */
+
+/* === 亮色主题 === */
+:root {
+  /* === 颜色系统 === */
+  --bg: #F3F6FB;
+  --bg2: #EBF0F8;
+  --panel: #FFFFFF;
+  --panel2: #F4F7FC;
+  --solid: #FFFFFF;
+  --solid2: #F6F8FC;
+
+  --border: #E1E8F2;
+  --border2: #C6D2E4;
+
+  --ink: #0F1726;
+  --ink2: #4E5D75;
+  --ink3: #8593A9;
+
+  --accent: #2E6BF0;
+  --accent2: #0891B2;
+  --glow: rgba(46, 107, 240, .25);
+
+  --ok: #059669;
+  --warn: #B45309;
+  --danger: #DC2626;
+  --info: #2563EB;
+
+  --grid-line: rgba(46, 107, 240, .055);
+
+  /* === 间距系统 === */
+  --gap-xs: 4px;
+  --gap-sm: 8px;
+  --gap-md: 12px;
+  --gap-lg: 16px;
+  --gap-xl: 24px;
+
+  /* === 圆角 === */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+
+  /* === 阴影 === */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 38, .03);
+  --shadow-sm: 0 2px 4px rgba(15, 23, 38, .05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 38, .1);
+
+  /* === 兼容映射 === */
+  --primary: var(--accent);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink2);
+  --text-tertiary: var(--ink3);
+}
+
+/* === 暗色主题 === */
+html.dark {
+  --bg: #060A11;
+  --bg2: #0A0F19;
+  --panel: rgba(148, 178, 255, .05);
+  --panel2: rgba(148, 178, 255, .09);
+  --solid: #0C1322;
+  --solid2: #111A2C;
+
+  --border: rgba(148, 178, 255, .13);
+  --border2: rgba(148, 178, 255, .24);
+
+  --ink: #E9EEF8;
+  --ink2: #93A1B8;
+  --ink3: #56657D;
+
+  --accent: #3D7FFF;
+  --accent2: #22D3EE;
+  --glow: rgba(61, 127, 255, .4);
+
+  --ok: #34D399;
+  --warn: #FBBF24;
+  --danger: #F87171;
+  --info: #60A5FA;
+
+  --grid-line: rgba(148, 178, 255, .05);
+}

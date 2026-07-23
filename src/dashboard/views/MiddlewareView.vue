@@ -169,15 +169,18 @@ async function onCopyAddr(m: Middleware) {
 
 .mw-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--gap-lg);
-  padding: 0 var(--page-pad) var(--page-pad);
+  padding: 0 var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   align-content: start;
   position: relative;
 }
+@media (min-width: 640px) { .mw-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1280px) { .mw-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1536px) { .mw-grid { grid-template-columns: repeat(4, 1fr); } }
 
 .mw-card {
   padding: var(--gap-lg);

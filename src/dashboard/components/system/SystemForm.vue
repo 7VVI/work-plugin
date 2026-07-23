@@ -44,17 +44,15 @@
                 </div>
                 <div class="field">
                   <label class="lbl">颜色</label>
-                  <div class="color-row">
-                    <button
-                      v-for="c in QUICK_COLORS"
-                      :key="c"
-                      class="color-opt"
-                      :class="{ on: c.toLowerCase() === currentColor.toLowerCase() }"
-                      :style="colorOptStyle(c)"
-                      :title="c"
-                      type="button"
-                      @click="pickColor(c)"
-                    ></button>
+                  <div class="color-bar">
+                    <input
+                      type="color"
+                      :value="currentColor"
+                      class="color-input"
+                      @input="pickColor(($event.target as HTMLInputElement).value)"
+                    />
+                    <span class="color-swatch" :style="{ background: currentColor }"></span>
+                    <span class="color-value mono">{{ currentColor.toUpperCase() }}</span>
                   </div>
                 </div>
               </div>
@@ -105,10 +103,9 @@
                 <span>角色</span>
                 <span>用户名</span>
                 <span>密码</span>
-                <span class="ta-right">操作</span>
               </div>
               <div class="acct-rows">
-                <div v-for="(row, idx) in acctRows" :key="row.uid" class="acct-row">
+                <div v-for="row in acctRows" :key="row.uid" class="acct-row">
                   <input v-model="row.role" class="inp acct-inp" placeholder="角色" />
                   <input v-model="row.username" class="inp acct-inp" placeholder="用户名" />
                   <div class="pwd-cell">
@@ -120,14 +117,6 @@
                     />
                     <button class="ibtn pwd-toggle" type="button" :title="row.show ? '隐藏' : '显示'" @click="row.show = !row.show">
                       <i :class="row.show ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'"></i>
-                    </button>
-                  </div>
-                  <div class="acct-ops">
-                    <button class="ibtn acct-confirm" type="button" title="账号已保存" @click="toast.success('账号已保存')">
-                      <i class="fa-solid fa-check"></i>
-                    </button>
-                    <button class="ibtn danger" type="button" title="删除" @click="removeAccountRow(idx)">
-                      <i class="fa-solid fa-xmark"></i>
                     </button>
                   </div>
                 </div>
@@ -175,7 +164,6 @@ const systemStore = useSystemStore();
 const toast = useToastStore();
 
 // ---- v3 verbatim constants ----
-const QUICK_COLORS = ['#2E6BF0', '#0EA5E9', '#0891B2', '#10B981', '#F59E0B', '#DC2626', '#7C3AED', '#111827'];
 const QUICK_ICONS = [
   'fa-solid fa-globe', 'fa-solid fa-server', 'fa-solid fa-database', 'fa-solid fa-cloud',
   'fa-solid fa-map-location-dot', 'fa-solid fa-truck-fast', 'fa-solid fa-chart-line', 'fa-solid fa-warehouse',
@@ -223,14 +211,6 @@ function pickColor(c: string) {
 function pickIcon(ic: string) {
   form.value.icon = ic;
 }
-function colorOptStyle(c: string) {
-  const on = c.toLowerCase() === currentColor.value.toLowerCase();
-  return {
-    background: c,
-    boxShadow: on ? `0 0 0 2px var(--solid), 0 0 0 4px ${c}` : 'none',
-    transform: on ? 'scale(1.12)' : 'none',
-  } as Record<string, string>;
-}
 function iconOptStyle(ic: string) {
   if (ic !== currentIcon.value) return { borderColor: 'var(--border)' } as Record<string, string>;
   const color = currentColor.value;
@@ -274,9 +254,6 @@ function newUid() {
 }
 function addAccountRow(role = '', username = '', password = '', id?: string) {
   acctRows.value.push({ uid: newUid(), id, role, username, password, show: false });
-}
-function removeAccountRow(idx: number) {
-  acctRows.value.splice(idx, 1);
 }
 
 // ---------- load on open ----------
@@ -508,20 +485,40 @@ async function save() {
   gap: 16px;
 }
 
-/* color dot picker */
-.color-row {
+/* color bar picker (input[type=color] + swatch + hex) */
+.color-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 0;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
 }
-.color-opt {
-  width: 24px;
-  height: 24px;
+.color-bar:hover { border-color: var(--border-strong); }
+.color-input {
+  width: 32px;
+  height: 26px;
   border: none;
-  border-radius: var(--radius-sm);
+  padding: 0;
+  background: transparent;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+}
+.color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.color-input::-webkit-color-swatch { border: 1px solid var(--border-strong); border-radius: 6px; }
+.color-input::-moz-color-swatch { border: 1px solid var(--border-strong); border-radius: 6px; }
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  flex-shrink: 0;
+}
+.color-value {
+  font-size: 12px;
+  color: var(--ink2);
+  letter-spacing: 0.03em;
 }
 
 /* icon grid */
@@ -535,7 +532,7 @@ async function save() {
 }
 .icon-opt i { font-size: 12px; }
 
-/* tag chip input */
+/* tag chip input — styled like .inp */
 .tag-inp {
   display: flex;
   flex-wrap: wrap;
@@ -544,7 +541,13 @@ async function save() {
   min-height: 38px;
   padding: 6px 12px;
   cursor: text;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
 }
+.tag-inp:hover { border-color: var(--border-strong); }
+.tag-inp:focus-within { border-color: var(--accent); box-shadow: var(--shadow-focus); }
 .tag-chip { padding: 2px 7px; font-size: 11.5px; }
 .tag-x {
   margin-left: 2px;
@@ -574,7 +577,7 @@ async function save() {
 .acct-panel { display: flex; flex-direction: column; }
 .acct-head {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1.2fr 72px;
+  grid-template-columns: 1fr 1.2fr 1.2fr;
   gap: 8px;
   padding: 0 4px;
   margin-bottom: 8px;
@@ -584,11 +587,10 @@ async function save() {
   letter-spacing: 0.1em;
   color: var(--ink3);
 }
-.ta-right { text-align: right; }
 .acct-rows { display: flex; flex-direction: column; gap: 8px; }
 .acct-row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1.2fr 72px;
+  grid-template-columns: 1fr 1.2fr 1.2fr;
   align-items: center;
   gap: 8px;
   padding: 6px;
@@ -615,10 +617,6 @@ async function save() {
   height: 20px;
 }
 .pwd-toggle i { font-size: 10px; }
-.acct-ops { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
-.acct-ops .ibtn { width: 24px; height: 24px; }
-.acct-confirm { color: var(--ok); }
-.acct-confirm:hover { background: rgba(5, 150, 105, 0.1); color: var(--ok); }
 
 .dashed {
   margin-top: 12px;

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dock v3 · Light Lab 原型总览</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = { theme: { extend: {
+  fontFamily: {
+    sans: ['"Amazon Ember"','"Noto Sans SC"','-apple-system','BlinkMacSystemFont','"Segoe UI"','Roboto','sans-serif'],
+    mono: ['"JetBrains Mono"','Consolas','monospace']
+  }
+}}};
+</script>
+<style>
+:root{
+  --bg:#F3F6FB; --panel:#FFFFFF; --panel2:#F4F7FC;
+  --solid:#FFFFFF; --border:#E1E8F2; --border2:#C6D2E4;
+  --ink:#0F1726; --ink2:#4E5D75; --ink3:#8593A9;
+  --accent:#2E6BF0; --accent2:#0891B2; --glow:rgba(46,107,240,.25);
+  --ok:#059669; --warn:#B45309; --info:#2563EB;
+}
+*{-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font-family:'Amazon Ember','Noto Sans SC',-apple-system,sans-serif}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(46,107,240,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(46,107,240,.05) 1px,transparent 1px);
+  background-size:40px 40px;mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,#000 25%,transparent 100%)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(720px 320px at 20% -8%,rgba(46,107,240,.1),transparent 65%),radial-gradient(620px 320px at 88% -6%,rgba(8,145,178,.07),transparent 65%)}
+.t1{color:var(--ink)}.t2{color:var(--ink2)}.t3{color:var(--ink3)}
+.mono{font-family:'JetBrains Mono',monospace}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 2px rgba(15,23,38,.03)}
+.kbd{display:inline-flex;align-items:center;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:var(--panel2);padding:2px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--ink3)}
+.grad-text{background:linear-gradient(100deg,var(--ink) 25%,var(--accent) 60%,var(--accent2) 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.frame{position:relative;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--solid);transition:.25s;box-shadow:0 1px 3px rgba(15,23,38,.04)}
+.frame:hover{border-color:var(--border2);box-shadow:0 16px 44px -16px rgba(15,23,38,.18),0 0 36px -14px var(--glow)}
+.frame iframe{pointer-events:none}
+.open-link{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(15,23,38,0);opacity:0;transition:.25s}
+.open-link:hover{background:rgba(15,23,38,.3);opacity:1}
+.rise{animation:rise .55s cubic-bezier(.2,.9,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}}
+.d1{animation-delay:.06s}.d2{animation-delay:.14s}.d3{animation-delay:.22s}.d4{animation-delay:.3s}
+</style>
+</head>
+<body class="relative z-10 min-h-screen">
+
+<div class="mx-auto max-w-6xl px-8 py-12">
+
+  <!-- Hero -->
+  <div class="rise flex items-start gap-5">
+    <div class="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl font-black text-white" style="background:linear-gradient(135deg,var(--accent),#1D4ED8);box-shadow:0 10px 28px -8px var(--glow)">D</div>
+    <div>
+      <div class="mono text-[10.5px] tracking-[.25em] t3">DOCK // LIGHT LAB · V3</div>
+      <h1 class="grad-text mt-1.5 text-3xl font-black tracking-tight">运维资产控制台 · 重设计</h1>
+      <p class="mt-2 max-w-xl text-[13.5px] leading-relaxed t2">系统导航 / 服务器 / 中间件 / 配置一站式管理。亮色全宽布局：滑动指示 Tab、环境徽章、状态栏时钟 —— 信息铺满每一寸屏幕。</p>
+    </div>
+    <div class="flex-1"></div>
+    <div class="flex flex-col items-end gap-2 text-xs t3">
+      <div class="flex gap-2">
+        <span class="rounded-md border bg-white px-2 py-1" style="border-color:var(--border)">HTML5 + CSS3 + 原生 JS</span>
+        <span class="rounded-md border bg-white px-2 py-1" style="border-color:var(--border)">TailwindCSS CDN</span>
+      </div>
+      <div class="flex gap-2">
+        <span class="rounded-md border bg-white px-2 py-1" style="border-color:var(--border)">Font Awesome 6</span>
+        <span class="rounded-md border bg-white px-2 py-1" style="border-color:var(--border)">Noto Sans SC / Amazon Ember</span>
+      </div>
+      <div class="mono mt-1 flex gap-3 text-[10.5px]">
+        <a href="../redesign/index.html" class="t3 transition hover:t2">v1 经典版</a>
+        <a href="../v2/index.html" class="t3 transition hover:t2">v2 暗色版</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 两个界面 -->
+  <div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-5">
+    <!-- Popup -->
+    <div class="rise d1 lg:col-span-2">
+      <div class="mb-2.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="mono text-[10px] tracking-widest t3">01</span>
+          <span class="text-[14px] font-semibold t1">扩展弹窗</span>
+          <span class="mono text-[10.5px] t3">popup.html · 378×560</span>
+        </div>
+        <a href="popup.html" target="_blank" class="inline-flex items-center gap-1 text-xs font-medium transition hover:brightness-110" style="color:var(--accent)">打开<i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
+      </div>
+      <div class="frame aspect-[4/5]">
+        <iframe src="popup.html" class="h-[200%] w-[200%] origin-top-left scale-50 border-0" title="popup 预览"></iframe>
+        <a href="popup.html" target="_blank" class="open-link">
+          <span class="rounded-xl bg-white px-4 py-2.5 text-[13px] font-semibold t1" style="border:1px solid var(--border2);box-shadow:0 16px 40px -12px rgba(15,23,38,.3)"><i class="fa-solid fa-arrow-up-right-from-square mr-1.5 text-xs" style="color:var(--accent)"></i>打开交互预览</span>
+        </a>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-[12px] t2">
+        <div class="panel !rounded-xl p-3"><i class="fa-solid fa-keyboard mb-1.5 block" style="color:var(--accent)"></i><span class="kbd">Ctrl</span>+<span class="kbd">K</span> 搜索 · ↑↓ 选择 · Enter 打开</div>
+        <div class="panel !rounded-xl p-3"><i class="fa-solid fa-star mb-1.5 block" style="color:#F59E0B"></i>常用置顶 · 一键复制账号 · 玻璃拟态</div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="rise d2 lg:col-span-3">
+      <div class="mb-2.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="mono text-[10px] tracking-widest t3">02</span>
+          <span class="text-[14px] font-semibold t1">管理控制台</span>
+          <span class="mono text-[10.5px] t3">dashboard.html</span>
+        </div>
+        <a href="dashboard.html" target="_blank" class="inline-flex items-center gap-1 text-xs font-medium transition hover:brightness-110" style="color:var(--accent)">打开<i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
+      </div>
+      <div class="frame aspect-[16/10]">
+        <iframe src="dashboard.html" class="h-[200%] w-[200%] origin-top-left scale-50 border-0" title="dashboard 预览"></iframe>
+        <a href="dashboard.html" target="_blank" class="open-link">
+          <span class="rounded-xl bg-white px-4 py-2.5 text-[13px] font-semibold t1" style="border:1px solid var(--border2);box-shadow:0 16px 40px -12px rgba(15,23,38,.3)"><i class="fa-solid fa-arrow-up-right-from-square mr-1.5 text-xs" style="color:var(--accent)"></i>打开交互预览</span>
+        </a>
+      </div>
+      <div class="mt-3 grid grid-cols-3 gap-2 text-[12px] t2">
+        <div class="panel !rounded-xl p-3"><i class="fa-solid fa-arrows-left-right mb-1.5 block" style="color:var(--accent)"></i>滑动发光指示条 · 顶部 Tab 切换</div>
+        <div class="panel !rounded-xl p-3"><i class="fa-solid fa-expand mb-1.5 block" style="color:var(--accent2)"></i>全宽铺满 · 信息密度优先</div>
+        <div class="panel !rounded-xl p-3"><i class="fa-solid fa-wave-square mb-1.5 block" style="color:var(--ok)"></i>状态栏实时时钟 · 同步状态</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设计规范 -->
+  <div class="rise d3 mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div class="panel p-4">
+      <div class="mono text-[10px] tracking-widest t3">ACCENT</div>
+      <div class="mt-2.5 flex items-center gap-2">
+        <span class="h-6 w-6 rounded-lg" style="background:var(--accent);box-shadow:0 4px 12px -3px var(--glow)"></span>
+        <span class="mono text-xs t2">#2E6BF0</span>
+      </div>
+    </div>
+    <div class="panel p-4">
+      <div class="mono text-[10px] tracking-widest t3">ENV BADGES</div>
+      <div class="mt-2.5 flex gap-1.5">
+        <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium" style="color:var(--ok);background:rgba(5,150,105,.08);box-shadow:inset 0 0 0 1px rgba(5,150,105,.22)">生产</span>
+        <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium" style="color:var(--info);background:rgba(37,99,235,.08);box-shadow:inset 0 0 0 1px rgba(37,99,235,.2)">开发</span>
+        <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium" style="color:var(--warn);background:rgba(180,83,9,.08);box-shadow:inset 0 0 0 1px rgba(180,83,9,.22)">测试</span>
+      </div>
+    </div>
+    <div class="panel p-4">
+      <div class="mono text-[10px] tracking-widest t3">TYPE</div>
+      <div class="mt-2.5 text-xs leading-relaxed t2">Noto Sans SC · Amazon Ember<br/><span class="mono text-[11px] t3">JetBrains Mono（数据 / 路径）</span></div>
+    </div>
+    <div class="panel p-4">
+      <div class="mono text-[10px] tracking-widest t3">MOTION</div>
+      <div class="mt-2.5 text-xs leading-relaxed t2">Tab 滑动指示 · 入场编排 rise<br/><span class="t3">弹窗 spring · 呼吸状态点</span></div>
+    </div>
+  </div>
+
+  <div class="rise d4 mt-10 flex items-center justify-center gap-3 text-[11px] t3">
+    <span class="h-px w-16" style="background:var(--border)"></span>
+    <span class="mono">Dock v3 · 双击 HTML 文件即可体验 · 控制台内可切暗色</span>
+    <span class="h-px w-16" style="background:var(--border)"></span>
+  </div>
+</div>
+
+</body>
+</html>

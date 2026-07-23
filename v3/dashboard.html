@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dock · 控制台 v3</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = { theme: { extend: {
+  fontFamily: {
+    sans: ['"Amazon Ember"','"Noto Sans SC"','-apple-system','BlinkMacSystemFont','"Segoe UI"','Roboto','sans-serif'],
+    mono: ['"JetBrains Mono"','"SFMono-Regular"','Consolas','monospace']
+  }
+}}};
+</script>
+<style>
+/* ================= 设计令牌（亮色默认，html.dark 切换暗色） ================= */
+:root{
+  --bg:#F3F6FB; --bg2:#EBF0F8; --panel:#FFFFFF; --panel2:#F4F7FC;
+  --solid:#FFFFFF; --solid2:#F6F8FC;
+  --border:#E1E8F2; --border2:#C6D2E4;
+  --ink:#0F1726; --ink2:#4E5D75; --ink3:#8593A9;
+  --accent:#2E6BF0; --accent2:#0891B2; --glow:rgba(46,107,240,.25);
+  --ok:#059669; --warn:#B45309; --danger:#DC2626; --info:#2563EB;
+  --grid-line:rgba(46,107,240,.055);
+}
+html.dark{
+  --bg:#060A11; --bg2:#0A0F19; --panel:rgba(148,178,255,.05); --panel2:rgba(148,178,255,.09);
+  --solid:#0C1322; --solid2:#111A2C;
+  --border:rgba(148,178,255,.13); --border2:rgba(148,178,255,.24);
+  --ink:#E9EEF8; --ink2:#93A1B8; --ink3:#56657D;
+  --accent:#3D7FFF; --accent2:#22D3EE; --glow:rgba(61,127,255,.4);
+  --ok:#34D399; --warn:#FBBF24; --danger:#F87171; --info:#60A5FA;
+  --grid-line:rgba(148,178,255,.05);
+}
+*{-webkit-font-smoothing:antialiased}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Amazon Ember','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  overflow-x:hidden;
+  transition:background .25s;
+}
+body::before{ /* 细网格纹理 */
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:40px 40px;
+  mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,#000 25%,transparent 100%);
+}
+body::after{ /* 顶部淡蓝光晕 */
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(720px 300px at 18% -8%, rgba(46,107,240,.10), transparent 65%),
+    radial-gradient(620px 300px at 88% -8%, rgba(8,145,178,.07), transparent 65%);
+}
+html.dark body::after{background:
+  radial-gradient(640px 320px at 12% -6%, rgba(61,127,255,.14), transparent 65%),
+  radial-gradient(560px 320px at 95% 108%, rgba(34,211,238,.09), transparent 65%);}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#C4CEDE;border-radius:8px;border:3px solid transparent;background-clip:content-box}
+html.dark ::-webkit-scrollbar-thumb{background:rgba(148,178,255,.18)}
+
+/* ================= 组件 ================= */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 2px rgba(15,23,38,.03)}
+html.dark .panel{box-shadow:none;backdrop-filter:blur(10px)}
+.panel-solid{background:var(--solid);border:1px solid var(--border);border-radius:16px}
+.t1{color:var(--ink)} .t2{color:var(--ink2)} .t3{color:var(--ink3)}
+.mono{font-family:'JetBrains Mono',monospace}
+.inp{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
+html.dark .inp{background:var(--bg2)}
+.inp::placeholder{color:var(--ink3)}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,107,240,.16)}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238593A9' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.btn-p{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 15px;font-size:13px;font-weight:500;cursor:pointer;transition:.18s;box-shadow:0 4px 14px -4px var(--glow),inset 0 1px 0 rgba(255,255,255,.2)}
+.btn-p:hover{filter:brightness(1.07);box-shadow:0 6px 20px -4px var(--glow),inset 0 1px 0 rgba(255,255,255,.2)}
+.btn-p:active{transform:scale(.97)}
+.btn-g{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);color:var(--ink2);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
+.btn-g:hover{border-color:var(--border2);color:var(--ink);background:var(--panel2)}
+html.dark .btn-g{background:transparent}
+html.dark .btn-g:hover{background:var(--panel2)}
+.btn-g:active{transform:scale(.97)}
+.btn-d{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid rgba(220,38,38,.3);color:var(--danger);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
+.btn-d:hover{background:rgba(220,38,38,.06)}
+.btn-d:disabled{opacity:.35;cursor:not-allowed}
+.ibtn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;color:var(--ink3);background:transparent;border:none;cursor:pointer;transition:.15s}
+.ibtn:hover{background:var(--panel2);color:var(--ink)}
+.ibtn.danger:hover{background:rgba(220,38,38,.08);color:var(--danger)}
+.kbd{display:inline-flex;align-items:center;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:var(--panel2);padding:2px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--ink3)}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);padding:2px 7px;font-size:10.5px;font-weight:500;color:var(--ink2)}
+/* 环境徽章（发光点签名） */
+.env{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:500;box-shadow:inset 0 0 0 1px}
+.env::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+.env-生产{color:var(--ok);background:rgba(5,150,105,.08);box-shadow:inset 0 0 0 1px rgba(5,150,105,.22)}
+.env-开发{color:var(--info);background:rgba(37,99,235,.08);box-shadow:inset 0 0 0 1px rgba(37,99,235,.2)}
+.env-测试{color:var(--warn);background:rgba(180,83,9,.08);box-shadow:inset 0 0 0 1px rgba(180,83,9,.22)}
+.env-预发{color:#7C3AED;background:rgba(124,58,237,.07);box-shadow:inset 0 0 0 1px rgba(124,58,237,.2)}
+/* 顶部 Tab（滑动指示条） */
+.tab-btn{display:flex;align-items:center;gap:6px;padding:10px 14px;font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;transition:color .18s;background:none;border:none;white-space:nowrap}
+.tab-btn:hover{color:var(--ink)}
+.tab-btn.active{color:var(--accent)}
+.tab-btn i{font-size:12px}
+#tab-ink{position:absolute;bottom:-1px;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 12px var(--glow),0 0 4px var(--glow);transition:left .32s cubic-bezier(.3,1.1,.4,1),width .32s cubic-bezier(.3,1.1,.4,1)}
+/* 状态栏 */
+.statusbar{position:fixed;left:0;right:0;bottom:0;height:32px;z-index:40;display:flex;align-items:center;gap:18px;padding:0 24px;border-top:1px solid var(--border);background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(14px);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink3)}
+.statusbar .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* 视图切换 */
+.view-btn{display:flex;align-items:center;justify-content:center;width:30px;height:26px;border-radius:7px;color:var(--ink3);cursor:pointer;transition:.15s;border:none;background:transparent}
+.view-btn.active{background:var(--panel);color:var(--accent);box-shadow:0 0 0 1px var(--border),0 2px 8px -2px rgba(15,23,38,.1)}
+/* 统计卡（顶部渐变高光） */
+.stat-card{position:relative;overflow:hidden;transition:.2s}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2),transparent 80%);opacity:0;transition:opacity .25s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px -12px rgba(15,23,38,.14)}
+.stat-card:hover::before{opacity:1}
+.stat-num{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--ink)}
+/* 弹窗动画 */
+.modal-overlay{animation:ovIn .18s ease both}
+.modal-panel{animation:panelIn .3s cubic-bezier(.3,1.3,.45,1) both}
+@keyframes ovIn{from{opacity:0}}
+@keyframes panelIn{from{opacity:0;transform:translateY(16px) scale(.95)}}
+.modal.closing .modal-overlay{animation:ovOut .16s ease both}
+.modal.closing .modal-panel{animation:panelOut .16s ease both}
+@keyframes ovOut{to{opacity:0}}
+@keyframes panelOut{to{opacity:0;transform:translateY(8px) scale(.97)}}
+/* Toast */
+.toast-item{animation:toastIn .3s cubic-bezier(.3,1.2,.4,1) both}
+.toast-item.leaving{animation:toastOut .2s ease both}
+@keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.95)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(8px) scale(.96)}}
+/* 弹窗内 tab */
+.mtab{position:relative;padding:12px 16px;font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;transition:.15s;background:none;border:none}
+.mtab:hover{color:var(--ink)}
+.mtab.active{color:var(--accent)}
+.mtab::after{content:'';position:absolute;left:16px;right:16px;bottom:-1px;height:2px;border-radius:2px;background:transparent}
+.mtab.active::after{background:var(--accent);box-shadow:0 0 8px var(--glow)}
+/* 开关 */
+.sw{width:38px;height:21px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);position:relative;transition:.2s;cursor:pointer;flex:none}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(15,23,38,.25);transition:.2s}
+html.dark .sw::after{background:var(--ink3);box-shadow:none}
+.sw.on{background:var(--accent);border-color:var(--accent)}
+.sw.on::after{transform:translateX(17px);background:#fff}
+/* 分段选择 */
+.seg-btn{border-radius:8px;padding:6px 13px;font-size:12px;color:var(--ink3);cursor:pointer;transition:.15s;border:none;background:transparent}
+.seg-btn.on{background:var(--panel);color:var(--accent);box-shadow:0 0 0 1px var(--border),0 2px 8px -2px rgba(15,23,38,.08)}
+/* 命令面板 HUD 切角 */
+.pal{position:relative}
+.pal::before,.pal::after{content:'';position:absolute;width:18px;height:18px;pointer-events:none;z-index:1}
+.pal::before{top:-1px;left:-1px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);border-top-left-radius:16px}
+.pal::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--accent2);border-right:2px solid var(--accent2);border-bottom-right-radius:16px}
+.pal-item{display:flex;align-items:center;gap:12px;padding:9px 14px;border-radius:10px;cursor:pointer;transition:background .12s}
+.pal-item.sel{background:rgba(46,107,240,.1);box-shadow:inset 0 0 0 1px rgba(46,107,240,.28)}
+/* 入场编排 */
+.rise{animation:rise .5s cubic-bezier(.2,.9,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+.d1{animation-delay:.05s}.d2{animation-delay:.12s}.d3{animation-delay:.19s}
+/* 表格行 */
+.row-h:hover{background:rgba(46,107,240,.035)}
+html.dark .row-h:hover{background:rgba(148,178,255,.05)}
+/* 字段 inline 编辑输入 */
+.finput{width:100%;background:transparent;border:1px solid transparent;border-radius:7px;padding:5px 9px;font-size:12.5px;color:var(--ink);outline:none;transition:.13s}
+.finput:hover{border-color:var(--border)}
+.finput:focus{border-color:var(--accent);background:var(--panel);box-shadow:0 0 0 3px rgba(46,107,240,.12)}
+.finput::placeholder{color:var(--ink3)}
+</style>
+</head>
+<body class="font-sans">
+
+<!-- ================= 顶栏 + Tab ================= -->
+<header class="sticky top-0 z-40 border-b backdrop-blur-xl" style="border-color:var(--border);background:color-mix(in srgb,var(--bg) 82%,transparent)">
+  <div class="flex h-14 items-center gap-3 px-6">
+    <a href="index.html" class="flex items-center gap-2.5">
+      <span class="flex h-8 w-8 items-center justify-center rounded-[10px] text-[14px] font-black text-white" style="background:linear-gradient(135deg,var(--accent),#1D4ED8);box-shadow:0 4px 14px -4px var(--glow)">D</span>
+      <span class="text-[15px] font-bold tracking-tight t1">Dock</span>
+      <span class="rounded-md px-1.5 py-0.5 text-[10.5px] font-medium" style="color:var(--accent);background:rgba(46,107,240,.08);box-shadow:inset 0 0 0 1px rgba(46,107,240,.18)">控制台</span>
+    </a>
+    <div class="flex-1"></div>
+    <button id="theme-toggle" class="ibtn !h-9 !w-9" title="切换主题"><i class="fa-solid fa-moon text-[13px]"></i></button>
+    <div class="ml-1 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white" style="background:linear-gradient(135deg,#F59E0B,#EA580C);box-shadow:0 0 0 2px var(--bg),0 4px 10px -2px rgba(245,158,11,.4)" title="admin@dock.local">A</div>
+  </div>
+  <div class="flex items-end justify-between px-6">
+    <nav id="tabs" class="relative flex gap-0.5 overflow-x-auto">
+      <button class="tab-btn active" data-tab="systems"><i class="fa-solid fa-layer-group"></i>系统</button>
+      <button class="tab-btn" data-tab="servers"><i class="fa-solid fa-server"></i>服务器</button>
+      <button class="tab-btn" data-tab="middleware"><i class="fa-solid fa-cubes"></i>中间件</button>
+      <button class="tab-btn" data-tab="configs"><i class="fa-solid fa-sliders"></i>配置</button>
+      <button class="tab-btn" data-tab="io"><i class="fa-solid fa-arrow-right-arrow-left"></i>导入 / 导出</button>
+      <button class="tab-btn" data-tab="settings"><i class="fa-solid fa-gear"></i>设置</button>
+      <span id="tab-ink"></span>
+    </nav>
+    <div class="mono hidden pb-2 text-[10.5px] t3 lg:block"><span id="page-path" class="mr-3">dock://systems</span><span id="page-sub">—</span></div>
+  </div>
+</header>
+
+<!-- ================= 主区域（全宽铺满） ================= -->
+<main class="relative z-10 w-full px-6 pb-16 pt-5">
+
+  <!-- ================= 系统 ================= -->
+  <section id="tab-systems" class="tab-panel">
+    <div class="rise d1 mb-4 flex flex-wrap items-center gap-3">
+      <button class="btn-p" onclick="openSystemModal()"><i class="fa-solid fa-plus text-[11px]"></i>新增系统</button>
+      <button id="btn-del-selected" class="btn-d" style="display:none" onclick="deleteSelectedSystems()"><i class="fa-regular fa-trash-can text-[11px]"></i>删除选中<span id="sel-count" class="ml-0.5"></span></button>
+      <div class="flex-1"></div>
+      <div class="flex items-center gap-0.5 rounded-[10px] border p-0.5" style="border-color:var(--border);background:var(--bg2)">
+        <button id="view-list-btn" class="view-btn active" title="列表视图" onclick="setSystemView('list')"><i class="fa-solid fa-list text-xs"></i></button>
+        <button id="view-grid-btn" class="view-btn" title="网格视图" onclick="setSystemView('grid')"><i class="fa-solid fa-table-cells-large text-xs"></i></button>
+      </div>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
+        <input id="systems-search" class="inp w-72 !pl-8" placeholder="搜索系统名称、URL、标签…"/>
+      </div>
+    </div>
+
+    <div id="systems-list" class="panel rise d2 overflow-hidden">
+      <table class="w-full">
+        <thead style="border-bottom:1px solid var(--border);background:var(--panel2)">
+          <tr class="text-left text-[10.5px] font-semibold uppercase tracking-widest t3">
+            <th class="w-10 py-2.5 pl-4 pr-2"><input type="checkbox" id="check-all" class="h-3.5 w-3.5 cursor-pointer" style="accent-color:var(--accent)"/></th>
+            <th class="px-4 py-2.5 font-semibold">系统名称</th>
+            <th class="px-4 py-2.5 font-semibold">URL</th>
+            <th class="w-24 px-4 py-2.5 font-semibold">环境</th>
+            <th class="w-24 px-4 py-2.5 font-semibold">账号</th>
+            <th class="w-28 px-4 py-2.5 font-semibold">最近更新</th>
+            <th class="w-32 px-4 py-2.5 pr-4 text-right font-semibold">操作</th>
+          </tr>
+        </thead>
+        <tbody id="systems-tbody"></tbody>
+      </table>
+    </div>
+    <div id="systems-grid" class="hidden grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"></div>
+  </section>
+
+  <!-- ================= 服务器 ================= -->
+  <section id="tab-servers" class="tab-panel hidden">
+    <div class="rise d1 mb-4 flex flex-wrap items-center gap-3">
+      <button class="btn-p" onclick="openServerModal()"><i class="fa-solid fa-plus text-[11px]"></i>新增服务器</button>
+      <div class="flex-1"></div>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
+        <input id="servers-search" class="inp w-72 !pl-8" placeholder="搜索服务器名称、IP…"/>
+      </div>
+    </div>
+    <div id="servers-grid" class="rise d2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"></div>
+  </section>
+
+  <!-- ================= 中间件 ================= -->
+  <section id="tab-middleware" class="tab-panel hidden">
+    <div class="rise d1 mb-4 flex flex-wrap items-center gap-3">
+      <button class="btn-p" onclick="openMwModal()"><i class="fa-solid fa-plus text-[11px]"></i>新增中间件</button>
+      <div class="flex-1"></div>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
+        <input id="mw-search" class="inp w-72 !pl-8" placeholder="搜索中间件名称、Host…"/>
+      </div>
+    </div>
+    <div id="mw-grid" class="rise d2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"></div>
+  </section>
+
+  <!-- ================= 配置 ================= -->
+  <section id="tab-configs" class="tab-panel hidden">
+    <div class="rise d1 mb-4 flex flex-wrap items-center gap-3">
+      <button class="btn-p" onclick="showProjectAdd()"><i class="fa-solid fa-plus text-[11px]"></i>新增项目</button>
+      <div class="flex-1"></div>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
+        <input id="configs-search" class="inp w-72 !pl-8" placeholder="搜索项目、配置…"/>
+      </div>
+    </div>
+    <div class="rise d2 flex gap-4">
+      <div class="w-60 flex-none">
+        <div class="panel p-2">
+          <div class="flex items-center justify-between px-2 pb-1.5 pt-1">
+            <span class="text-[10px] font-semibold tracking-widest t3">项目</span>
+            <button class="ibtn !h-5 !w-5" title="新增项目" onclick="showProjectAdd()"><i class="fa-solid fa-plus text-[10px]"></i></button>
+          </div>
+          <div id="project-list" class="space-y-0.5"></div>
+        </div>
+      </div>
+      <div id="config-detail" class="panel min-h-[340px] flex-1 p-5"></div>
+    </div>
+  </section>
+
+  <!-- ================= 导入 / 导出 ================= -->
+  <section id="tab-io" class="tab-panel hidden">
+    <div class="rise d1 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div class="panel p-6">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl" style="background:rgba(46,107,240,.09);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(46,107,240,.2)"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+        <h3 class="mt-4 text-[15px] font-semibold t1">导出数据</h3>
+        <p class="mt-1 text-[13px] leading-relaxed t2">将全部资产数据导出为 JSON 备份文件，可用于迁移或存档。</p>
+        <div id="export-scope" class="mt-4 space-y-2 text-[13px] t2">
+          <label class="flex items-center gap-2"><input type="checkbox" checked data-scope="systems" class="h-3.5 w-3.5" style="accent-color:var(--accent)"/>系统（含账号密码）</label>
+          <label class="flex items-center gap-2"><input type="checkbox" checked data-scope="servers" class="h-3.5 w-3.5" style="accent-color:var(--accent)"/>服务器</label>
+          <label class="flex items-center gap-2"><input type="checkbox" checked data-scope="middlewares" class="h-3.5 w-3.5" style="accent-color:var(--accent)"/>中间件</label>
+          <label class="flex items-center gap-2"><input type="checkbox" checked data-scope="configs" class="h-3.5 w-3.5" style="accent-color:var(--accent)"/>配置（项目 / 字段）</label>
+        </div>
+        <button class="btn-p mt-5" onclick="exportData()"><i class="fa-solid fa-download text-[11px]"></i>导出 JSON</button>
+      </div>
+      <div class="panel p-6">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl" style="background:rgba(5,150,105,.08);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(5,150,105,.2)"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+        <h3 class="mt-4 text-[15px] font-semibold t1">导入数据</h3>
+        <p class="mt-1 text-[13px] leading-relaxed t2">从 JSON 备份文件恢复数据，导入前会自动校验文件格式。</p>
+        <div id="drop-zone" class="mt-4 flex h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed t3 transition" style="border-color:var(--border)">
+          <i class="fa-solid fa-file-import text-xl"></i>
+          <span class="text-[13px]">拖拽文件到此处，或点击选择文件</span>
+          <span class="mono text-[10.5px]">.json</span>
+        </div>
+        <input id="import-file" type="file" accept=".json,application/json" class="hidden"/>
+      </div>
+    </div>
+    <div class="rise d2 mt-4 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-[12.5px]" style="border-color:rgba(180,83,9,.28);background:rgba(251,191,36,.07);color:var(--warn)">
+      <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+      <span>数据仅保存在浏览器本地（chrome.storage.local）。导出的备份文件包含<strong>明文账号密码</strong>，请妥善保管，不要上传到公共网盘或群聊。</span>
+    </div>
+  </section>
+
+  <!-- ================= 设置 ================= -->
+  <section id="tab-settings" class="tab-panel hidden">
+    <div class="rise d1 grid max-w-5xl grid-cols-1 gap-4 xl:grid-cols-2">
+      <div class="panel p-6">
+        <h3 class="text-[14px] font-semibold t1">外观</h3>
+        <div class="mt-4 flex items-center justify-between">
+          <div>
+            <div class="text-[13px] font-medium t1">主题模式</div>
+            <div class="mt-0.5 text-xs t3">控制台与弹窗的显示主题</div>
+          </div>
+          <div class="flex items-center gap-0.5 rounded-[10px] border p-0.5" style="border-color:var(--border);background:var(--bg2)" id="theme-seg">
+            <button data-theme="light" class="seg-btn">浅色</button>
+            <button data-theme="dark" class="seg-btn">深色</button>
+            <button data-theme="system" class="seg-btn">跟随系统</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel p-6">
+        <h3 class="text-[14px] font-semibold t1">安全</h3>
+        <div class="mt-4 flex items-center justify-between">
+          <div>
+            <div class="text-[13px] font-medium t1">自动锁定</div>
+            <div class="mt-0.5 text-xs t3">空闲后需要重新输入主密码</div>
+          </div>
+          <select class="inp !w-36" id="auto-lock"><option>从不</option><option>5 分钟</option><option selected>15 分钟</option><option>1 小时</option></select>
+        </div>
+        <div class="mt-4 flex items-center justify-between pt-4" style="border-top:1px solid var(--border)">
+          <div>
+            <div class="text-[13px] font-medium t1">启用主密码</div>
+            <div class="mt-0.5 text-xs t3">打开弹窗前需要验证主密码</div>
+          </div>
+          <div class="sw" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+      <div class="panel p-6">
+        <h3 class="text-[14px] font-semibold t1">快捷键</h3>
+        <div class="mt-4 space-y-3 text-[13px] t2">
+          <div class="flex items-center justify-between"><span>弹窗中聚焦搜索</span><span class="flex gap-1"><span class="kbd">Ctrl</span><span class="kbd">K</span></span></div>
+          <div class="flex items-center justify-between"><span>关闭弹窗</span><span class="kbd">Esc</span></div>
+          <div class="flex items-center justify-between"><span>弹窗中上下选择系统</span><span class="flex gap-1"><span class="kbd">↑</span><span class="kbd">↓</span></span></div>
+          <div class="flex items-center justify-between"><span>打开选中系统</span><span class="kbd">Enter</span></div>
+        </div>
+      </div>
+      <div class="panel p-6">
+        <h3 class="text-[14px] font-semibold t1">关于</h3>
+        <div class="mt-4 flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl text-base font-black text-white" style="background:linear-gradient(135deg,var(--accent),#1D4ED8);box-shadow:0 6px 16px -4px var(--glow)">D</div>
+          <div>
+            <div class="text-[13px] font-medium t1">Dock for Chrome</div>
+            <div class="mono mt-0.5 text-xs t3">v3.0.0 · Manifest V3 · Light Lab</div>
+          </div>
+          <div class="flex-1"></div>
+          <button class="btn-d" onclick="clearAllData()"><i class="fa-regular fa-trash-can text-[11px]"></i>清除所有数据</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ================= 状态栏 ================= -->
+<footer class="statusbar">
+  <span class="flex items-center gap-1.5"><span class="dot"></span>本地已同步</span>
+  <span id="sb-stats">—</span>
+  <div class="flex-1"></div>
+  <span>chrome.storage.local</span>
+  <span id="sb-clock" class="t2">--:--:--</span>
+  <span style="color:var(--accent)">Dock v3.0.0</span>
+</footer>
+
+<!-- ================= 弹窗：新增/编辑系统 ================= -->
+<div id="modal-system" class="modal fixed inset-0 z-50 hidden items-center justify-center p-6">
+  <div class="modal-overlay absolute inset-0" style="background:rgba(15,23,38,.35);backdrop-filter:blur(3px)" onclick="closeModal('modal-system')"></div>
+  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px rgba(15,23,38,.3),0 0 40px -16px var(--glow)">
+    <div class="flex items-center justify-between px-5 pt-4">
+      <h2 id="system-modal-title" class="text-[15px] font-semibold t1">新增系统</h2>
+      <button class="ibtn" onclick="closeModal('modal-system')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-1 flex px-2" style="border-bottom:1px solid var(--border)">
+      <button class="mtab active" data-mtab="basic">基本信息</button>
+      <button class="mtab" data-mtab="accounts">账号密码 <span id="acct-count" class="ml-0.5 text-xs t3">(0)</span></button>
+      <button class="mtab" data-mtab="remark">备注信息</button>
+    </div>
+    <div class="flex-1 overflow-y-auto px-5 py-4">
+      <div id="mtab-basic" class="mtab-panel space-y-4">
+        <div>
+          <label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">系统名称 <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label>
+          <input id="sys-name" class="inp" placeholder="如：内部OA系统"/>
+        </div>
+        <div>
+          <label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">系统地址 <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label>
+          <div class="relative">
+            <input id="sys-url" class="inp mono !pr-9 !text-xs" placeholder="https://example.com"/>
+            <button class="ibtn absolute right-1.5 top-1/2 -translate-y-1/2" title="从剪贴板粘贴" onclick="pasteUrl()"><i class="fa-regular fa-clipboard text-xs"></i></button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="mb-1.5 block text-[12.5px] font-medium t2">环境分类</label>
+            <select id="sys-env" class="inp"><option>开发</option><option>测试</option><option>预发</option><option selected>生产</option></select>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-[12.5px] font-medium t2">颜色</label>
+            <input id="sys-color" type="hidden" value="#2E6BF0"/>
+            <div id="color-quick" class="flex items-center gap-1 py-1"></div>
+          </div>
+        </div>
+        <div>
+          <label class="mb-1.5 block text-[12.5px] font-medium t2">图标</label>
+          <input id="sys-icon" type="hidden" value="fa-solid fa-globe"/>
+          <div id="icon-quick" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div>
+          <label class="mb-1.5 block text-[12.5px] font-medium t2">标签</label>
+          <div class="inp flex min-h-[38px] flex-wrap items-center gap-1.5 !py-1.5" onclick="document.getElementById('sys-tag-input').focus()">
+            <span id="sys-tags-wrap" class="contents"></span>
+            <input id="sys-tag-input" class="min-w-[120px] flex-1 border-none bg-transparent p-0 text-[13px] t1 outline-none" placeholder="输入标签后回车添加…"/>
+          </div>
+        </div>
+      </div>
+      <div id="mtab-accounts" class="mtab-panel hidden">
+        <div class="mb-2 grid grid-cols-[1fr_1.2fr_1.2fr_72px] gap-2 px-1 text-[10.5px] font-semibold uppercase tracking-widest t3">
+          <span>角色</span><span>用户名</span><span>密码</span><span class="text-right">操作</span>
+        </div>
+        <div id="acct-rows" class="space-y-2"></div>
+        <button class="btn-g mt-3 w-full justify-center border-dashed" onclick="addAccountRow()"><i class="fa-solid fa-plus text-[11px]"></i>添加账号</button>
+      </div>
+      <div id="mtab-remark" class="mtab-panel hidden">
+        <textarea id="sys-remark" rows="9" class="inp resize-none !leading-relaxed" placeholder="记录系统的使用说明、部署位置、负责人…"></textarea>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 px-5 py-3.5" style="border-top:1px solid var(--border)">
+      <button class="btn-g" onclick="closeModal('modal-system')">取消</button>
+      <button class="btn-p" onclick="saveSystem()"><i class="fa-solid fa-check text-[11px]"></i>保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 弹窗：新增服务器 ================= -->
+<div id="modal-server" class="modal fixed inset-0 z-50 hidden items-center justify-center p-6">
+  <div class="modal-overlay absolute inset-0" style="background:rgba(15,23,38,.35);backdrop-filter:blur(3px)" onclick="closeModal('modal-server')"></div>
+  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px rgba(15,23,38,.3),0 0 40px -16px var(--glow)">
+    <div class="flex items-center justify-between px-5 pb-3 pt-4">
+      <h2 class="text-[15px] font-semibold t1">新增服务器</h2>
+      <button class="ibtn" onclick="closeModal('modal-server')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="flex-1 space-y-3.5 overflow-y-auto px-5 pb-4">
+      <div><label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">名称 <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label><input id="srv-name" class="inp" placeholder="如：应用服务器-01"/></div>
+      <div class="grid grid-cols-[1fr_110px] gap-3">
+        <div><label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">IP <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label><input id="srv-ip" class="inp mono !text-xs" placeholder="172.16.0.1"/></div>
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">SSH 端口</label><input id="srv-port" class="inp mono !text-xs" value="22"/></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">账号</label><input id="srv-user" class="inp" placeholder="root"/></div>
+        <div>
+          <label class="mb-1.5 block text-[12.5px] font-medium t2">密码</label>
+          <div class="relative">
+            <input id="srv-pwd" type="password" class="inp !pr-9" placeholder="••••••••"/>
+            <button class="ibtn absolute right-1.5 top-1/2 -translate-y-1/2" onclick="togglePwd(this)"><i class="fa-regular fa-eye text-xs"></i></button>
+          </div>
+        </div>
+      </div>
+      <div><label class="mb-1.5 block text-[12.5px] font-medium t2">SSH Key</label><textarea id="srv-key" rows="3" class="inp mono resize-none !text-[11px]" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">环境</label><select id="srv-env" class="inp"><option selected>开发</option><option>测试</option><option>预发</option><option>生产</option></select></div>
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">用途</label><input id="srv-usage" class="inp" placeholder="如：应用服务器"/></div>
+      </div>
+      <div><label class="mb-1.5 block text-[12.5px] font-medium t2">备注</label><textarea id="srv-remark" rows="2" class="inp resize-none"></textarea></div>
+    </div>
+    <div class="flex justify-end gap-2 px-5 py-3.5" style="border-top:1px solid var(--border)">
+      <button class="btn-g" onclick="closeModal('modal-server')">取消</button>
+      <button class="btn-p" onclick="saveServer()"><i class="fa-solid fa-check text-[11px]"></i>保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 弹窗：新增中间件 ================= -->
+<div id="modal-mw" class="modal fixed inset-0 z-50 hidden items-center justify-center p-6">
+  <div class="modal-overlay absolute inset-0" style="background:rgba(15,23,38,.35);backdrop-filter:blur(3px)" onclick="closeModal('modal-mw')"></div>
+  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px rgba(15,23,38,.3),0 0 40px -16px var(--glow)">
+    <div class="flex items-center justify-between px-5 pb-3 pt-4">
+      <h2 class="text-[15px] font-semibold t1">新增中间件</h2>
+      <button class="ibtn" onclick="closeModal('modal-mw')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="flex-1 space-y-3.5 overflow-y-auto px-5 pb-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">类型 <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label>
+          <select id="mw-type" class="inp" onchange="mwTypeChange()"></select>
+        </div>
+        <div><label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">名称 <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label><input id="mw-name" class="inp" placeholder="如：订单库主库"/></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">版本</label><input id="mw-version" class="inp mono !text-xs" placeholder="如：7.2"/></div>
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">环境</label><select id="mw-env" class="inp"><option selected>开发</option><option>测试</option><option>预发</option><option>生产</option></select></div>
+      </div>
+      <div class="grid grid-cols-[1fr_110px] gap-3">
+        <div><label class="mb-1.5 flex items-center gap-1 text-[12.5px] font-medium t2">Host <i class="fa-solid fa-asterisk text-[7px]" style="color:var(--danger)"></i></label><input id="mw-host" class="inp mono !text-xs" placeholder="172.16.0.1"/></div>
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">端口</label><input id="mw-port" class="inp mono !text-xs" value="6379"/></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">数据库</label><input id="mw-db" class="inp mono !text-xs" placeholder="如：business"/></div>
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">DB Index</label><input id="mw-dbindex" class="inp mono !text-xs" value="0"/></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="mb-1.5 block text-[12.5px] font-medium t2">账号</label><input id="mw-user" class="inp"/></div>
+        <div>
+          <label class="mb-1.5 block text-[12.5px] font-medium t2">密码</label>
+          <div class="relative">
+            <input id="mw-pwd" type="password" class="inp !pr-9" placeholder="••••••••"/>
+            <button class="ibtn absolute right-1.5 top-1/2 -translate-y-1/2" onclick="togglePwd(this)"><i class="fa-regular fa-eye text-xs"></i></button>
+          </div>
+        </div>
+      </div>
+      <div><label class="mb-1.5 block text-[12.5px] font-medium t2">额外参数</label><input id="mw-extra" class="inp mono !text-xs" placeholder="如：maxmemory-policy=allkeys-lru"/></div>
+      <div><label class="mb-1.5 block text-[12.5px] font-medium t2">备注</label><textarea id="mw-remark" rows="2" class="inp resize-none"></textarea></div>
+    </div>
+    <div class="flex justify-end gap-2 px-5 py-3.5" style="border-top:1px solid var(--border)">
+      <button class="btn-g" onclick="closeModal('modal-mw')">取消</button>
+      <button class="btn-p" onclick="saveMw()"><i class="fa-solid fa-check text-[11px]"></i>保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-wrap" class="pointer-events-none fixed bottom-11 right-6 z-[80] flex flex-col items-end gap-2"></div>
+
+<script>
+/* ================================================================
+   Dock v3 · Light Lab · 原生 JS
+   ================================================================ */
+const state = {
+  view: 'list', editingSystemId: null, selected: new Set(), activeProjectId: 1, activeConfigId: 11, tab: 'systems',
+  systems: [
+    { id: 1, name: 'cors国内', url: 'https://vrs.zhdgps.com:8009/#/login', env: '生产', color: '#0EA5E9', icon: 'fa-solid fa-globe', tags: ['定位','核心'], accounts: [{role:'管理员',user:'admin',pwd:'Vrs@2026!'}], remark: '', updated: '20 小时前' },
+    { id: 2, name: 'CORS跳板机', url: 'http://43.136.30.112/', env: '生产', color: '#10B981', icon: 'fa-solid fa-server', tags: ['运维'], accounts: [{role:'运维',user:'ops',pwd:'Jump#9931'}], remark: '', updated: '昨天' },
+  ],
+  servers: [
+    { id: 1, name: 'cors开发', ip: '172.16.36.218', port: 22, env: '开发', user: 'root', status: 'online', usage: '应用服务器', updated: '昨天' },
+  ],
+  middlewares: [
+    { id: 1, type: 'Redis', name: 'cors缓存', version: '7.2', host: '172.16.36.218', port: 6379, env: '开发', db: '', dbindex: 0, user: '', updated: '3 天前' },
+  ],
+  projects: [
+    { id: 1, name: 'cors国内', configs: [
+      { id: 11, name: '接口配置', fields: [
+        { key: 'api.base', label: '接口地址', value: 'https://vrs.zhdgps.com:8009/api' },
+        { key: 'api.timeout', label: '接口超时(ms)', value: '3000' },
+      ]},
+      { id: 12, name: '333', fields: [{ key: '22', label: '222', value: '22' }] },
+    ]},
+  ],
+};
+const MW_TYPES = {
+  'Redis':        { icon: 'fa-solid fa-bolt',             color: '#DC382D', port: 6379 },
+  'MySQL':        { icon: 'fa-solid fa-database',         color: '#00758F', port: 3306 },
+  'PostgreSQL':   { icon: 'fa-solid fa-database',         color: '#336791', port: 5432 },
+  'MongoDB':      { icon: 'fa-solid fa-leaf',             color: '#47A248', port: 27017 },
+  'Elasticsearch':{ icon: 'fa-solid fa-magnifying-glass', color: '#B7791F', port: 9200 },
+  'RabbitMQ':     { icon: 'fa-solid fa-message',          color: '#FF6600', port: 5672 },
+  'Kafka':        { icon: 'fa-solid fa-stream',           color: '#4B5563', port: 9092 },
+  'Nginx':        { icon: 'fa-solid fa-server',           color: '#009639', port: 80 },
+  'MinIO':        { icon: 'fa-solid fa-cube',             color: '#C72E49', port: 9000 },
+};
+const QUICK_ICONS = ['fa-solid fa-globe','fa-solid fa-server','fa-solid fa-database','fa-solid fa-cloud','fa-solid fa-map-location-dot','fa-solid fa-truck-fast','fa-solid fa-chart-line','fa-solid fa-warehouse','fa-solid fa-mobile-screen','fa-solid fa-desktop','fa-solid fa-gear','fa-solid fa-shield-halved','fa-solid fa-cart-shopping','fa-solid fa-book','fa-solid fa-comments','fa-solid fa-calendar-check','fa-solid fa-diagram-project','fa-solid fa-gauge-high'];
+const TAB_META = {
+  systems:    { title: '系统导航',   path: 'dock://systems' },
+  servers:    { title: '服务器',     path: 'dock://servers' },
+  middleware: { title: '中间件',     path: 'dock://middleware' },
+  configs:    { title: '配置中心',   path: 'dock://configs' },
+  io:         { title: '数据导入导出', path: 'dock://io' },
+  settings:   { title: '设置',       path: 'dock://settings' },
+};
+let nextId = 100;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- 主题（亮色默认） ---------- */
+function applyTheme(mode) {
+  const dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', dark);
+  localStorage.setItem('dock-v3-theme', mode);
+  $('theme-toggle').querySelector('i').className = dark ? 'fa-solid fa-sun text-[13px]' : 'fa-solid fa-moon text-[13px]';
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('on', b.dataset.theme === mode));
+}
+$('theme-toggle').onclick = () => {
+  const cur = localStorage.getItem('dock-v3-theme') || 'light';
+  applyTheme(cur === 'light' || cur === 'system' ? 'dark' : 'light');
+};
+document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => applyTheme(b.dataset.theme));
+applyTheme(localStorage.getItem('dock-v3-theme') || 'light');
+
+/* ---------- Toast ---------- */
+function toast(msg, type = 'success') {
+  const conf = { success: ['fa-circle-check','var(--ok)'], info: ['fa-circle-info','var(--accent)'], error: ['fa-circle-exclamation','var(--danger)'] }[type];
+  const el = document.createElement('div');
+  el.className = 'toast-item pointer-events-auto flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-[13px] font-medium t1';
+  el.style.cssText = 'background:var(--solid);border:1px solid var(--border);box-shadow:0 12px 32px -10px rgba(15,23,38,.25),0 0 24px -10px var(--glow)';
+  el.innerHTML = `<i class="fa-solid ${conf[0]}" style="color:${conf[1]}"></i><span>${esc(msg)}</span>`;
+  $('toast-wrap').appendChild(el);
+  setTimeout(() => { el.classList.add('leaving'); setTimeout(() => el.remove(), 200); }, 2600);
+}
+
+/* ---------- 复制 ---------- */
+function copyText(text, msg = '已复制到剪贴板') {
+  const done = () => toast(msg);
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败', 'error'); }
+  ta.remove();
+}
+
+/* ---------- Tab 切换 + 滑动指示条 ---------- */
+function moveInk() {
+  const btn = document.querySelector(`.tab-btn[data-tab="${state.tab}"]`);
+  if (!btn) return;
+  const ink = $('tab-ink');
+  ink.style.left = (btn.offsetLeft + 12) + 'px';
+  ink.style.width = (btn.offsetWidth - 24) + 'px';
+}
+function switchTab(name) {
+  if (!TAB_META[name]) name = 'systems';
+  state.tab = name;
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  $('tab-' + name).classList.remove('hidden');
+  $('page-path').textContent = TAB_META[name].path;
+  updateHeaderSub(); moveInk();
+  localStorage.setItem('dock-v3-tab', name);
+}
+function updateHeaderSub() {
+  const totalCfgs = state.projects.reduce((a, p) => a + p.configs.length, 0);
+  const totalFields = state.projects.reduce((a, p) => a + p.configs.reduce((b, c) => b + c.fields.length, 0), 0);
+  const subs = {
+    systems: `共 ${state.systems.length} 个系统 · 生产 ${state.systems.filter(s => s.env === '生产').length} 个`,
+    servers: `共 ${state.servers.length} 台 · 在线 ${state.servers.filter(s => s.status === 'online').length} 台`,
+    middleware: `共 ${state.middlewares.length} 个实例 · ${[...new Set(state.middlewares.map(m => m.type))].join(' / ') || '—'}`,
+    configs: `${state.projects.length} 个项目 · ${totalCfgs} 个配置 · ${totalFields} 个字段`,
+    io: 'JSON 备份 · 本地存储',
+    settings: '外观 · 安全 · 快捷键 · 关于',
+  };
+  $('page-sub').textContent = subs[state.tab] || '';
+  $('sb-stats').textContent = `系统 ${state.systems.length} · 服务器 ${state.servers.length} · 中间件 ${state.middlewares.length} · 项目 ${state.projects.length}`;
+}
+document.querySelectorAll('.tab-btn').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+window.addEventListener('resize', moveInk);
+
+/* ---------- 弹窗通用 ---------- */
+function openModal(id) { const m = $(id); m.classList.remove('hidden'); m.classList.add('flex'); }
+function closeModal(id) {
+  const m = $(id); m.classList.add('closing');
+  setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex','closing'); }, 160);
+}
+
+/* ---------- 环境徽章 ---------- */
+const envBadge = env => `<span class="env env-${esc(env)}">${esc(env)}</span>`;
+
+/* ================================================================
+   系统
+   ================================================================ */
+function renderSystems() {
+  const q = ($('systems-search').value || '').trim().toLowerCase();
+  const list = state.systems.filter(s => !q || s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q) || s.tags.some(t => t.toLowerCase().includes(q)));
+  updateHeaderSub();
+  const tbody = $('systems-tbody'), grid = $('systems-grid');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="py-16 text-center">
+      <i class="fa-regular fa-folder-open text-2xl t3"></i>
+      <div class="mt-2 text-[13px] t3">${q ? '未找到匹配的系统' : '还没有系统，点击「新增系统」创建'}</div></td></tr>`;
+    grid.innerHTML = '';
+  } else {
+    tbody.innerHTML = list.map(s => `
+      <tr class="row-h group transition" style="border-bottom:1px solid var(--border)">
+        <td class="py-3 pl-4 pr-2"><input type="checkbox" data-id="${s.id}" class="row-check h-3.5 w-3.5 cursor-pointer" style="accent-color:var(--accent)" ${state.selected.has(s.id) ? 'checked' : ''}/></td>
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-3">
+            <span class="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] text-[13px] text-white" style="background:${esc(s.color)};box-shadow:0 3px 10px -3px ${esc(s.color)}"><i class="${esc(s.icon)}"></i></span>
+            <span class="min-w-0">
+              <span class="block truncate text-[13.5px] font-medium t1">${esc(s.name)}</span>
+              ${s.tags.length ? `<span class="mt-0.5 flex gap-1">${s.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</span>` : ''}
+            </span>
+          </div>
+        </td>
+        <td class="px-4 py-3">
+          <span class="flex items-center gap-1.5 mono text-xs t2">
+            <i class="fa-solid fa-link text-[10px] t3"></i>
+            <span class="max-w-[340px] truncate">${esc(s.url)}</span>
+            <button class="ibtn !h-5 !w-5 opacity-0 transition group-hover:opacity-100" title="复制链接" onclick="copyText('${esc(s.url)}','链接已复制')"><i class="fa-regular fa-copy text-[10px]"></i></button>
+          </span>
+        </td>
+        <td class="px-4 py-3">${envBadge(s.env)}</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1 text-xs t2"><i class="fa-solid fa-key text-[10px] t3"></i>${s.accounts.length} 个</span></td>
+        <td class="px-4 py-3 text-xs t3">${esc(s.updated)}</td>
+        <td class="py-3 pl-4 pr-4 text-right">
+          <div class="flex justify-end gap-0.5 opacity-50 transition group-hover:opacity-100">
+            <button class="ibtn" title="编辑" onclick="openSystemModal(${s.id})"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button class="ibtn" title="打开系统" onclick="toast('已在新标签页打开','info')"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></button>
+            <button class="ibtn danger" title="删除" onclick="deleteSystem(${s.id})"><i class="fa-regular fa-trash-can text-xs"></i></button>
+          </div>
+        </td>
+      </tr>`).join('');
+    grid.innerHTML = list.map(s => `
+      <div class="panel stat-card group p-4">
+        <div class="flex items-start justify-between">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl text-base text-white" style="background:${esc(s.color)};box-shadow:0 5px 14px -4px ${esc(s.color)}"><i class="${esc(s.icon)}"></i></span>
+          ${envBadge(s.env)}
+        </div>
+        <div class="mt-3 text-[14px] font-semibold t1">${esc(s.name)}</div>
+        <div class="mono mt-0.5 truncate text-xs t3">${esc(s.url)}</div>
+        ${s.tags.length ? `<div class="mt-2 flex flex-wrap gap-1">${s.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+        <div class="mt-3 flex items-center justify-between pt-3 text-xs t3" style="border-top:1px solid var(--border)">
+          <span><i class="fa-solid fa-key mr-1 text-[10px]"></i>${s.accounts.length} 个账号 · ${esc(s.updated)}</span>
+          <div class="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
+            <button class="ibtn !h-6 !w-6" onclick="openSystemModal(${s.id})"><i class="fa-solid fa-pen text-[11px]"></i></button>
+            <button class="ibtn danger !h-6 !w-6" onclick="deleteSystem(${s.id})"><i class="fa-regular fa-trash-can text-[11px]"></i></button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  document.querySelectorAll('.row-check').forEach(c => c.onchange = () => {
+    const id = +c.dataset.id;
+    c.checked ? state.selected.add(id) : state.selected.delete(id);
+    updateSelectionUI();
+  });
+  updateSelectionUI();
+}
+function setSystemView(v) {
+  state.view = v;
+  $('view-list-btn').classList.toggle('active', v === 'list');
+  $('view-grid-btn').classList.toggle('active', v === 'grid');
+  $('systems-list').classList.toggle('hidden', v !== 'list');
+  $('systems-grid').classList.toggle('hidden', v !== 'grid');
+  $('systems-grid').classList.toggle('grid', v === 'grid');
+}
+function updateSelectionUI() {
+  const n = state.selected.size;
+  $('btn-del-selected').style.display = n === 0 ? 'none' : '';
+  $('sel-count').textContent = n ? `（${n}）` : '';
+  $('check-all').checked = n > 0 && n === state.systems.length;
+}
+$('check-all').onchange = e => {
+  state.selected = e.target.checked ? new Set(state.systems.map(s => s.id)) : new Set();
+  renderSystems();
+};
+$('systems-search').addEventListener('input', renderSystems);
+function deleteSystem(id) {
+  state.systems = state.systems.filter(s => s.id !== id);
+  state.selected.delete(id);
+  renderSystems(); toast('系统已删除');
+}
+function deleteSelectedSystems() {
+  state.systems = state.systems.filter(s => !state.selected.has(s.id));
+  state.selected.clear();
+  renderSystems(); toast('已删除选中系统');
+}
+
+/* ---------- 系统弹窗 ---------- */
+let sysTags = [];
+function openSystemModal(id) {
+  state.editingSystemId = id || null;
+  $('system-modal-title').textContent = id ? '编辑系统' : '新增系统';
+  const s = id ? state.systems.find(x => x.id === id) : null;
+  $('sys-name').value = s?.name || '';
+  $('sys-url').value = s?.url || '';
+  $('sys-env').value = s?.env || '生产';
+  $('sys-color').value = s?.color || '#2E6BF0';
+  $('sys-icon').value = s?.icon || 'fa-solid fa-globe';
+  $('sys-remark').value = s?.remark || '';
+  sysTags = s ? [...s.tags] : [];
+  renderSysTags();
+  $('acct-rows').innerHTML = '';
+  (s?.accounts || []).forEach(a => addAccountRow(a.role, a.user, a.pwd));
+  updateAcctCount(); syncPickerUI(); switchMtab('basic');
+  openModal('modal-system');
+  setTimeout(() => $('sys-name').focus(), 60);
+}
+function switchMtab(name) {
+  document.querySelectorAll('#modal-system .mtab').forEach(t => t.classList.toggle('active', t.dataset.mtab === name));
+  document.querySelectorAll('.mtab-panel').forEach(p => p.classList.add('hidden'));
+  $('mtab-' + name).classList.remove('hidden');
+}
+document.querySelectorAll('#modal-system .mtab').forEach(t => t.onclick = () => switchMtab(t.dataset.mtab));
+const QUICK_COLORS = ['#2E6BF0','#0EA5E9','#0891B2','#10B981','#F59E0B','#DC2626','#7C3AED','#111827'];
+function syncPickerUI() {
+  const curIcon = $('sys-icon').value || 'fa-solid fa-globe';
+  const curColor = $('sys-color').value || '#2E6BF0';
+  document.querySelectorAll('.icon-opt').forEach(b => {
+    const on = b.dataset.icon === curIcon;
+    b.style.borderColor = on ? 'transparent' : 'var(--border)';
+    b.style.color = on ? '#fff' : '';
+    b.style.background = on ? curColor : '';
+    b.style.boxShadow = on ? `0 3px 10px -3px ${curColor}` : '';
+  });
+  document.querySelectorAll('.color-opt').forEach(b => {
+    const on = b.dataset.color.toLowerCase() === curColor.toLowerCase();
+    b.style.boxShadow = on ? `0 0 0 2px var(--solid), 0 0 0 4px ${b.dataset.color}` : '';
+    b.style.transform = on ? 'scale(1.12)' : '';
+  });
+}
+$('icon-quick').innerHTML = QUICK_ICONS.map(ic => `<button class="icon-opt ibtn !h-8 !w-8 !rounded-[10px] border" data-icon="${ic}" style="border-color:var(--border)" onclick="pickIcon('${ic}')" title="${ic.replace('fa-solid ','')}"><i class="${ic} text-xs"></i></button>`).join('');
+$('color-quick').innerHTML = QUICK_COLORS.map(c => `<button class="color-opt h-6 w-6 cursor-pointer rounded-lg border-none transition" data-color="${c}" style="background:${c}" onclick="pickColor('${c}')" title="${c}"></button>`).join('');
+function pickIcon(ic) { $('sys-icon').value = ic; syncPickerUI(); }
+function pickColor(c) { $('sys-color').value = c; syncPickerUI(); }
+function renderSysTags() {
+  $('sys-tags-wrap').innerHTML = sysTags.map((t, i) =>
+    `<span class="chip !py-1 !text-[11.5px]">${esc(t)}<button class="ml-0.5 t3 hover:t1" onclick="removeSysTag(${i})"><i class="fa-solid fa-xmark text-[9px]"></i></button></span>`).join('');
+}
+function removeSysTag(i) { sysTags.splice(i, 1); renderSysTags(); }
+$('sys-tag-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const v = e.target.value.trim();
+    if (v && !sysTags.includes(v)) { sysTags.push(v); renderSysTags(); }
+    e.target.value = '';
+  }
+});
+$('sys-tag-input').addEventListener('blur', () => {
+  const v = $('sys-tag-input').value.trim();
+  if (v && !sysTags.includes(v)) { sysTags.push(v); renderSysTags(); }
+  $('sys-tag-input').value = '';
+});
+function addAccountRow(role = '', user = '', pwd = '') {
+  const row = document.createElement('div');
+  row.className = 'acct-row grid grid-cols-[1fr_1.2fr_1.2fr_72px] items-center gap-2 rounded-[10px] border p-1.5';
+  row.style.cssText = 'border-color:var(--border);background:var(--panel2)';
+  row.innerHTML = `
+    <input class="inp acct-role !border-transparent !bg-transparent !py-1.5 !text-xs" placeholder="角色" value="${esc(role)}"/>
+    <input class="inp acct-user !border-transparent !bg-transparent !py-1.5 !text-xs" placeholder="用户名" value="${esc(user)}"/>
+    <div class="relative">
+      <input class="inp acct-pwd !border-transparent !bg-transparent !py-1.5 !pr-7 !text-xs" type="password" placeholder="密码" value="${esc(pwd)}"/>
+      <button class="ibtn !h-5 !w-5 absolute right-1 top-1/2 -translate-y-1/2" onclick="togglePwd(this)"><i class="fa-regular fa-eye text-[10px]"></i></button>
+    </div>
+    <div class="flex justify-end">
+      <button class="ibtn !h-6 !w-6" style="color:var(--ok)" title="确认" onclick="toast('账号已保存')"><i class="fa-solid fa-check text-[11px]"></i></button>
+      <button class="ibtn danger !h-6 !w-6" title="删除" onclick="this.closest('.acct-row').remove();updateAcctCount()"><i class="fa-solid fa-xmark text-[11px]"></i></button>
+    </div>`;
+  $('acct-rows').appendChild(row);
+  updateAcctCount();
+}
+function updateAcctCount() { $('acct-count').textContent = `(${$('acct-rows').children.length})`; }
+function togglePwd(btn) {
+  const input = btn.parentElement.querySelector('input');
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.querySelector('i').className = show ? 'fa-regular fa-eye-slash text-[10px]' : 'fa-regular fa-eye text-[10px]';
+}
+function pasteUrl() {
+  navigator.clipboard?.readText().then(t => { if (t) { $('sys-url').value = t.trim(); toast('已粘贴链接', 'info'); } }).catch(() => toast('无法读取剪贴板', 'error'));
+}
+function saveSystem() {
+  const name = $('sys-name').value.trim(), url = $('sys-url').value.trim();
+  if (!name) { toast('请填写系统名称', 'error'); switchMtab('basic'); $('sys-name').focus(); return; }
+  if (!url) { toast('请填写系统地址', 'error'); switchMtab('basic'); $('sys-url').focus(); return; }
+  const accounts = [...$('acct-rows').children].map(r => ({
+    role: r.querySelector('.acct-role').value.trim(),
+    user: r.querySelector('.acct-user').value.trim(),
+    pwd: r.querySelector('.acct-pwd').value,
+  })).filter(a => a.role || a.user || a.pwd);
+  const data = { name, url, env: $('sys-env').value, color: $('sys-color').value,
+    icon: $('sys-icon').value || 'fa-solid fa-globe', tags: [...sysTags], accounts, remark: $('sys-remark').value, updated: '刚刚' };
+  if (state.editingSystemId) {
+    Object.assign(state.systems.find(s => s.id === state.editingSystemId), data);
+    toast('系统已更新');
+  } else {
+    state.systems.unshift({ id: ++nextId, ...data });
+    toast('系统已添加');
+  }
+  renderSystems(); closeModal('modal-system');
+}
+
+/* ================================================================
+   服务器
+   ================================================================ */
+function renderServers() {
+  const q = ($('servers-search').value || '').trim().toLowerCase();
+  const list = state.servers.filter(s => !q || s.name.toLowerCase().includes(q) || s.ip.includes(q));
+  updateHeaderSub();
+  $('servers-grid').innerHTML = list.map(s => `
+    <div class="panel stat-card group p-4">
+      <div class="flex items-center justify-between">
+        <span class="inline-flex items-center gap-1.5 text-[11px] font-medium" style="color:${s.status === 'online' ? 'var(--ok)' : 'var(--ink3)'}">
+          <span class="relative flex h-1.5 w-1.5"><span class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style="background:${s.status === 'online' ? 'var(--ok)' : 'var(--ink3)'}"></span><span class="relative inline-flex h-1.5 w-1.5 rounded-full" style="background:${s.status === 'online' ? 'var(--ok)' : 'var(--ink3)'};box-shadow:0 0 8px ${s.status === 'online' ? 'var(--ok)' : 'transparent'}"></span></span>
+          ${s.status === 'online' ? '在线' : '离线'}
+        </span>
+        <div class="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
+          <button class="ibtn !h-6 !w-6" title="终端" onclick="toast('正在打开 SSH 终端…','info')"><i class="fa-solid fa-terminal text-[11px]"></i></button>
+          <button class="ibtn danger !h-6 !w-6" title="删除" onclick="deleteServer(${s.id})"><i class="fa-regular fa-trash-can text-[11px]"></i></button>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center gap-3">
+        <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl text-base text-white" style="background:#F59E0B;box-shadow:0 5px 14px -4px #F59E0B"><i class="fa-solid fa-server"></i></span>
+        <div class="min-w-0">
+          <div class="truncate text-[14px] font-semibold t1">${esc(s.name)}</div>
+          <div class="mono truncate text-xs t3">${esc(s.ip)}:${esc(s.port)}</div>
+        </div>
+      </div>
+      <div class="mt-2.5 flex items-center gap-1.5">${envBadge(s.env)}${s.usage ? `<span class="chip">${esc(s.usage)}</span>` : ''}</div>
+      <dl class="mt-3 space-y-1.5 pt-3 text-xs" style="border-top:1px solid var(--border)">
+        <div class="flex justify-between"><dt class="t3"><i class="fa-regular fa-user mr-1.5 w-3 text-center"></i>账号</dt><dd class="mono t2">${esc(s.user || '—')}</dd></div>
+        <div class="flex justify-between"><dt class="t3"><i class="fa-solid fa-plug mr-1.5 w-3 text-center"></i>SSH 端口</dt><dd class="mono t2">${esc(s.port)}</dd></div>
+        <div class="flex justify-between"><dt class="t3"><i class="fa-regular fa-clock mr-1.5 w-3 text-center"></i>最后更新</dt><dd class="t2">${esc(s.updated)}</dd></div>
+      </dl>
+      <div class="mt-3 flex gap-2">
+        <button class="btn-g flex-1 justify-center !py-1.5 !text-xs" onclick="copyText('${esc(s.ip)}','IP 已复制')"><i class="fa-regular fa-copy text-[10px]"></i>复制 IP</button>
+        <button class="btn-g flex-1 justify-center !py-1.5 !text-xs" onclick="copyText('ssh ${esc(s.user || 'root')}@${esc(s.ip)} -p ${esc(s.port)}','SSH 命令已复制')"><i class="fa-solid fa-terminal text-[10px]"></i>复制 SSH</button>
+      </div>
+    </div>`).join('') + `
+    <button class="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed t3 transition hover:border-[var(--accent)] hover:text-[var(--accent)]" style="border-color:var(--border2)" onclick="openServerModal()">
+      <i class="fa-solid fa-plus text-lg"></i>
+      <span class="text-[13px] font-medium">添加服务器</span>
+      <span class="text-[11px]">快速创建新的服务器连接</span>
+    </button>`;
+}
+$('servers-search').addEventListener('input', renderServers);
+function openServerModal() { openModal('modal-server'); setTimeout(() => $('srv-name').focus(), 60); }
+function saveServer() {
+  const name = $('srv-name').value.trim(), ip = $('srv-ip').value.trim();
+  if (!name) { toast('请填写服务器名称', 'error'); $('srv-name').focus(); return; }
+  if (!ip) { toast('请填写 IP 地址', 'error'); $('srv-ip').focus(); return; }
+  state.servers.unshift({ id: ++nextId, name, ip, port: $('srv-port').value || 22, env: $('srv-env').value,
+    user: $('srv-user').value.trim(), usage: $('srv-usage').value.trim(), status: 'online', updated: '刚刚' });
+  renderServers(); closeModal('modal-server'); toast('服务器已添加');
+}
+function deleteServer(id) { state.servers = state.servers.filter(s => s.id !== id); renderServers(); toast('服务器已删除'); }
+
+/* ================================================================
+   中间件
+   ================================================================ */
+$('mw-type').innerHTML = Object.keys(MW_TYPES).map(t => `<option>${t}</option>`).join('');
+function mwTypeChange() { const t = MW_TYPES[$('mw-type').value]; if (t) $('mw-port').value = t.port; }
+function renderMw() {
+  const q = ($('mw-search').value || '').trim().toLowerCase();
+  const list = state.middlewares.filter(m => !q || m.name.toLowerCase().includes(q) || m.host.includes(q) || m.type.toLowerCase().includes(q));
+  updateHeaderSub();
+  $('mw-grid').innerHTML = list.map(m => {
+    const t = MW_TYPES[m.type] || MW_TYPES['Redis'];
+    return `
+    <div class="panel stat-card group p-4">
+      <div class="flex items-start justify-between">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl text-base text-white" style="background:${t.color};box-shadow:0 5px 14px -4px ${t.color}"><i class="${t.icon}"></i></span>
+        <div class="flex items-center gap-1.5">
+          ${envBadge(m.env)}
+          <div class="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
+            <button class="ibtn danger !h-6 !w-6" onclick="deleteMw(${m.id})"><i class="fa-regular fa-trash-can text-[11px]"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center gap-2">
+        <span class="text-[14px] font-semibold t1">${esc(m.name)}</span>
+        <span class="mono rounded px-1 py-0.5 text-[10px] t2" style="background:var(--panel2);border:1px solid var(--border)">${esc(m.type)}${m.version ? ' ' + esc(m.version) : ''}</span>
+      </div>
+      <div class="mono mt-1 truncate text-xs t3">${esc(m.host)}:${esc(m.port)}${m.db ? ' / ' + esc(m.db) : ''}</div>
+      <dl class="mt-3 space-y-1.5 pt-3 text-xs" style="border-top:1px solid var(--border)">
+        <div class="flex justify-between"><dt class="t3"><i class="fa-regular fa-user mr-1.5 w-3 text-center"></i>账号</dt><dd class="mono t2">${esc(m.user || '—')}</dd></div>
+        <div class="flex justify-between"><dt class="t3"><i class="fa-regular fa-clock mr-1.5 w-3 text-center"></i>最后更新</dt><dd class="t2">${esc(m.updated)}</dd></div>
+      </dl>
+      <button class="btn-g mt-3 w-full justify-center !py-1.5 !text-xs" onclick="copyText('${esc(m.host)}:${esc(m.port)}','连接地址已复制')"><i class="fa-regular fa-copy text-[10px]"></i>复制连接地址</button>
+    </div>`;
+  }).join('') + `
+    <button class="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed t3 transition hover:border-[var(--accent)] hover:text-[var(--accent)]" style="border-color:var(--border2)" onclick="openMwModal()">
+      <i class="fa-solid fa-plus text-lg"></i>
+      <span class="text-[13px] font-medium">添加中间件</span>
+      <span class="mono text-[10.5px]">Redis · MySQL · MongoDB · ES</span>
+    </button>`;
+}
+$('mw-search').addEventListener('input', renderMw);
+function openMwModal() { openModal('modal-mw'); setTimeout(() => $('mw-name').focus(), 60); }
+function saveMw() {
+  const name = $('mw-name').value.trim(), host = $('mw-host').value.trim();
+  if (!name) { toast('请填写中间件名称', 'error'); $('mw-name').focus(); return; }
+  if (!host) { toast('请填写 Host', 'error'); $('mw-host').focus(); return; }
+  state.middlewares.unshift({ id: ++nextId, type: $('mw-type').value, name, version: $('mw-version').value.trim(),
+    host, port: $('mw-port').value, env: $('mw-env').value, db: $('mw-db').value.trim(),
+    dbindex: $('mw-dbindex').value, user: $('mw-user').value.trim(), updated: '刚刚' });
+  renderMw(); closeModal('modal-mw'); toast('中间件已添加');
+}
+function deleteMw(id) { state.middlewares = state.middlewares.filter(m => m.id !== id); renderMw(); toast('中间件已删除'); }
+
+/* ================================================================
+   配置（项目 → 配置 → 字段 · 全自动保存）
+   ================================================================ */
+const currentProject = () => state.projects.find(x => x.id === state.activeProjectId);
+const currentConfig = () => currentProject()?.configs.find(x => x.id === state.activeConfigId);
+function renderConfigs() {
+  const q = ($('configs-search').value || '').trim().toLowerCase();
+  const list = state.projects.filter(p => !q || p.name.toLowerCase().includes(q) || p.configs.some(c => c.name.toLowerCase().includes(q)));
+  updateHeaderSub();
+  $('project-list').innerHTML = list.map(p => `
+    <div class="group flex cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-2 transition ${p.id === state.activeProjectId ? '' : 't2'}" style="${p.id === state.activeProjectId ? 'background:rgba(46,107,240,.09);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(46,107,240,.25)' : ''}" onclick="selectProject(${p.id})" data-pid="${p.id}">
+      <i class="fa-regular fa-folder text-xs" style="color:${p.id === state.activeProjectId ? 'var(--accent)' : 'var(--ink3)'}"></i>
+      <span class="flex-1 truncate text-[13px] font-medium">${esc(p.name)}</span>
+      <span class="mono text-[10px] t3">${p.configs.length}</span>
+      <button class="ibtn !h-5 !w-5 opacity-0 transition group-hover:opacity-100" title="重命名" onclick="event.stopPropagation();renameProjectInline(${p.id},this)"><i class="fa-solid fa-pen text-[9px]"></i></button>
+      <button class="ibtn danger !h-5 !w-5 opacity-0 transition group-hover:opacity-100" title="删除" onclick="event.stopPropagation();deleteProject(${p.id})"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+    </div>`).join('') || `<div class="px-3 py-6 text-center text-xs t3">暂无项目</div>`;
+  renderConfigArea();
+}
+function renderConfigArea() {
+  const p = currentProject();
+  if (!p) {
+    $('config-detail').innerHTML = `<div class="flex h-full min-h-[300px] flex-col items-center justify-center t3">
+      <i class="fa-regular fa-folder-open text-2xl"></i>
+      <div class="mt-2 text-[13px]">选择左侧项目，或点击「新增项目」开始</div></div>`;
+    return;
+  }
+  const c = currentConfig();
+  $('config-detail').innerHTML = `
+    <div class="flex items-center gap-2.5">
+      <span class="flex h-8 w-8 items-center justify-center rounded-[10px]" style="background:rgba(46,107,240,.09);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(46,107,240,.2)"><i class="fa-regular fa-folder-open text-xs"></i></span>
+      <span class="text-[15px] font-semibold t1">${esc(p.name)}</span>
+      <span id="cfg-savehint" class="ml-1 inline-flex items-center gap-1 text-[11px] font-medium opacity-0 transition-opacity duration-300" style="color:var(--ok)"><i class="fa-solid fa-check text-[9px]"></i>已自动保存</span>
+      <div class="flex-1"></div>
+    </div>
+    <div class="mt-3 flex flex-wrap items-center gap-2" id="cfg-chips">
+      ${p.configs.map(x => `
+        <span class="group inline-flex cursor-pointer items-center gap-1.5 rounded-lg border py-1.5 pl-3 pr-2 text-[12.5px] transition ${x.id === state.activeConfigId ? 'font-medium' : 't2'}" style="${x.id === state.activeConfigId ? 'border-color:rgba(46,107,240,.4);background:rgba(46,107,240,.08);color:var(--accent)' : 'border-color:var(--border);background:var(--panel)'}" onclick="selectConfig(${x.id})" data-cid="${x.id}">
+          ${esc(x.name)}
+          <span class="mono text-[10px] t3">${x.fields.length}</span>
+          <button class="ibtn !h-4 !w-4 opacity-0 transition group-hover:opacity-100" title="重命名" onclick="event.stopPropagation();renameConfigInline(${x.id},this)"><i class="fa-solid fa-pen text-[8px]"></i></button>
+          <button class="ibtn danger !h-4 !w-4 opacity-0 transition group-hover:opacity-100" title="删除" onclick="event.stopPropagation();deleteConfig(${x.id})"><i class="fa-solid fa-xmark text-[9px]"></i></button>
+        </span>`).join('')}
+      <button class="inline-flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1.5 text-[12px] t3 transition hover:border-[var(--accent)] hover:text-[var(--accent)]" style="border-color:var(--border2)" onclick="showConfigAdd()"><i class="fa-solid fa-plus text-[9px]"></i>新增配置</button>
+    </div>
+    ${c ? `
+    <table class="mt-4 w-full">
+      <thead><tr class="text-left text-[10.5px] font-semibold uppercase tracking-widest t3" style="border-bottom:1px solid var(--border)">
+        <th class="py-2 pr-4 font-semibold">字段标识</th><th class="px-4 py-2 font-semibold">字段名称</th><th class="px-4 py-2 font-semibold">默认值</th><th class="w-20 py-2 text-right font-semibold">操作</th>
+      </tr></thead>
+      <tbody>
+        ${c.fields.map((f, i) => `
+        <tr class="row-h group" style="border-bottom:1px solid var(--border)">
+          <td class="py-1 pr-4"><input class="finput mono" value="${esc(f.key)}" onblur="editField(${i},'key',this.value)" onkeydown="fieldEnter(event,this)"/></td>
+          <td class="px-4 py-1"><input class="finput" value="${esc(f.label)}" onblur="editField(${i},'label',this.value)" onkeydown="fieldEnter(event,this)"/></td>
+          <td class="px-4 py-1"><input class="finput mono" value="${esc(f.value)}" onblur="editField(${i},'value',this.value)" onkeydown="fieldEnter(event,this)"/></td>
+          <td class="py-1 text-right">
+            <div class="flex justify-end gap-0.5 opacity-0 transition group-hover:opacity-100">
+              <button class="ibtn !h-6 !w-6" title="复制值" onclick="copyText('${esc(f.value)}','字段值已复制')"><i class="fa-regular fa-copy text-[10px]"></i></button>
+              <button class="ibtn danger !h-6 !w-6" title="删除" onclick="deleteField(${i})"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+            </div>
+          </td>
+        </tr>`).join('')}
+        <tr>
+          <td class="py-1 pr-4"><input id="nf-key" class="finput mono" placeholder="+ 字段标识" onblur="tryAutoAddField()" onkeydown="newFieldEnter(event,'nf-label')"/></td>
+          <td class="px-4 py-1"><input id="nf-label" class="finput" placeholder="字段名称" onblur="tryAutoAddField()" onkeydown="newFieldEnter(event,'nf-value')"/></td>
+          <td class="px-4 py-1"><input id="nf-value" class="finput mono" placeholder="默认值 · 回车保存" onblur="tryAutoAddField()" onkeydown="newFieldEnter(event,null)"/></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="mt-2 text-[11px] t3"><i class="fa-regular fa-lightbulb mr-1"></i>末行输入后回车 / 失焦即自动保存 · 点击任意单元格直接修改，失焦自动保存</div>`
+    : `<div class="mt-8 flex flex-col items-center justify-center py-10 t3">
+      <i class="fa-regular fa-file-lines text-2xl"></i>
+      <div class="mt-2 text-[13px]">点击上方「新增配置」创建第一组字段</div></div>`}`;
+}
+function selectProject(id) {
+  state.activeProjectId = id;
+  state.activeConfigId = currentProject()?.configs[0]?.id ?? null;
+  renderConfigs();
+}
+function selectConfig(id) { state.activeConfigId = id; renderConfigArea(); }
+function showSaveHint() {
+  const h = $('cfg-savehint'); if (!h) return;
+  h.style.opacity = '1';
+  clearTimeout(showSaveHint._t);
+  showSaveHint._t = setTimeout(() => { h.style.opacity = '0'; }, 1400);
+}
+/* --- 项目：inline 新建 / 重命名 / 删除 --- */
+function showProjectAdd() {
+  if ($('np-input')) { $('np-input').focus(); return; }
+  const row = document.createElement('div');
+  row.className = 'px-1 py-1';
+  row.innerHTML = `<input id="np-input" class="inp !py-1.5 !text-xs" placeholder="项目名称 · 回车创建"/>`;
+  $('project-list').appendChild(row);
+  const inp = row.querySelector('input');
+  inp.focus();
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); createProject(inp.value); }
+    if (e.key === 'Escape') row.remove();
+  };
+  inp.onblur = () => { if (!row.isConnected) return; inp.value.trim() ? createProject(inp.value) : row.remove(); };
+}
+function createProject(name) {
+  name = (name || '').trim(); if (!name) return;
+  const p = { id: ++nextId, name, configs: [] };
+  state.projects.push(p);
+  state.activeProjectId = p.id; state.activeConfigId = null;
+  renderConfigs(); toast('项目已创建');
+}
+function renameProjectInline(id, btn) {
+  const row = btn.closest('[data-pid]');
+  const p = state.projects.find(x => x.id === id); if (!p || !row) return;
+  row.innerHTML = `<input class="inp !py-1 !text-xs" value="${esc(p.name)}"/>`;
+  const inp = row.querySelector('input'); inp.focus(); inp.select();
+  let done = false;
+  const commit = save => {
+    if (done) return; done = true;
+    const v = inp.value.trim();
+    if (save && v) { p.name = v; toast('已重命名'); }
+    renderConfigs();
+  };
+  inp.onkeydown = e => { if (e.key === 'Enter') commit(true); if (e.key === 'Escape') commit(false); };
+  inp.onblur = () => commit(true);
+}
+function deleteProject(id) {
+  state.projects = state.projects.filter(p => p.id !== id);
+  if (state.activeProjectId === id) {
+    state.activeProjectId = state.projects[0]?.id ?? null;
+    state.activeConfigId = state.projects[0]?.configs[0]?.id ?? null;
+  }
+  renderConfigs(); toast('项目已删除');
+}
+/* --- 配置：inline 新建 / 重命名 / 删除 --- */
+function showConfigAdd() {
+  if (!currentProject()) { toast('请先创建一个项目', 'error'); return; }
+  if ($('nc-input')) { $('nc-input').focus(); return; }
+  const span = document.createElement('span');
+  span.innerHTML = `<input id="nc-input" class="inp !w-32 !py-1 !text-xs" placeholder="配置名 · 回车"/>`;
+  $('cfg-chips').appendChild(span);
+  const inp = span.querySelector('input'); inp.focus();
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); createConfig(inp.value); }
+    if (e.key === 'Escape') span.remove();
+  };
+  inp.onblur = () => { if (!span.isConnected) return; inp.value.trim() ? createConfig(inp.value) : span.remove(); };
+}
+function createConfig(name) {
+  name = (name || '').trim(); if (!name) return;
+  const p = currentProject(); if (!p) return;
+  const c = { id: ++nextId, name, fields: [] };
+  p.configs.push(c); state.activeConfigId = c.id;
+  renderConfigs(); toast('配置已创建');
+}
+function renameConfigInline(id, btn) {
+  const chip = btn.closest('[data-cid]');
+  const c = currentProject()?.configs.find(x => x.id === id); if (!c || !chip) return;
+  chip.innerHTML = `<input class="inp !w-28 !py-0.5 !text-xs" value="${esc(c.name)}"/>`;
+  const inp = chip.querySelector('input'); inp.focus(); inp.select();
+  let done = false;
+  const commit = save => {
+    if (done) return; done = true;
+    const v = inp.value.trim();
+    if (save && v) { c.name = v; toast('已重命名'); }
+    renderConfigs();
+  };
+  inp.onkeydown = e => { if (e.key === 'Enter') commit(true); if (e.key === 'Escape') commit(false); };
+  inp.onblur = () => commit(true);
+}
+function deleteConfig(id) {
+  const p = currentProject(); if (!p) return;
+  p.configs = p.configs.filter(c => c.id !== id);
+  if (state.activeConfigId === id) state.activeConfigId = p.configs[0]?.id ?? null;
+  renderConfigs(); toast('配置已删除');
+}
+/* --- 字段：自动保存 --- */
+function editField(i, f, val) {
+  const c = currentConfig(); if (!c) return;
+  if (c.fields[i][f] === val) return;
+  c.fields[i][f] = val;
+  showSaveHint();
+}
+function fieldEnter(e, el) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } }
+function newFieldEnter(e, nextId) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (nextId) { $(nextId).focus(); return; }
+  commitNewField(true);
+}
+function tryAutoAddField() {
+  setTimeout(() => {
+    const ae = document.activeElement;
+    if (ae && ['nf-key', 'nf-label', 'nf-value'].includes(ae.id)) return;
+    commitNewField(false);
+  }, 0);
+}
+function commitNewField(refocus) {
+  const keyEl = $('nf-key'); if (!keyEl) return;
+  const key = keyEl.value.trim();
+  if (!key) return;
+  const c = currentConfig(); if (!c) return;
+  c.fields.push({ key, label: $('nf-label').value.trim(), value: $('nf-value').value });
+  renderConfigArea(); showSaveHint();
+  if (refocus) $('nf-key').focus();
+}
+function deleteField(i) {
+  const c = currentConfig(); if (!c) return;
+  c.fields.splice(i, 1);
+  renderConfigArea(); showSaveHint();
+}
+$('configs-search').addEventListener('input', renderConfigs);
+
+/* ================================================================
+   导入 / 导出
+   ================================================================ */
+function exportData() {
+  const scope = [...document.querySelectorAll('#export-scope input:checked')].map(c => c.dataset.scope);
+  const data = { app: 'Dock', version: '3.0.0', exportedAt: new Date().toISOString() };
+  if (scope.includes('systems')) data.systems = state.systems;
+  if (scope.includes('servers')) data.servers = state.servers;
+  if (scope.includes('middlewares')) data.middlewares = state.middlewares;
+  if (scope.includes('configs')) data.projects = state.projects;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dock-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('备份文件已导出');
+}
+$('drop-zone').onclick = () => $('import-file').click();
+$('drop-zone').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; });
+$('drop-zone').addEventListener('dragleave', e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = ''; });
+$('drop-zone').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = '';
+  if (e.dataTransfer.files[0]) importFile(e.dataTransfer.files[0]);
+});
+$('import-file').addEventListener('change', e => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; });
+function importFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data || typeof data !== 'object' || !(data.systems || data.servers || data.middlewares || data.projects || data.configs)) throw new Error('bad');
+      if (Array.isArray(data.systems)) state.systems = data.systems;
+      if (Array.isArray(data.servers)) state.servers = data.servers;
+      if (Array.isArray(data.middlewares)) state.middlewares = data.middlewares;
+      if (Array.isArray(data.projects)) state.projects = data.projects;
+      else if (Array.isArray(data.configs)) state.projects = [{ id: ++nextId, name: '导入项目', configs: data.configs }];
+      state.activeProjectId = state.projects[0]?.id ?? null;
+      state.activeConfigId = state.projects[0]?.configs[0]?.id ?? null;
+      renderAll(); toast(`导入完成：${file.name}`);
+    } catch (e) { toast('文件格式不正确，导入失败', 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+/* ================================================================
+   设置
+   ================================================================ */
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+  toast(el.classList.contains('on') ? '主密码已启用' : '主密码已关闭', 'info');
+}
+function clearAllData() {
+  if (!confirm('确定清除所有本地数据吗？此操作不可恢复。')) return;
+  state.systems = []; state.servers = []; state.middlewares = []; state.projects = [];
+  state.activeProjectId = null; state.activeConfigId = null; state.selected.clear();
+  renderAll(); toast('所有数据已清除', 'info');
+}
+
+/* ---------- 全局快捷键 ---------- */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal:not(.hidden)').forEach(m => closeModal(m.id));
+});
+
+/* ---------- 状态栏时钟 ---------- */
+function tickClock() {
+  const d = new Date();
+  $('sb-clock').textContent = [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* ---------- 初始化 ---------- */
+function renderAll() { renderSystems(); renderServers(); renderMw(); renderConfigs(); updateHeaderSub(); }
+renderAll();
+switchTab(localStorage.getItem('dock-v3-tab') || 'systems');
+window.addEventListener('load', moveInk);
+</script>
+</body>
+</html>

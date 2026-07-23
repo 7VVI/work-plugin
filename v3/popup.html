@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dock · 扩展弹窗预览 v3</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = { theme: { extend: {
+  fontFamily: {
+    sans: ['"Amazon Ember"','"Noto Sans SC"','-apple-system','BlinkMacSystemFont','"Segoe UI"','Roboto','sans-serif'],
+    mono: ['"JetBrains Mono"','Consolas','monospace']
+  }
+}}};
+</script>
+<style>
+:root{
+  --bg:#EDF1F8; --bg2:#E4EAF4; --panel:#FFFFFF; --panel2:#F4F7FC;
+  --solid:#FFFFFF; --solid2:#F6F8FC;
+  --border:#DDE5F0; --border2:#C6D2E4;
+  --ink:#0F1726; --ink2:#4E5D75; --ink3:#8593A9;
+  --accent:#2E6BF0; --accent2:#0891B2; --glow:rgba(46,107,240,.25);
+  --ok:#059669; --warn:#B45309; --info:#2563EB;
+}
+*{-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font-family:'Amazon Ember','Noto Sans SC',-apple-system,sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(46,107,240,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(46,107,240,.05) 1px,transparent 1px);
+  background-size:40px 40px;mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,#000 25%,transparent 100%)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(720px 320px at 20% -8%,rgba(46,107,240,.1),transparent 65%),radial-gradient(620px 320px at 88% -6%,rgba(8,145,178,.07),transparent 65%)}
+.t1{color:var(--ink)}.t2{color:var(--ink2)}.t3{color:var(--ink3)}
+.mono{font-family:'JetBrains Mono',monospace}
+.kbd{display:inline-flex;align-items:center;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:var(--panel2);padding:2px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--ink3)}
+.popup-item{position:relative;display:flex;align-items:center;gap:12px;border-radius:12px;padding:9px 12px;cursor:pointer;transition:background .12s;border:1px solid transparent}
+.popup-item:hover{background:var(--panel2)}
+.popup-item.active{background:rgba(46,107,240,.08);border-color:rgba(46,107,240,.3);box-shadow:0 2px 12px -4px var(--glow)}
+.popup-item.active .item-actions,.popup-item:hover .item-actions{opacity:1}
+.item-actions{opacity:0;transition:.15s}
+.env{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:500;box-shadow:inset 0 0 0 1px}
+.env::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+.env-生产{color:var(--ok);background:rgba(5,150,105,.08);box-shadow:inset 0 0 0 1px rgba(5,150,105,.22)}
+.toast-item{animation:toastIn .3s cubic-bezier(.3,1.2,.4,1) both}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px) scale(.95)}}
+.popup-anim{animation:popOpen .34s cubic-bezier(.25,1.35,.45,1) both;transform-origin:top right}
+@keyframes popOpen{from{opacity:0;transform:translateY(-10px) scale(.9)}}
+.skel{border-radius:8px;background:linear-gradient(90deg,var(--bg2) 25%,#F2F5FA 50%,var(--bg2) 75%);background-size:200% 100%;animation:shimmer 2.2s infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pls 2.4s infinite}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-thumb{background:#C4CEDE;border-radius:8px}
+</style>
+</head>
+<body class="relative z-10 flex min-h-screen flex-col">
+
+<!-- 页面说明 -->
+<div class="relative z-10 mx-auto flex w-full max-w-6xl items-center gap-3 px-8 pt-6 text-[13px] t2">
+  <span class="flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-black text-white" style="background:linear-gradient(135deg,var(--accent),#1D4ED8);box-shadow:0 4px 12px -3px var(--glow)">D</span>
+  <span><strong class="t1 font-semibold">Dock</strong> · Chrome Extension Popup <span class="mono text-[10px] t3">v3 · Light Lab</span></span>
+  <span class="t3">|</span>
+  <span class="text-xs t3">点击工具栏 <span class="mx-0.5 inline-flex h-4 w-4 items-center justify-center rounded align-[-2px] text-[9px] font-black text-white" style="background:var(--accent)">D</span> 开合弹窗 · <span class="kbd">↑</span> <span class="kbd">↓</span> 选择 · <span class="kbd">Enter</span> 打开</span>
+  <div class="flex-1"></div>
+  <a href="dashboard.html" class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium t2 transition hover:t1" style="border-color:var(--border);background:var(--panel)">管理控制台<i class="fa-solid fa-arrow-up-right-from-square text-[10px]" style="color:var(--accent)"></i></a>
+</div>
+
+<!-- 浏览器窗口 Mockup（亮色 Chrome） -->
+<div class="relative z-10 mx-auto flex w-full max-w-6xl flex-1 px-8 py-6">
+  <div class="relative flex w-full flex-col overflow-hidden rounded-2xl border bg-white" style="border-color:var(--border2);box-shadow:0 24px 64px -20px rgba(15,23,38,.22),0 0 44px -18px var(--glow)">
+
+    <!-- 标题栏 -->
+    <div style="background:#DEE3EB;border-bottom:1px solid var(--border)">
+      <div class="flex items-center gap-2 px-3 pt-2">
+        <div class="flex gap-1.5 px-1">
+          <span class="h-3 w-3 rounded-full bg-[#FF5F57]"></span><span class="h-3 w-3 rounded-full bg-[#FEBC2E]"></span><span class="h-3 w-3 rounded-full bg-[#28C840]"></span>
+        </div>
+        <div class="ml-2 flex items-center gap-2 rounded-t-lg bg-white px-3.5 py-2 text-xs text-slate-600 shadow-sm">
+          <span class="flex h-4 w-4 items-center justify-center rounded-sm bg-sky-500 text-[9px] text-white"><i class="fa-solid fa-globe"></i></span>
+          <span class="max-w-[140px] truncate">CORS 车辆定位平台</span>
+          <i class="fa-solid fa-xmark text-[10px] text-slate-300"></i>
+        </div>
+        <div class="flex items-center px-2 py-2 text-slate-400"><i class="fa-solid fa-plus text-xs"></i></div>
+      </div>
+      <div class="flex items-center gap-2 bg-white px-3 py-2">
+        <div class="flex gap-1 text-slate-400">
+          <i class="fa-solid fa-arrow-left rounded-full p-1.5 text-xs"></i>
+          <i class="fa-solid fa-arrow-right rounded-full p-1.5 text-xs text-slate-300"></i>
+          <i class="fa-solid fa-rotate-right rounded-full p-1.5 text-xs"></i>
+        </div>
+        <div class="mono flex flex-1 items-center gap-2 rounded-full bg-slate-100 px-3.5 py-1.5 text-xs text-slate-500">
+          <i class="fa-solid fa-lock text-[10px]" style="color:var(--ok)"></i>
+          <span>vrs.zhdgps.com:8009/#/login</span>
+        </div>
+        <div class="flex items-center gap-0.5 text-slate-500">
+          <i class="fa-solid fa-puzzle-piece rounded-full p-1.5 text-xs"></i>
+          <button id="ext-icon" class="relative rounded-full p-1 transition hover:bg-slate-100" title="Dock">
+            <span class="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-black text-white" style="background:linear-gradient(135deg,var(--accent),#1D4ED8);box-shadow:0 3px 10px -2px var(--glow)">D</span>
+            <span id="ext-badge" class="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">2</span>
+          </button>
+          <i class="fa-solid fa-ellipsis-vertical rounded-full p-1.5 text-xs"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- 网页内容区 -->
+    <div class="relative flex-1 bg-slate-50">
+      <div class="flex h-full flex-col items-center justify-center gap-4 p-10">
+        <div class="skel h-9 w-9 !rounded-xl"></div>
+        <div class="skel h-4 w-44"></div>
+        <div class="skel h-9 w-72 !rounded-lg"></div>
+        <div class="skel h-9 w-72 !rounded-lg"></div>
+        <div class="skel h-9 w-24 !rounded-lg" style="background:linear-gradient(90deg,rgba(46,107,240,.12) 25%,rgba(46,107,240,.24) 50%,rgba(46,107,240,.12) 75%);background-size:200% 100%"></div>
+        <div class="mono mt-2 text-[10.5px] text-slate-300">// 网页内容区域</div>
+      </div>
+
+      <!-- ================= 扩展 Popup ================= -->
+      <div id="popup" class="popup-anim absolute right-4 top-2 flex h-[560px] w-[378px] flex-col overflow-hidden rounded-2xl border" style="border-color:var(--border2);background:rgba(255,255,255,.96);backdrop-filter:blur(16px);box-shadow:0 20px 56px -14px rgba(15,23,38,.28),0 0 32px -12px var(--glow)">
+
+        <!-- header -->
+        <div class="flex items-center gap-2 px-4 pb-3 pt-3.5" style="border-bottom:1px solid var(--border)">
+          <span class="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-black text-white" style="background:linear-gradient(135deg,var(--accent),#1D4ED8);box-shadow:0 3px 10px -2px var(--glow)">D</span>
+          <span class="text-[13.5px] font-bold t1">全部系统</span>
+          <span id="popup-count" class="mono rounded-md px-1.5 py-0.5 text-[10.5px] t2" style="background:var(--panel2)">2</span>
+          <div class="flex-1"></div>
+          <button class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white transition hover:brightness-105 active:scale-95" style="background:var(--accent);box-shadow:0 3px 10px -3px var(--glow)" onclick="quickAdd()"><i class="fa-solid fa-plus text-[9px]"></i>新增</button>
+          <button class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium t2 transition hover:t1" style="border-color:var(--border)" title="打开管理控制台" onclick="window.open('dashboard.html','_blank')"><i class="fa-solid fa-table-columns text-[10px]"></i>面板</button>
+        </div>
+
+        <!-- 搜索框 -->
+        <div class="px-3 pt-3">
+          <div class="flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition" style="border-color:var(--border);background:var(--panel2)" id="search-box">
+            <i class="fa-solid fa-terminal text-xs" style="color:var(--accent)"></i>
+            <input id="popup-search" class="w-full bg-transparent text-[13px] t1 outline-none placeholder:text-[var(--ink3)]" placeholder="搜索系统 / URL / 标签 / 账号…"/>
+            <span class="flex flex-none gap-1"><span class="kbd">Ctrl</span><span class="kbd">K</span></span>
+          </div>
+        </div>
+
+        <!-- 列表 -->
+        <div id="popup-list" class="mt-1 flex-1 overflow-y-auto px-2 pb-2 pt-1"></div>
+
+        <!-- footer -->
+        <div class="flex items-center justify-between px-4 py-2.5" style="border-top:1px solid var(--border);background:var(--panel2)">
+          <span class="flex items-center gap-1.5 text-[11px] t3"><span class="pulse-dot"></span>本地已同步 · <span id="popup-count-2" class="mono">2</span> 个系统</span>
+          <a href="dashboard.html" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-medium transition hover:brightness-110" style="color:var(--accent)">管理控制台<i class="fa-solid fa-arrow-right text-[9px]"></i></a>
+        </div>
+      </div>
+      <!-- /popup -->
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-wrap" class="pointer-events-none fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2"></div>
+
+<script>
+const systems = [
+  { id: 1, name: 'cors国内', url: 'https://vrs.zhdgps.com:8009/#/login', env: '生产', color: '#0EA5E9', icon: 'fa-solid fa-globe', tags: ['定位','核心'], account: 'admin', starred: true },
+  { id: 2, name: 'CORS跳板机', url: 'http://43.136.30.112/', env: '生产', color: '#10B981', icon: 'fa-solid fa-server', tags: ['运维'], account: 'ops', starred: false },
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let activeIdx = -1, filtered = [];
+
+function toast(msg, type = 'success') {
+  const conf = { success: ['fa-circle-check','var(--ok)'], info: ['fa-circle-info','var(--accent)'] }[type];
+  const el = document.createElement('div');
+  el.className = 'toast-item pointer-events-auto flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-medium t1';
+  el.style.cssText = 'background:#fff;border:1px solid var(--border2);box-shadow:0 12px 32px -10px rgba(15,23,38,.25),0 0 24px -10px var(--glow)';
+  el.innerHTML = `<i class="fa-solid ${conf[0]}" style="color:${conf[1]}"></i><span>${esc(msg)}</span>`;
+  $('toast-wrap').appendChild(el);
+  setTimeout(() => { el.style.transition = 'all .2s'; el.style.opacity = '0'; el.style.transform = 'translateY(6px)'; setTimeout(() => el.remove(), 200); }, 2200);
+}
+
+function itemHtml(s) {
+  return `
+  <div class="popup-item" data-id="${s.id}" onclick="openSystem(${s.id})" onmouseenter="setActive(${s.id})">
+    <span class="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] text-sm text-white" style="background:${esc(s.color)};box-shadow:0 4px 12px -3px ${esc(s.color)}"><i class="${esc(s.icon)}"></i></span>
+    <span class="min-w-0 flex-1">
+      <span class="flex items-center gap-1.5">
+        <span class="truncate text-[13.5px] font-medium t1">${esc(s.name)}</span>
+        ${s.starred ? '<i class="fa-solid fa-star text-[9px]" style="color:#F59E0B"></i>' : ''}
+      </span>
+      <span class="mono mt-0.5 block truncate text-[11px] t3">${esc(s.url)}</span>
+    </span>
+    <span class="flex flex-none items-center gap-1.5">
+      <span class="item-actions flex gap-0.5">
+        <button class="flex h-6 w-6 items-center justify-center rounded-md t3 transition hover:t1 hover:bg-white" title="复制账号 ${esc(s.account)}" onclick="event.stopPropagation();copyAccount(${s.id})"><i class="fa-regular fa-copy text-[10px]"></i></button>
+        <button class="flex h-6 w-6 items-center justify-center rounded-md t3 transition hover:t1 hover:bg-white" title="打开" onclick="event.stopPropagation();openSystem(${s.id})"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></button>
+      </span>
+      <span class="env env-${esc(s.env)}">${esc(s.env)}</span>
+    </span>
+  </div>`;
+}
+
+function renderPopup() {
+  const q = ($('popup-search').value || '').trim().toLowerCase();
+  filtered = systems.filter(s => !q || s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q) || s.tags.some(t => t.toLowerCase().includes(q)) || s.account.toLowerCase().includes(q));
+  $('popup-count').textContent = filtered.length;
+  $('popup-count-2').textContent = systems.length;
+  const starred = filtered.filter(s => s.starred);
+  const rest = filtered.filter(s => !s.starred);
+  let html = '';
+  if (starred.length) html += `<div class="px-3 pb-1 pt-2 text-[10px] font-semibold tracking-widest t3">常用</div>` + starred.map(itemHtml).join('');
+  if (rest.length) html += `<div class="px-3 pb-1 pt-2 text-[10px] font-semibold tracking-widest t3">全部系统</div>` + rest.map(itemHtml).join('');
+  if (!filtered.length) html = `
+    <div class="flex h-full flex-col items-center justify-center gap-2 t3">
+      <i class="fa-regular fa-folder-open text-2xl"></i>
+      <div class="text-xs">未找到匹配的系统</div>
+      <button class="mt-1 text-xs font-medium transition hover:brightness-110" style="color:var(--accent)" onclick="$('popup-search').value='';renderPopup();$('popup-search').focus()">清除搜索</button>
+    </div>`;
+  $('popup-list').innerHTML = html;
+  if (activeIdx >= filtered.length) activeIdx = filtered.length - 1;
+  paintActive();
+}
+function paintActive() {
+  document.querySelectorAll('.popup-item').forEach(el => {
+    const idx = filtered.findIndex(s => s.id === +el.dataset.id);
+    el.classList.toggle('active', idx === activeIdx);
+  });
+}
+function setActive(id) {
+  const idx = filtered.findIndex(s => s.id === id);
+  if (idx >= 0) { activeIdx = idx; paintActive(); }
+}
+function openSystem(id) {
+  const s = systems.find(x => x.id === id);
+  toast(`正在打开「${s.name}」…`, 'info');
+}
+function copyAccount(id) {
+  const s = systems.find(x => x.id === id);
+  const done = () => toast(`账号「${s.account}」已复制`);
+  if (navigator.clipboard) navigator.clipboard.writeText(s.account).then(done).catch(done); else done();
+}
+function quickAdd() {
+  toast('正在打开管理控制台…', 'info');
+  setTimeout(() => window.open('dashboard.html', '_blank'), 350);
+}
+
+$('popup-search').addEventListener('input', () => { activeIdx = filtered.length ? 0 : -1; renderPopup(); });
+$('popup-search').addEventListener('focus', () => { $('search-box').style.borderColor = 'var(--accent)'; $('search-box').style.background = '#fff'; $('search-box').style.boxShadow = '0 0 0 3px rgba(46,107,240,.16)'; });
+$('popup-search').addEventListener('blur', () => { $('search-box').style.borderColor = 'var(--border)'; $('search-box').style.background = 'var(--panel2)'; $('search-box').style.boxShadow = 'none'; });
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('popup-search').focus(); return; }
+  if (document.activeElement !== $('popup-search') && !['ArrowDown','ArrowUp','Enter','Escape'].includes(e.key)) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, filtered.length - 1); paintActive(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); paintActive(); }
+  if (e.key === 'Enter' && activeIdx >= 0 && filtered[activeIdx]) openSystem(filtered[activeIdx].id);
+  if (e.key === 'Escape') { $('popup-search').value = ''; activeIdx = -1; renderPopup(); $('popup-search').blur(); }
+});
+
+$('ext-icon').onclick = () => {
+  const p = $('popup');
+  if (p.style.display === 'none') {
+    p.style.display = ''; p.classList.remove('popup-anim'); void p.offsetWidth; p.classList.add('popup-anim');
+    $('ext-badge').style.display = '';
+  } else {
+    p.style.display = 'none';
+    $('ext-badge').style.display = 'none';
+  }
+};
+
+renderPopup();
+setTimeout(() => $('popup-search').focus(), 400);
+</script>
+</body>
+</html>

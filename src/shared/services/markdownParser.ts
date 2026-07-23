@@ -9,11 +9,16 @@ export interface FrontMatter {
   passwordsIncluded: boolean;
 }
 
+export interface ParsedConfigField { key: string; label?: string; value?: string }
+export interface ParsedConfig { name: string; fields: ParsedConfigField[] }
+export interface ParsedProject { name: string; configs: ParsedConfig[] }
+
 export interface ParsedBackup {
   meta: FrontMatter;
   systems: Array<Partial<System> & { tags?: string[]; accounts?: Array<{ role: string; username: string; password: string; isDefault?: boolean }> }>;
   servers: Array<Partial<Server> & { tags?: string[]; plainPassword?: string }>;
   middlewares: Array<Partial<Middleware> & { tags?: string[]; plainPassword?: string }>;
+  projects: ParsedProject[];
   tags: Array<Partial<Tag>>;
 }
 
@@ -24,6 +29,7 @@ export function parseMarkdown(content: string): ParsedBackup {
     systems: [],
     servers: [],
     middlewares: [],
+    projects: [],
     tags: [],
   };
 
@@ -37,12 +43,55 @@ export function parseMarkdown(content: string): ParsedBackup {
       result.servers = parseServers(section.body);
     } else if (heading === '中间件' || heading === 'Middlewares') {
       result.middlewares = parseMiddlewares(section.body);
+    } else if (heading === '配置' || heading === 'Configs') {
+      result.projects = parseProjects(section.body);
     } else if (heading === '标签' || heading === 'Tags') {
       result.tags = parseTags(section.body);
     }
   }
 
   return result;
+}
+
+/* 配置：H3 = 项目，H4 = 配置，配置体为三列表格（字段标识 / 字段名称 / 默认值） */
+function parseProjects(body: string): ParsedProject[] {
+  const projects: ParsedProject[] = [];
+  for (const section of splitByHeading(body, 3)) {
+    const name = section.heading.trim();
+    const configs: ParsedConfig[] = [];
+    for (const sub of splitByHeading(section.body, 4)) {
+      configs.push({ name: sub.heading.trim(), fields: parseFieldTable(sub.body) });
+    }
+    projects.push({ name, configs });
+  }
+  return projects;
+}
+
+function parseFieldTable(body: string): ParsedConfigField[] {
+  const fields: ParsedConfigField[] = [];
+  const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+  let inTable = false;
+  let headers: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.slice(1, -1).split('|').map(c => c.trim());
+      if (cells.every(c => /^-+$/.test(c))) { inTable = true; continue; }
+      if (!inTable) { headers = cells; continue; }
+      const keyIdx = headers.findIndex(h => h === '字段标识' || h === 'Key');
+      const labelIdx = headers.findIndex(h => h === '字段名称' || h === 'Label');
+      const valIdx = headers.findIndex(h => h === '默认值' || h === 'Value');
+      if (keyIdx >= 0) {
+        fields.push({
+          key: cells[keyIdx] ?? '',
+          label: labelIdx >= 0 ? cells[labelIdx] : undefined,
+          value: valIdx >= 0 ? cells[valIdx] : undefined,
+        });
+      }
+    } else {
+      inTable = false;
+    }
+  }
+  return fields;
 }
 
 interface Section { heading: string; body: string; }

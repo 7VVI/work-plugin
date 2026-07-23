@@ -70,7 +70,7 @@
             <td colspan="6" class="empty-cell">
               <div class="empty-state">
                 <i class="fa-solid fa-globe"></i>
-                <p>暂无系统，点击“新增系统”添加</p>
+                <p>暂无系统，点击"新增系统"添加</p>
               </div>
             </td>
           </tr>
@@ -82,28 +82,27 @@
     <div v-else class="card-wrap">
       <div class="card-grid">
         <div v-for="s in filteredSystems" :key="s.id" class="sys-card stat-card" @click="onOpen(s)">
-          <div class="card-header">
+          <div class="card-top">
             <div class="card-icon" :style="iconStyle(s)">
               <i :class="s.icon || 'fa-solid fa-globe'"></i>
             </div>
+            <EnvBadge :env="s.environment" />
+          </div>
+          <div class="card-name">{{ s.name }}</div>
+          <div class="card-url mono" :title="s.url">{{ s.url }}</div>
+          <div class="card-footer">
+            <span class="card-acct">
+              <i class="fa-solid fa-key"></i>{{ acctCounts[s.id] ?? 0 }} 个账号 · {{ formatRelativeTime(s.updatedAt) }}
+            </span>
             <div class="card-actions" @click.stop>
               <button class="row-action row-action-sm edit" @click="onEdit(s)" title="编辑"><i class="fa-solid fa-pen"></i></button>
               <button class="row-action row-action-sm danger" @click="onDelete(s.id)" title="删除"><i class="fa-solid fa-trash"></i></button>
             </div>
           </div>
-          <div class="card-body">
-            <div class="card-name">{{ s.name }}</div>
-            <div class="card-url" :title="s.url">{{ s.url }}</div>
-            <div v-if="s.remark" class="card-remark">{{ s.remark }}</div>
-          </div>
-          <div class="card-footer">
-            <EnvBadge :env="s.environment" />
-            <span class="card-time">{{ formatRelativeTime(s.updatedAt) }}</span>
-          </div>
         </div>
         <div v-if="filteredSystems.length === 0" class="empty-state">
           <i class="fa-solid fa-globe"></i>
-          <p>暂无系统，点击“新增系统”添加</p>
+          <p>暂无系统，点击"新增系统"添加</p>
         </div>
       </div>
     </div>
@@ -119,6 +118,7 @@ import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import type { System } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
+import { accountService } from '@shared/services/accountService';
 import EnvBadge from '../components/common/EnvBadge.vue';
 import SystemForm from '../components/system/SystemForm.vue';
 
@@ -135,6 +135,19 @@ const viewMode = ref<'table' | 'card'>(
 );
 watch(viewMode, (v) => { try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } });
 
+// 账户计数（卡片视图使用）
+const acctCounts = ref<Record<string, number>>({});
+
+async function loadAcctCounts() {
+  const counts: Record<string, number> = {};
+  await Promise.all(
+    store.list.map(async (s) => {
+      counts[s.id] = await accountService.countBySystem(s.id);
+    }),
+  );
+  acctCounts.value = counts;
+}
+
 const iconPalettes = [
   'linear-gradient(135deg, #4F7CFF 0%, #3D6DF7 100%)',
   'linear-gradient(135deg, #34D399 0%, #10B981 100%)',
@@ -150,7 +163,10 @@ function iconStyle(s: System) {
   return { background: bg, boxShadow: `0 5px 14px -4px ${solid}66` };
 }
 
-onMounted(async () => { await store.load(); });
+onMounted(async () => {
+  await store.load();
+  await loadAcctCounts();
+});
 
 const filteredSystems = computed(() => {
   if (!search.value.trim()) return store.list;
@@ -183,6 +199,7 @@ async function onDelete(id: string) {
   const ok = await dialog.confirm('确认删除', '确认删除该系统？');
   if (!ok) return;
   await store.remove(id);
+  await loadAcctCounts();
   toast.success('已删除');
 }
 
@@ -192,17 +209,19 @@ async function onBulkDelete() {
   if (!ok) return;
   for (const id of ids) await store.remove(id);
   selectedIds.value.clear();
+  await loadAcctCounts();
   toast.success(`已删除 ${ids.length} 个系统`);
 }
 
 async function onSaved() {
   formVisible.value = false;
   await store.load();
+  await loadAcctCounts();
 }
 </script>
 
 <style scoped>
-.system-view { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.system-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 .action-bar {
   display: flex;
@@ -249,13 +268,12 @@ async function onSaved() {
 
 /* 表格视图 */
 .table-wrap {
-  flex: 1;
   min-height: 0;
   overflow: auto;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  margin: 0 var(--page-pad) var(--page-pad);
+  margin: 0 var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   box-shadow: var(--shadow-xs);
   position: relative;
 }
@@ -381,10 +399,9 @@ async function onSaved() {
 
 /* 卡片视图 */
 .card-wrap {
-  flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0 var(--page-pad) var(--page-pad);
+  padding: 0 var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   position: relative;
 }
 .card-grid {
@@ -395,20 +412,24 @@ async function onSaved() {
 }
 .sys-card {
   background: var(--card-bg);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--gap-lg);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-md);
+  gap: var(--gap-sm);
+  box-shadow: var(--shadow-xs);
+  transition: var(--transition);
 }
 .sys-card:hover {
-  border-color: var(--primary);
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
-.card-header {
+.card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
 }
 .card-icon {
@@ -420,37 +441,18 @@ async function onSaved() {
   justify-content: center;
   color: #fff;
   font-size: var(--text-base);
-  box-shadow: var(--shadow-xs);
+  flex-shrink: 0;
 }
-.card-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: var(--transition-fast);
-}
-.sys-card:hover .card-actions { opacity: 1; }
-.card-body { flex: 1; min-width: 0; }
 .card-name {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
   color: var(--ink);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-top: 4px;
+  line-height: var(--leading-tight);
 }
 .card-url {
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--ink3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-remark {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  margin-top: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -459,13 +461,25 @@ async function onSaved() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: 4px;
   padding-top: var(--gap-sm);
   border-top: 1px solid var(--border-soft);
-}
-.card-time {
   font-size: var(--text-xs);
-  color: var(--text-quaternary);
+  color: var(--ink3);
 }
+.card-acct {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-acct i { font-size: 10px; }
+.card-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+.sys-card:hover .card-actions { opacity: 1; }
 .card-empty {
   grid-column: 1 / -1;
   display: flex;

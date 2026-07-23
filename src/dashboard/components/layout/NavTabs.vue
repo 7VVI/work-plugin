@@ -16,7 +16,6 @@
       <span ref="inkEl" class="tab-ink"></span>
     </nav>
     <div class="tabs-meta">
-      <span class="mono path">{{ currentPath }}</span>
       <span class="sub t3">{{ currentSub }}</span>
     </div>
   </div>
@@ -25,7 +24,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
-import { dockPathFor, subtitleFor, type DockStats } from '../../utils/dockPath';
+import { subtitleFor, type DockStats } from '../../utils/dockPath';
 import { useSystemStore } from '@shared/stores/systemStore';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
@@ -51,14 +50,20 @@ const serverStore = useServerStore();
 const middlewareStore = useMiddlewareStore();
 const configStore = useConfigStore();
 
-const stats = computed<DockStats>(() => ({
-  systems: systemStore.list?.length ?? 0,
-  servers: serverStore.list?.length ?? 0,
-  middlewares: middlewareStore.list?.length ?? 0,
-  projects: configStore.list?.length ?? 0,
-}));
+const stats = computed<DockStats>(() => {
+  const projects = configStore.list ?? [];
+  const configs = projects.reduce((a, p) => a + p.configs.length, 0);
+  const fields = projects.reduce((a, p) => a + p.configs.reduce((b, c) => b + c.fields.length, 0), 0);
+  return {
+    systems: systemStore.list?.length ?? 0,
+    servers: serverStore.list?.length ?? 0,
+    middlewares: middlewareStore.list?.length ?? 0,
+    projects: projects.length,
+    configs,
+    fields,
+  };
+});
 
-const currentPath = computed(() => dockPathFor(route.path));
 const currentSub = computed(() => subtitleFor(route.path, stats.value));
 
 function moveInk() {
@@ -136,7 +141,6 @@ onBeforeUnmount(() => {
   padding-bottom: 8px;
   font-size: 10.5px;
 }
-.tabs-meta .path { color: var(--accent); font-family: var(--font-mono); }
 .tabs-meta .sub { font-family: var(--font-mono); }
 @media (min-width: 1024px) { .tabs-meta { display: inline-flex; } }
 </style>

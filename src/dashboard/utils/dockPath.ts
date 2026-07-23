@@ -3,6 +3,8 @@ export interface DockStats {
   servers: number;
   middlewares: number;
   projects: number;
+  configs: number;
+  fields: number;
 }
 
 const PATH_MAP: Record<string, string> = {
@@ -23,8 +25,8 @@ export function subtitleFor(routePath: string, s: DockStats): string {
     case '/systems': return `共 ${s.systems} 个系统`;
     case '/servers': return `共 ${s.servers} 台服务器`;
     case '/middlewares': return `共 ${s.middlewares} 个实例`;
-    case '/configs': return `${s.projects} 个项目`;
-    case '/import-export': return 'JSON 备份 · 本地存储';
+    case '/configs': return `${s.projects} 个项目 · ${s.configs} 个配置 · ${s.fields} 个字段`;
+    case '/import-export': return 'JSON / Markdown 备份 · 本地存储';
     case '/settings': return '外观 · 安全 · 快捷键 · 关于';
     default: return '';
   }

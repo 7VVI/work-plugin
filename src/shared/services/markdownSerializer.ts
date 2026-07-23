@@ -1,4 +1,4 @@
-import type { System, Server, Middleware, Tag } from '../types/entities';
+import type { System, Server, Middleware, Tag, ConfigProject } from '../types/entities';
 import type { ParsedBackup } from './markdownParser';
 
 export interface SerializeOptions {
@@ -10,6 +10,7 @@ interface BackupData {
   systems: Array<System & { tags?: string[]; plainAccounts?: Array<{ role: string; username: string; password: string; isDefault?: boolean }> }>;
   servers: Array<Server & { tags?: string[]; plainPassword?: string }>;
   middlewares: Array<Middleware & { tags?: string[]; plainPassword?: string }>;
+  projects: ConfigProject[];
   tags: Tag[];
 }
 
@@ -115,6 +116,27 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
       if (rows.length > 0) {
         lines.push(...buildTable(['字段', '值'], rows));
         lines.push('');
+      }
+    }
+  }
+
+  if (data.projects && data.projects.length > 0) {
+    lines.push('## 配置');
+    lines.push('');
+    for (const p of data.projects) {
+      lines.push(`### ${p.name}`);
+      lines.push('');
+      for (const c of p.configs) {
+        lines.push(`#### ${c.name}`);
+        lines.push('');
+        const fieldRows = c.fields.map(f => [f.key ?? '', f.label ?? '', f.value ?? '']);
+        if (fieldRows.length > 0) {
+          lines.push(...buildTable(['字段标识', '字段名称', '默认值'], fieldRows));
+          lines.push('');
+        } else {
+          lines.push(...buildTable(['字段标识', '字段名称', '默认值'], []));
+          lines.push('');
+        }
       }
     }
   }

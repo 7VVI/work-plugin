@@ -1,68 +1,115 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { configService } from '../services/configService';
-import type { ConfigGroup, ConfigItem } from '../types/entities';
+import { generateId } from '../utils/id';
+import type { ConfigField, ConfigProject } from '../types/entities';
 
 export const useConfigStore = defineStore('config', () => {
-  const list = ref<ConfigGroup[]>([]);
+  const list = ref<ConfigProject[]>([]);
   const loading = ref(false);
-  const selectedId = ref<string | null>(null);
+  const selectedProjectId = ref<string | null>(null);
+  const selectedConfigId = ref<string | null>(null);
+
+  const selectedProject = computed(
+    () => list.value.find(p => p.id === selectedProjectId.value) ?? null
+  );
+  const selectedConfig = computed(
+    () => selectedProject.value?.configs.find(c => c.id === selectedConfigId.value) ?? null
+  );
+
+  function ensureConfigSelection() {
+    const p = selectedProject.value;
+    if (p) {
+      if (!p.configs.some(c => c.id === selectedConfigId.value)) {
+        selectedConfigId.value = p.configs[0]?.id ?? null;
+      }
+    } else {
+      selectedConfigId.value = null;
+    }
+  }
 
   async function load() {
     loading.value = true;
     list.value = await configService.all();
-    if (!selectedId.value && list.value.length > 0) {
-      selectedId.value = list.value[0].id;
+    if (!selectedProjectId.value && list.value.length > 0) {
+      selectedProjectId.value = list.value[0].id;
     }
+    ensureConfigSelection();
     loading.value = false;
   }
 
-  async function create(name: string) {
-    const id = await configService.create(name);
+  function selectProject(id: string) {
+    selectedProjectId.value = id;
+    ensureConfigSelection();
+  }
+
+  function selectConfig(id: string) {
+    selectedConfigId.value = id;
+  }
+
+  async function createProject(name: string) {
+    const id = await configService.createProject(name);
     await load();
-    selectedId.value = id;
+    selectedProjectId.value = id;
+    selectedConfigId.value = null;
     return id;
   }
 
-  async function rename(id: string, name: string) {
-    await configService.rename(id, name);
+  async function renameProject(id: string, name: string) {
+    const p = list.value.find(x => x.id === id);
+    if (!p) return;
+    await configService.renameProject(p, name);
+  }
+
+  async function deleteProject(id: string) {
+    await configService.deleteProject(id);
     await load();
   }
 
-  async function remove(id: string) {
-    await configService.delete(id);
-    if (selectedId.value === id) selectedId.value = null;
-    await load();
+  async function addConfig(projectId: string, name: string): Promise<string | null> {
+    const p = list.value.find(x => x.id === projectId);
+    if (!p) return null;
+    const cfg = { id: generateId(), name, fields: [] as ConfigField[] };
+    p.configs.push(cfg);
+    selectedConfigId.value = cfg.id;
+    await configService.saveProject(p);
+    return cfg.id;
   }
 
-  async function setItems(groupId: string, items: ConfigItem[]) {
-    await configService.setItems(groupId, items);
-    await load();
+  async function renameConfig(projectId: string, configId: string, name: string) {
+    const p = list.value.find(x => x.id === projectId);
+    const c = p?.configs.find(x => x.id === configId);
+    if (!p || !c) return;
+    c.name = name;
+    await configService.saveProject(p);
   }
 
-  async function addItem(groupId: string, key: string, value: string) {
-    await configService.addItem(groupId, key, value);
-    await load();
+  async function deleteConfig(projectId: string, configId: string) {
+    const p = list.value.find(x => x.id === projectId);
+    if (!p) return;
+    p.configs = p.configs.filter(c => c.id !== configId);
+    if (selectedConfigId.value === configId) {
+      selectedConfigId.value = p.configs[0]?.id ?? null;
+    }
+    await configService.saveProject(p);
   }
 
-  async function updateItem(groupId: string, index: number, key: string, value: string) {
-    await configService.updateItem(groupId, index, key, value);
-    await load();
+  async function setFields(projectId: string, configId: string, fields: ConfigField[]) {
+    const p = list.value.find(x => x.id === projectId);
+    const c = p?.configs.find(x => x.id === configId);
+    if (!p || !c) return;
+    c.fields = fields;
+    await configService.saveProject(p);
   }
 
-  async function removeItem(groupId: string, index: number) {
-    await configService.removeItem(groupId, index);
-    await load();
+  async function copyValue(value: string) {
+    await configService.copyValue(value);
   }
-
-  function select(id: string) {
-    selectedId.value = id;
-  }
-
-  const selected = computed(() => list.value.find(g => g.id === selectedId.value));
 
   return {
-    list, loading, selectedId, selected,
-    load, create, rename, remove, setItems, addItem, updateItem, removeItem, select,
+    list, loading, selectedProjectId, selectedConfigId, selectedProject, selectedConfig,
+    load, selectProject, selectConfig,
+    createProject, renameProject, deleteProject,
+    addConfig, renameConfig, deleteConfig, setFields, copyValue,
   };
 });

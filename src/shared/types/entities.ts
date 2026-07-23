@@ -87,22 +87,29 @@ export interface Recent {
   role?: string;
 }
 
-export interface ConfigItem {
+// 配置三级结构（与 v3 dashboard.html 对齐）：项目 → 配置 → 字段
+// 项目(ConfigProject) 对应 v3 左侧项目列表；配置(ConfigDef) 对应 v3 右侧 chips；字段(ConfigField) 对应 v3 表格行
+export interface ConfigField {
   key: string;
   label?: string;
-  defaultValue?: string;
   value?: string;
 }
 
-export interface ConfigGroup {
+export interface ConfigDef {
   id: string;
   name: string;
-  items: ConfigItem[];
+  fields: ConfigField[];
+}
+
+export interface ConfigProject {
+  id: string;
+  name: string;
+  configs: ConfigDef[];
   createdAt: number;
   updatedAt: number;
 }
 
-export type ConfigGroupInput = Omit<ConfigGroup, 'id' | 'createdAt' | 'updatedAt'>;
+export type ConfigProjectInput = Omit<ConfigProject, 'id' | 'createdAt' | 'updatedAt'>;
 
 export interface MetaEntry {
   key: string;

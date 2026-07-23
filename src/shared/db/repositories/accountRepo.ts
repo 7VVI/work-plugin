@@ -7,6 +7,10 @@ export const accountRepo = {
     return db.accounts.where('systemId').equals(systemId).toArray();
   },
 
+  async countBySystem(systemId: string): Promise<number> {
+    return db.accounts.where('systemId').equals(systemId).count();
+  },
+
   async byId(id: string): Promise<Account | undefined> {
     return db.accounts.get(id);
   },

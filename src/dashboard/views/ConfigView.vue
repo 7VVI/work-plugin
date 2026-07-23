@@ -1,94 +1,152 @@
 <template>
   <div class="config-view">
     <div class="action-bar">
-      <button class="btn btn-primary" @click="onCreate"><i class="fa-solid fa-plus"></i> 新增配置</button>
+      <button class="btn-p" @click="startAddProject"><i class="fa-solid fa-plus"></i>新增项目</button>
+      <div class="flex-1"></div>
       <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input v-model="search" class="search-input" placeholder="搜索配置..." />
+        <input v-model="search" class="search-input" placeholder="搜索项目、配置…" />
       </div>
     </div>
 
     <div class="split-body">
+      <!-- 项目列表 -->
       <div class="left-panel panel">
-        <div
-          v-for="g in filtered"
-          :key="g.id"
-          class="left-item"
-          :class="{ active: selectedId === g.id }"
-          @click="selectGroup(g.id)"
-        >
-          <i :class="groupIcon(g.name)"></i>
-          <span class="item-name">{{ g.name }}</span>
-          <span class="item-count">{{ g.items.length }}</span>
-          <i class="fa-solid fa-times del-btn" @click.stop="onDelete(g.id)" title="删除"></i>
+        <div class="left-head">
+          <span class="left-head-title">项目</span>
+          <button class="ibtn small" title="新增项目" @click="startAddProject"><i class="fa-solid fa-plus"></i></button>
         </div>
-        <div v-if="filtered.length === 0" class="empty-left">
-          <i class="fa-solid fa-folder-open"></i>
-          <p>{{ search ? '未找到匹配' : '暂无配置' }}</p>
+        <div class="left-list">
+          <template v-for="p in filteredProjects" :key="p.id">
+            <div
+              v-if="renamingProjectId !== p.id"
+              class="proj-item group"
+              :class="{ active: p.id === store.selectedProjectId }"
+              @click="store.selectProject(p.id)"
+            >
+              <i class="fa-regular fa-folder proj-icon" :class="{ on: p.id === store.selectedProjectId }"></i>
+              <span class="proj-name">{{ p.name }}</span>
+              <span class="proj-count mono">{{ p.configs.length }}</span>
+              <button class="ibtn tiny" title="重命名" @click.stop="startRenameProject(p)"><i class="fa-solid fa-pen"></i></button>
+              <button class="ibtn tiny danger" title="删除" @click.stop="onDeleteProject(p.id)"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div v-else class="proj-item renaming">
+              <input
+                v-focus
+                class="inp rename-inp"
+                :value="renamingProjectName"
+                @input="renamingProjectName = ($event.target as HTMLInputElement).value"
+                @keyup.enter="commitRenameProject"
+                @keyup.escape="cancelRenameProject"
+                @blur="commitRenameProject"
+              />
+            </div>
+          </template>
+          <div v-if="addingProject" class="proj-item adding">
+            <input
+              v-focus
+              class="inp rename-inp"
+              v-model="newProjectName"
+              placeholder="项目名称 · 回车创建"
+              @keyup.enter="commitAddProject"
+              @keyup.escape="cancelAddProject"
+              @blur="commitAddProject"
+            />
+          </div>
+          <div v-if="filteredProjects.length === 0 && !addingProject" class="empty-left">暂无项目</div>
         </div>
       </div>
 
+      <!-- 配置详情 -->
       <div class="right-panel panel">
-        <template v-if="selected">
-          <div class="right-header">
-            <div class="title-wrap">
-              <i :class="groupIcon(selected.name)"></i>
-              <span class="title">{{ selected.name }}</span>
-              <span class="count">{{ selected.items.length }} 项</span>
-            </div>
-            <i class="fa-solid fa-pen rename-btn" @click="onRename(selected)" title="重命名"></i>
+        <template v-if="store.selectedProject">
+          <div class="right-head">
+            <span class="head-icon"><i class="fa-regular fa-folder-open"></i></span>
+            <span class="head-title">{{ store.selectedProject.name }}</span>
+            <span class="save-hint" :class="{ show: showSave }"><i class="fa-solid fa-check"></i>已自动保存</span>
           </div>
 
-          <div class="right-body">
-            <div class="field-list">
-              <div class="field-item header-row">
-                <div>字段标识</div>
-                <div>字段名称</div>
-                <div>默认值</div>
-                <div class="text-right">操作</div>
-              </div>
-              <template v-for="(item, idx) in selected.items" :key="idx">
-                <!-- 编辑态 -->
-                <div v-if="editingIdx === idx" class="field-item edit-row">
-                  <input v-model="editItem.key" class="finput mono" placeholder="如：api_key" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <input v-model="editItem.label" class="finput" placeholder="如：API 密钥" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <input v-model="editItem.defaultValue" class="finput mono" placeholder="默认值" @keyup.enter="confirmEdit" @keyup.escape="cancelEdit" />
-                  <div class="field-icons">
-                    <div class="row-action confirm" @click="confirmEdit" title="确认"><i class="fa-solid fa-check"></i></div>
-                    <div class="row-action danger" @click="cancelEdit" title="取消"><i class="fa-solid fa-xmark"></i></div>
-                  </div>
-                </div>
-                <!-- 显示态 -->
-                <div v-else class="field-item" @dblclick="startEdit(idx)">
-                  <div class="mono field-key">{{ item.key || '—' }}</div>
-                  <div>{{ item.label || '—' }}</div>
-                  <div class="mono field-value">{{ item.defaultValue || '—' }}</div>
-                  <div class="field-icons">
-                    <div class="row-action" v-if="item.defaultValue" @click="onCopy(item.defaultValue)" title="复制默认值"><i class="fa-solid fa-copy"></i></div>
-                    <div class="row-action" @click="startEdit(idx)" title="编辑"><i class="fa-solid fa-pen"></i></div>
-                    <div class="row-action danger" @click="onRemoveItem(idx)" title="删除"><i class="fa-solid fa-trash"></i></div>
-                  </div>
-                </div>
-              </template>
-              <div v-if="selected.items.length === 0 && !adding" class="empty-row">暂无字段，点击下方"添加字段"添加</div>
-              <div v-if="adding" class="field-item edit-row">
-                <input ref="addKeyRef" v-model="newItem.key" class="finput mono" placeholder="如：api_key" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <input v-model="newItem.label" class="finput" placeholder="如：API 密钥" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <input v-model="newItem.defaultValue" class="finput mono" placeholder="默认值" @keyup.enter="confirmAdd" @keyup.escape="cancelAdd" />
-                <div class="field-icons">
-                  <div class="row-action confirm" @click="confirmAdd" title="确认"><i class="fa-solid fa-check"></i></div>
-                  <div class="row-action danger" @click="cancelAdd" title="取消"><i class="fa-solid fa-xmark"></i></div>
-                </div>
-              </div>
+          <div class="cfg-chips">
+            <template v-for="c in store.selectedProject.configs" :key="c.id">
+              <span
+                v-if="renamingConfigId !== c.id"
+                class="cfg-chip group"
+                :class="{ active: c.id === store.selectedConfigId }"
+                @click="store.selectConfig(c.id)"
+              >
+                {{ c.name }}
+                <span class="cfg-count mono">{{ c.fields.length }}</span>
+                <button class="ibtn micro" title="重命名" @click.stop="startRenameConfig(c)"><i class="fa-solid fa-pen"></i></button>
+                <button class="ibtn micro danger" title="删除" @click.stop="onDeleteConfig(c.id)"><i class="fa-solid fa-xmark"></i></button>
+              </span>
+              <span v-else class="cfg-chip renaming">
+                <input
+                  v-focus
+                  class="inp rename-inp"
+                  :value="renamingConfigName"
+                  @input="renamingConfigName = ($event.target as HTMLInputElement).value"
+                  @keyup.enter="commitRenameConfig"
+                  @keyup.escape="cancelRenameConfig"
+                  @blur="commitRenameConfig"
+                />
+              </span>
+            </template>
+            <button v-if="!addingConfig" class="cfg-add" @click="startAddConfig"><i class="fa-solid fa-plus"></i>新增配置</button>
+            <span v-else class="cfg-chip adding">
+              <input
+                v-focus
+                class="inp rename-inp cfg-rename-inp"
+                v-model="newConfigName"
+                placeholder="配置名 · 回车"
+                @keyup.enter="commitAddConfig"
+                @keyup.escape="cancelAddConfig"
+                @blur="commitAddConfig"
+              />
+            </span>
+          </div>
+
+          <div class="field-area">
+            <template v-if="store.selectedConfig">
+              <table class="field-table">
+                <thead>
+                  <tr>
+                    <th>字段标识</th>
+                    <th>字段名称</th>
+                    <th>默认值</th>
+                    <th class="ops-col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(f, i) in store.selectedConfig.fields" :key="i" class="field-row group">
+                    <td><input class="finput mono" :value="f.key" @blur="onFieldBlur(i, 'key', $event)" @keydown="fieldEnter($event, $event.target)" /></td>
+                    <td><input class="finput" :value="f.label" @blur="onFieldBlur(i, 'label', $event)" @keydown="fieldEnter($event, $event.target)" /></td>
+                    <td><input class="finput mono" :value="f.value" @blur="onFieldBlur(i, 'value', $event)" @keydown="fieldEnter($event, $event.target)" /></td>
+                    <td class="ops-col">
+                      <div class="row-icons">
+                        <button class="ibtn tiny" title="复制值" @click="onCopy(f.value)"><i class="fa-regular fa-copy"></i></button>
+                        <button class="ibtn tiny danger" title="删除" @click="onDeleteField(i)"><i class="fa-regular fa-trash-can"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="field-row new-row">
+                    <td><input ref="nfKeyRef" v-model="nfKey" class="finput mono" placeholder="+ 字段标识" @blur="onNfBlur" @keydown="newFieldEnter($event, nfLabelRef)" /></td>
+                    <td><input ref="nfLabelRef" v-model="nfLabel" class="finput" placeholder="字段名称" @blur="onNfBlur" @keydown="newFieldEnter($event, nfValueRef)" /></td>
+                    <td><input ref="nfValueRef" v-model="nfValue" class="finput mono" placeholder="默认值 · 回车保存" @blur="onNfBlur" @keydown="newFieldEnter($event, null)" /></td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="field-hint"><i class="fa-regular fa-lightbulb"></i>末行输入后回车 / 失焦即自动保存 · 点击任意单元格直接修改，失焦自动保存</div>
+            </template>
+            <div v-else class="empty-config">
+              <i class="fa-regular fa-file-lines"></i>
+              <p>点击上方「新增配置」创建第一组字段</p>
             </div>
-            <button v-if="!adding" class="add-item-btn" @click="startAdd">
-              <i class="fa-solid fa-plus"></i> 添加字段
-            </button>
           </div>
         </template>
-        <div v-else class="no-selection">
-          <i class="fa-solid fa-hand-pointer"></i>
-          <p>请选择左侧配置，或点击"新增配置"</p>
+        <div v-else class="empty-right">
+          <i class="fa-regular fa-folder-open"></i>
+          <p>选择左侧项目，或点击「新增项目」开始</p>
         </div>
       </div>
     </div>
@@ -96,177 +154,226 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useConfigStore } from '@shared/stores/configStore';
 import { useToastStore } from '@shared/stores/toastStore';
-import { useDialogStore } from '@shared/stores/dialogStore';
-import { configService } from '@shared/services/configService';
-import type { ConfigGroup, ConfigItem } from '@shared/types/entities';
+import type { ConfigDef } from '@shared/types/entities';
 
 const store = useConfigStore();
 const toast = useToastStore();
-const dialog = useDialogStore();
 
 const search = ref('');
-const selectedId = ref<string | null>(null);
-const editingIdx = ref<number | null>(null);
-const editItem = ref<ConfigItem>({ key: '', label: '', defaultValue: '' });
-const adding = ref(false);
-const newItem = ref<ConfigItem>({ key: '', label: '', defaultValue: '' });
-const addKeyRef = ref<HTMLInputElement | null>(null);
 
-const configIcons = [
-  'fa-solid fa-gear',
-  'fa-solid fa-database',
-  'fa-solid fa-envelope',
-  'fa-solid fa-globe',
-  'fa-solid fa-key',
-  'fa-solid fa-palette',
-  'fa-solid fa-bolt',
-  'fa-solid fa-layer-group',
-  'fa-solid fa-code',
-  'fa-solid fa-shield-halved',
-  'fa-solid fa-cloud',
-  'fa-solid fa-terminal',
-];
+// 项目：inline 新建 / 重命名
+const addingProject = ref(false);
+const newProjectName = ref('');
+const renamingProjectId = ref<string | null>(null);
+const renamingProjectName = ref('');
 
-function groupIcon(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return configIcons[Math.abs(hash) % configIcons.length];
+// 配置：inline 新建 / 重命名
+const addingConfig = ref(false);
+const newConfigName = ref('');
+const renamingConfigId = ref<string | null>(null);
+const renamingConfigName = ref('');
+
+// 新增字段行
+const nfKey = ref('');
+const nfLabel = ref('');
+const nfValue = ref('');
+const nfKeyRef = ref<HTMLInputElement | null>(null);
+const nfLabelRef = ref<HTMLInputElement | null>(null);
+const nfValueRef = ref<HTMLInputElement | null>(null);
+
+// 自动保存提示
+const showSave = ref(false);
+let saveTimer: number | undefined;
+function showSaveHint() {
+  showSave.value = true;
+  if (saveTimer) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => { showSave.value = false; }, 1400);
 }
+
+// v-focus：inline 输入挂载即聚焦并选中
+const vFocus = { mounted: (el: HTMLInputElement) => { el.focus(); el.select(); } };
 
 onMounted(async () => { await store.load(); });
 
-const filtered = computed(() => {
-  if (!search.value.trim()) return store.list;
-  const q = search.value.toLowerCase();
-  return store.list.filter(g =>
-    g.name.toLowerCase().includes(q) ||
-    g.items.some(it =>
-      (it.key || '').toLowerCase().includes(q) ||
-      (it.label || '').toLowerCase().includes(q) ||
-      (it.value || '').toLowerCase().includes(q)
-    )
+const filteredProjects = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return store.list;
+  return store.list.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    p.configs.some(c => c.name.toLowerCase().includes(q))
   );
 });
 
-const selected = computed(() => store.list.find(g => g.id === selectedId.value));
+// 切换项目 / 配置时重置 inline 编辑态
+watch(() => store.selectedProjectId, resetInline);
+watch(() => store.selectedConfigId, () => { resetNf(); });
 
-watch(selected, () => {
-  editingIdx.value = null;
-  adding.value = false;
-});
-
-function selectGroup(id: string) {
-  selectedId.value = id;
+function resetInline() {
+  addingProject.value = false;
+  newProjectName.value = '';
+  renamingProjectId.value = null;
+  addingConfig.value = false;
+  newConfigName.value = '';
+  renamingConfigId.value = null;
+  resetNf();
 }
 
-async function onCreate() {
-  const name = await dialog.prompt('新增配置', '如：域名映射、开发邮箱、短信配置');
-  if (!name?.trim()) return;
-  const id = await store.create(name.trim());
-  selectedId.value = id;
+function resetNf() {
+  nfKey.value = '';
+  nfLabel.value = '';
+  nfValue.value = '';
+}
+
+/* ---------- 项目 ---------- */
+function startAddProject() {
+  addingProject.value = true;
+  newProjectName.value = '';
+  nextTick(() => {});
+}
+async function commitAddProject() {
+  if (!addingProject.value) return;
+  const name = newProjectName.value.trim();
+  addingProject.value = false;
+  newProjectName.value = '';
+  if (!name) return;
+  await store.createProject(name);
+  toast.success('项目已创建');
+}
+function cancelAddProject() { addingProject.value = false; newProjectName.value = ''; }
+
+function startRenameProject(p: { id: string; name: string }) {
+  renamingProjectId.value = p.id;
+  renamingProjectName.value = p.name;
+}
+function cancelRenameProject() { renamingProjectId.value = null; renamingProjectName.value = ''; }
+async function commitRenameProject() {
+  const id = renamingProjectId.value;
+  const name = renamingProjectName.value.trim();
+  renamingProjectId.value = null;
+  if (!id || !name) { renamingProjectName.value = ''; return; }
+  const cur = store.list.find(p => p.id === id);
+  if (cur && name !== cur.name) {
+    await store.renameProject(id, name);
+    toast.success('已重命名');
+  }
+  renamingProjectName.value = '';
+}
+async function onDeleteProject(id: string) {
+  await store.deleteProject(id);
+  toast.success('项目已删除');
+}
+
+/* ---------- 配置 ---------- */
+function startAddConfig() {
+  if (!store.selectedProject) { toast.error('请先创建一个项目'); return; }
+  addingConfig.value = true;
+  newConfigName.value = '';
+}
+async function commitAddConfig() {
+  if (!addingConfig.value) return;
+  const name = newConfigName.value.trim();
+  addingConfig.value = false;
+  newConfigName.value = '';
+  if (!name || !store.selectedProject) return;
+  await store.addConfig(store.selectedProject.id, name);
   toast.success('配置已创建');
 }
+function cancelAddConfig() { addingConfig.value = false; newConfigName.value = ''; }
 
-async function onRename(g: ConfigGroup) {
-  const name = await dialog.prompt('重命名', '', g.name);
-  if (!name?.trim() || name === g.name) return;
-  await store.rename(g.id, name.trim());
-  toast.success('已重命名');
+function startRenameConfig(c: ConfigDef) {
+  renamingConfigId.value = c.id;
+  renamingConfigName.value = c.name;
+}
+function cancelRenameConfig() { renamingConfigId.value = null; renamingConfigName.value = ''; }
+async function commitRenameConfig() {
+  const id = renamingConfigId.value;
+  const name = renamingConfigName.value.trim();
+  renamingConfigId.value = null;
+  const proj = store.selectedProject;
+  if (!id || !name || !proj) { renamingConfigName.value = ''; return; }
+  const cur = proj.configs.find(c => c.id === id);
+  if (cur && name !== cur.name) {
+    await store.renameConfig(proj.id, id, name);
+    toast.success('已重命名');
+  }
+  renamingConfigName.value = '';
+}
+async function onDeleteConfig(id: string) {
+  const proj = store.selectedProject;
+  if (!proj) return;
+  await store.deleteConfig(proj.id, id);
+  toast.success('配置已删除');
 }
 
-async function onDelete(id: string) {
-  const ok = await dialog.confirm('确认删除', '确认删除该配置及其所有字段？');
-  if (!ok) return;
-  if (selectedId.value === id) selectedId.value = null;
-  await store.remove(id);
-  toast.success('已删除');
+/* ---------- 字段（自动保存） ---------- */
+async function onFieldBlur(i: number, prop: 'key' | 'label' | 'value', e: Event) {
+  const proj = store.selectedProject;
+  const cfg = store.selectedConfig;
+  if (!proj || !cfg) return;
+  const val = (e.target as HTMLInputElement).value;
+  const cur = cfg.fields[i];
+  if (!cur || (cur as any)[prop] === val) return;
+  const fields = cfg.fields.map(f => ({ ...f }));
+  (fields[i] as any)[prop] = val;
+  await store.setFields(proj.id, cfg.id, fields);
+  showSaveHint();
 }
-
-function currentItems(): ConfigItem[] {
-  return (selected.value?.items ?? []).map(it => ({
-    key: it.key || '',
-    label: it.label || '',
-    defaultValue: it.defaultValue || '',
-  }));
+function fieldEnter(e: KeyboardEvent, el: EventTarget | null) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    (el as HTMLInputElement | null)?.blur();
+  }
 }
-
-function startEdit(idx: number) {
-  const it = selected.value?.items[idx];
-  if (!it) return;
-  adding.value = false;
-  editItem.value = { key: it.key || '', label: it.label || '', defaultValue: it.defaultValue || '' };
-  editingIdx.value = idx;
+function newFieldEnter(e: KeyboardEvent, next: HTMLInputElement | null) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (next) { next.focus(); return; }
+  commitNewField(true);
 }
-
-function cancelEdit() {
-  editingIdx.value = null;
+function onNfBlur() {
+  // 失焦时若焦点移到同行其它输入则不提交
+  window.setTimeout(() => {
+    const ae = document.activeElement;
+    if (ae === nfKeyRef.value || ae === nfLabelRef.value || ae === nfValueRef.value) return;
+    commitNewField(false);
+  }, 0);
 }
-
-async function confirmEdit() {
-  if (!selected.value || editingIdx.value === null) return;
-  if (!editItem.value.key?.trim() && !editItem.value.label?.trim()) return;
-  const items = currentItems();
-  items[editingIdx.value] = {
-    key: (editItem.value.key || '').trim(),
-    label: (editItem.value.label || '').trim(),
-    defaultValue: editItem.value.defaultValue || '',
-  };
-  await store.setItems(selected.value.id, items);
-  editingIdx.value = null;
-  toast.success('已保存');
+async function commitNewField(refocus: boolean) {
+  const key = nfKey.value.trim();
+  const proj = store.selectedProject;
+  const cfg = store.selectedConfig;
+  resetNf();
+  if (!key || !proj || !cfg) return;
+  const fields = [...cfg.fields, { key, label: nfLabel.value.trim(), value: nfValue.value }];
+  await store.setFields(proj.id, cfg.id, fields);
+  showSaveHint();
+  if (refocus) nextTick(() => nfKeyRef.value?.focus());
 }
-
-function startAdd() {
-  editingIdx.value = null;
-  newItem.value = { key: '', label: '', defaultValue: '' };
-  adding.value = true;
-  nextTick(() => addKeyRef.value?.focus());
+async function onDeleteField(i: number) {
+  const proj = store.selectedProject;
+  const cfg = store.selectedConfig;
+  if (!proj || !cfg) return;
+  const fields = cfg.fields.filter((_, idx) => idx !== i);
+  await store.setFields(proj.id, cfg.id, fields);
+  showSaveHint();
 }
-
-function cancelAdd() {
-  adding.value = false;
-  newItem.value = { key: '', label: '', defaultValue: '' };
-}
-
-async function confirmAdd() {
-  if (!selected.value) return;
-  if (!newItem.value.key?.trim() && !newItem.value.label?.trim()) { cancelAdd(); return; }
-  const items = currentItems();
-  items.push({
-    key: (newItem.value.key || '').trim(),
-    label: (newItem.value.label || '').trim(),
-    defaultValue: newItem.value.defaultValue || '',
-  });
-  await store.setItems(selected.value.id, items);
-  cancelAdd();
-  toast.success('已添加');
-}
-
-async function onRemoveItem(idx: number) {
-  if (!selected.value) return;
-  await store.removeItem(selected.value.id, idx);
-  if (editingIdx.value === idx) editingIdx.value = null;
-  toast.success('已删除');
-}
-
-async function onCopy(value: string) {
+async function onCopy(value?: string) {
   if (!value) return;
-  await configService.copyValue(value);
-  toast.success('已复制');
+  await store.copyValue(value);
+  toast.success('字段值已复制');
 }
 </script>
 
 <style scoped>
 .config-view {
-  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   gap: var(--gap-lg);
 }
 
@@ -276,268 +383,236 @@ async function onCopy(value: string) {
   gap: var(--gap-md);
   flex-shrink: 0;
 }
-.action-bar .search-wrap { width: 280px; margin-left: auto; }
+.action-bar .flex-1 { flex: 1; }
+.action-bar .search-wrap { width: 280px; }
 
 .split-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 240px 1fr;
   gap: var(--gap-lg);
   overflow: hidden;
 }
 
+/* 项目列表 */
 .left-panel {
-  overflow-y: auto;
-  padding: var(--gap-sm);
-}
-.left-item {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-md);
-  padding: 10px var(--gap-md);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--ink2);
-  transition: var(--transition-fast);
-  margin-bottom: 2px;
-}
-.left-item:hover { background: var(--surface-hover); color: var(--ink); }
-.left-item.active {
-  background: var(--primary-50);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--glow);
-}
-.left-item.active:hover {
-  background: var(--primary-50);
-  color: var(--accent);
-}
-.left-item > i:first-child {
-  font-size: var(--text-sm);
-  color: var(--text-quaternary);
-  width: 18px;
-  text-align: center;
-}
-.left-item.active > i:first-child { color: var(--primary); }
-.item-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: var(--font-medium);
-}
-.item-count {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  background: var(--surface-secondary);
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  font-weight: var(--font-medium);
-}
-.left-item.active .item-count {
-  background: var(--bg-pure);
-  color: var(--primary);
-}
-.del-btn {
-  font-size: 11px;
-  color: var(--text-quaternary);
-  padding: 4px;
-  opacity: 0;
-  transition: var(--transition-fast);
-  border-radius: var(--radius-xs);
-}
-.del-btn:hover { color: var(--danger); background: var(--danger-light); }
-.left-item:hover .del-btn { opacity: 1; }
-.left-item.active .del-btn { color: var(--primary); opacity: 0.6; }
-
-.empty-left {
-  text-align: center;
-  padding: 48px var(--gap-md);
-  color: var(--text-tertiary);
-}
-.empty-left i { font-size: 28px; margin-bottom: var(--gap-sm); color: var(--text-quaternary); }
-.empty-left p { font-size: var(--text-sm); margin: 0; }
-
-.right-panel {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-height: 0;
+  padding: var(--gap-sm);
 }
-.right-header {
+.left-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--gap-lg) var(--gap-xl);
-  border-bottom: 1px solid var(--border-soft);
-  flex-shrink: 0;
+  padding: 4px var(--gap-sm) 6px;
 }
-.title-wrap { display: flex; align-items: center; gap: var(--gap-md); }
-.title-wrap > i {
-  color: var(--primary);
-  font-size: var(--text-base);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--primary-50);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.title {
-  font-size: var(--text-lg);
+.left-head-title {
+  font-size: 10px;
   font-weight: var(--font-semibold);
-  color: var(--text-primary);
+  letter-spacing: .14em;
+  color: var(--ink3);
+  text-transform: uppercase;
 }
-.count {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  background: var(--surface-secondary);
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  font-weight: var(--font-medium);
+.left-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.rename-btn {
-  color: var(--text-tertiary);
-  cursor: pointer;
-  padding: var(--gap-sm);
-  font-size: var(--text-sm);
-  border-radius: var(--radius-md);
-  transition: var(--transition-fast);
-  border: none;
-  background: transparent;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.rename-btn:hover {
-  color: var(--primary);
-  background: var(--primary-50);
-}
+.ibtn.small { width: 20px; height: 20px; border-radius: 6px; }
+.ibtn.tiny { width: 20px; height: 20px; border-radius: 6px; }
+.ibtn.tiny i { font-size: 9px; }
+.ibtn.micro { width: 16px; height: 16px; border-radius: 5px; }
+.ibtn.micro i { font-size: 8px; }
 
-/* 字段列表 */
-.field-list {
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.field-item {
-  display: grid;
-  grid-template-columns: 1.2fr 1.5fr 1.5fr 120px;
+.proj-item {
+  display: flex;
   align-items: center;
-  padding: 0 14px;
-  height: 40px;
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-soft);
   gap: var(--gap-sm);
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--ink2);
+  transition: var(--transition-fast);
 }
-.field-item:last-child { border-bottom: none; }
-.field-item.header-row {
-  background: var(--surface-secondary);
-  color: var(--text-tertiary);
-  font-size: var(--text-xs);
+.proj-item:hover { background: var(--panel2); color: var(--ink); }
+.proj-item.active {
+  background: rgba(46,107,240,.09);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(46,107,240,.25);
+}
+.proj-icon { font-size: var(--text-xs); color: var(--ink3); }
+.proj-icon.on { color: var(--accent); }
+.proj-name {
+  flex: 1;
+  font-size: var(--text-sm);
   font-weight: var(--font-medium);
-  height: 36px;
-  letter-spacing: 0.3px;
-}
-.field-item.edit-row {
-  background: var(--primary-50);
-  height: auto;
-  padding: 8px 14px;
-}
-.field-item:not(.header-row):not(.edit-row) { cursor: default; }
-.field-item:not(.header-row):not(.edit-row):hover { background: var(--surface-hover); }
-.mono {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-.field-key, .field-value {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.text-right { text-align: right; }
-.field-icons {
+.proj-count { font-size: 10px; color: var(--ink3); }
+.proj-item .ibtn { opacity: 0; transition: var(--transition-fast); }
+.proj-item:hover .ibtn, .proj-item.active .ibtn { opacity: 1; }
+.proj-item.renaming, .proj-item.adding { padding: 4px 6px; cursor: default; }
+.rename-inp { padding: 6px 10px; font-size: 12px; }
+.empty-left {
+  padding: 28px 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--ink3);
+}
+
+/* 右侧详情 */
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 340px;
+  overflow: hidden;
+  padding: var(--gap-xl);
+}
+.empty-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-sm);
+  color: var(--ink3);
+}
+.empty-right i { font-size: 26px; }
+.empty-right p { margin: 0; font-size: var(--text-sm); }
+
+.right-head {
   display: flex;
   align-items: center;
-  gap: 2px;
-  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
 }
-.row-action {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
+.head-icon {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  background: rgba(46,107,240,.09);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(46,107,240,.2);
+  font-size: var(--text-xs);
+}
+.head-title { font-size: var(--text-md); font-weight: var(--font-semibold); color: var(--ink); }
+.save-hint {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: var(--text-quaternary);
-  cursor: pointer;
+  gap: 4px;
+  margin-left: 4px;
   font-size: 11px;
-  transition: var(--transition-fast);
-  background: transparent;
-}
-.row-action:hover { background: var(--primary-50); color: var(--primary); }
-.row-action.danger:hover { background: var(--danger-light); color: var(--danger); }
-.row-action.confirm { color: var(--success); }
-.row-action.confirm:hover { background: var(--success-light); }
-.empty-row {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-tertiary);
-  font-size: var(--text-sm);
-}
-/* 字段行内编辑输入：复用 tokens 的 .finput（透明底/聚焦描边） */
-.field-item input { min-width: 0; }
-.finput.mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink); }
-.right-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--gap-lg) var(--gap-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-sm);
-}
-
-.add-item-btn {
-  margin-top: var(--gap-sm);
-  font-size: var(--text-sm);
-  color: var(--primary);
-  background: none;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 8px 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-sm);
-  width: 100%;
   font-weight: var(--font-medium);
-  font-family: inherit;
+  color: var(--ok);
+  opacity: 0;
+  transition: opacity .3s;
+}
+.save-hint.show { opacity: 1; }
+.save-hint i { font-size: 9px; }
+
+.cfg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-top: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.cfg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink2);
+  font-size: 12.5px;
+  cursor: pointer;
   transition: var(--transition-fast);
 }
-.add-item-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-50);
+.cfg-chip:hover { color: var(--ink); border-color: var(--border-strong); }
+.cfg-chip.active {
+  border-color: rgba(46,107,240,.4);
+  background: rgba(46,107,240,.08);
+  color: var(--accent);
+  font-weight: var(--font-medium);
 }
+.cfg-count { font-size: 10px; color: var(--ink3); }
+.cfg-chip .ibtn { opacity: 0; transition: var(--transition-fast); }
+.cfg-chip:hover .ibtn, .cfg-chip.active .ibtn { opacity: 1; }
+.cfg-chip.renaming, .cfg-chip.adding { padding: 2px; cursor: default; }
+.cfg-rename-inp { width: 128px; }
+.cfg-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--ink3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.cfg-add:hover { border-color: var(--accent); color: var(--accent); }
+.cfg-add i { font-size: 9px; }
 
-.no-selection {
+.field-area {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: var(--gap-md);
+}
+.field-table { width: 100%; border-collapse: collapse; }
+.field-table thead th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: var(--font-semibold);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.field-table thead th:nth-child(2),
+.field-table thead th:nth-child(3) { padding-left: var(--gap-md); padding-right: var(--gap-md); }
+.field-table thead th.ops-col { width: 80px; text-align: right; }
+.field-row { border-bottom: 1px solid var(--border); }
+.field-row:hover { background: rgba(46,107,240,.035); }
+.field-row td { padding: 4px 0; }
+.field-row td:nth-child(2),
+.field-row td:nth-child(3) { padding-left: var(--gap-md); padding-right: var(--gap-md); }
+.field-row td.ops-col { text-align: right; }
+.row-icons { display: flex; justify-content: flex-end; gap: 2px; opacity: 0; transition: var(--transition-fast); }
+.field-row:hover .row-icons { opacity: 1; }
+.field-hint {
+  margin-top: var(--gap-sm);
+  font-size: 11px;
+  color: var(--ink3);
+}
+.field-hint i { margin-right: 4px; }
+
+.empty-config {
+  margin-top: 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--text-tertiary);
-  gap: var(--gap-md);
+  gap: var(--gap-sm);
+  color: var(--ink3);
 }
-.no-selection i {
-  font-size: 40px;
-  color: var(--text-quaternary);
-}
-.no-selection p { font-size: var(--text-sm); margin: 0; }
+.empty-config i { font-size: 26px; }
+.empty-config p { margin: 0; font-size: var(--text-sm); }
+
+:deep(.finput.mono) { font-family: var(--font-mono); }
 </style>

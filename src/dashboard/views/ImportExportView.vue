@@ -5,21 +5,37 @@
       <section class="panel ie-card">
         <div class="io-icon export"><i class="fa-solid fa-cloud-arrow-down"></i></div>
         <h3 class="io-title">导出数据</h3>
-        <p class="io-desc">将全部资产数据导出为 JSON 备份文件，可用于迁移或存档。</p>
+        <p class="io-desc">将资产数据导出为备份文件，可用于迁移或存档。支持 JSON 与 Markdown（每种记录为表格）。</p>
         <div class="scope-list">
           <label class="scope-item"><input type="checkbox" v-model="scope.systems" class="form-check" /><span>系统（含账号密码）</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.servers" class="form-check" /><span>服务器</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.middlewares" class="form-check" /><span>中间件</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.configs" class="form-check" /><span>配置（项目 / 字段）</span></label>
         </div>
-        <button class="btn btn-primary io-btn" @click="onExport"><i class="fa-solid fa-download"></i> 导出 JSON</button>
+
+        <div class="io-row">
+          <span class="io-label">格式</span>
+          <div class="seg-group">
+            <button class="seg-btn" :class="{ on: format === 'json' }" @click="format = 'json'">JSON</button>
+            <button class="seg-btn" :class="{ on: format === 'md' }" @click="format = 'md'">Markdown</button>
+          </div>
+        </div>
+        <label v-if="format === 'md'" class="scope-item pwd-item">
+          <input type="checkbox" v-model="includePasswords" class="form-check" />
+          <span>包含明文密码（系统 / 服务器 / 中间件）</span>
+        </label>
+
+        <button class="btn btn-primary io-btn" @click="onExport">
+          <i class="fa-solid fa-download"></i>
+          <span>{{ format === 'md' ? '导出 Markdown' : '导出 JSON' }}</span>
+        </button>
       </section>
 
       <!-- 导入 -->
       <section class="panel ie-card">
         <div class="io-icon import"><i class="fa-solid fa-cloud-arrow-up"></i></div>
         <h3 class="io-title">导入数据</h3>
-        <p class="io-desc">从 JSON 备份文件恢复数据，导入前会自动校验文件格式。</p>
+        <p class="io-desc">从备份文件恢复数据，导入前会自动校验文件格式。支持 .json 与 .md。</p>
         <div
           class="drop-zone"
           :class="{ over: dragOver }"
@@ -30,16 +46,16 @@
         >
           <i class="fa-solid fa-file-import"></i>
           <span class="dz-text">拖拽文件到此处，或点击选择文件</span>
-          <span class="dz-ext mono">.json</span>
+          <span class="dz-ext mono">.json / .md</span>
         </div>
-        <input ref="fileInput" type="file" accept=".json,application/json" class="hidden-input" @change="onFileChange" />
+        <input ref="fileInput" type="file" accept=".json,application/json,.md,text/markdown" class="hidden-input" @change="onFileChange" />
       </section>
     </div>
 
     <!-- 琥珀警示 -->
     <div class="warn-bar">
       <i class="fa-solid fa-triangle-exclamation"></i>
-      <span>数据仅保存在浏览器本地（chrome.storage.local）。导出的备份文件包含<strong>明文账号密码</strong>，请妥善保管，不要上传到公共网盘或群聊。</span>
+      <span>数据仅保存在浏览器本地（IndexedDB）。导出的备份文件可能包含<strong>明文账号密码</strong>，请妥善保管，不要上传到公共网盘或群聊。</span>
     </div>
   </div>
 </template>
@@ -47,26 +63,36 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { importExportService } from '@shared/services/importExportService';
-import { useConfigStore } from '@shared/stores/configStore';
 import { useToastStore } from '@shared/stores/toastStore';
 
 const toast = useToastStore();
-const configStore = useConfigStore();
 
 const scope = ref({ systems: true, servers: true, middlewares: true, configs: true });
+const format = ref<'json' | 'md'>('json');
+const includePasswords = ref(false);
 const dragOver = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
 async function onExport() {
+  const stamp = new Date().toISOString().slice(0, 10);
   try {
-    const full = JSON.parse(await importExportService.exportJSON());
-    const out: Record<string, unknown> = { app: 'Dock', version: '3.0.0', exportedAt: new Date().toISOString() };
-    if (scope.value.systems) out.systems = full.systems ?? [];
-    if (scope.value.servers) out.servers = full.servers ?? [];
-    if (scope.value.middlewares) out.middlewares = full.middlewares ?? [];
-    if (scope.value.configs) out.configs = configStore.list ?? [];
-    downloadFile(JSON.stringify(out, null, 2), `dock-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
-    toast.success('备份文件已导出');
+    if (format.value === 'md') {
+      const md = await importExportService.exportMarkdown({
+        includePasswords: includePasswords.value,
+        scope: { ...scope.value },
+      });
+      downloadFile(md, `dock-backup-${stamp}.md`, 'text/markdown');
+      toast.success('Markdown 备份已导出');
+    } else {
+      const full = JSON.parse(await importExportService.exportJSON());
+      const out: Record<string, unknown> = { app: 'Dock', version: '3.0.0', exportedAt: new Date().toISOString() };
+      if (scope.value.systems) out.systems = full.systems ?? [];
+      if (scope.value.servers) out.servers = full.servers ?? [];
+      if (scope.value.middlewares) out.middlewares = full.middlewares ?? [];
+      if (scope.value.configs) out.projects = full.projects ?? [];
+      downloadFile(JSON.stringify(out, null, 2), `dock-backup-${stamp}.json`, 'application/json');
+      toast.success('JSON 备份已导出');
+    }
   } catch (e) {
     toast.error((e as Error).message || '导出失败');
   }
@@ -85,13 +111,19 @@ function onFileChange(e: Event) {
 }
 
 async function importFile(file: File) {
-  if (!file.name.endsWith('.json')) {
-    toast.error('仅支持 .json 备份文件');
+  const isMd = file.name.endsWith('.md') || file.name.endsWith('.markdown');
+  const isJson = file.name.endsWith('.json');
+  if (!isMd && !isJson) {
+    toast.error('仅支持 .json 或 .md 备份文件');
     return;
   }
   try {
     const text = await file.text();
-    await importExportService.importJSON(text, { mode: 'merge' });
+    if (isMd) {
+      await importExportService.importMarkdown(text, { mode: 'merge' });
+    } else {
+      await importExportService.importJSON(text, { mode: 'merge' });
+    }
     toast.success(`导入完成：${file.name}`);
   } catch (e) {
     toast.error('文件格式不正确，导入失败');
@@ -111,8 +143,8 @@ function downloadFile(content: string, filename: string, mime: string) {
 
 <style scoped>
 .ie-view {
-  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
-  max-width: 880px;
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
+  max-width: 920px;
   height: 100%;
   overflow-y: auto;
 }
@@ -149,7 +181,7 @@ function downloadFile(content: string, filename: string, mime: string) {
   display: flex;
   flex-direction: column;
   gap: var(--gap-sm);
-  margin-bottom: var(--gap-lg);
+  margin-bottom: var(--gap-md);
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
@@ -157,7 +189,18 @@ function downloadFile(content: string, filename: string, mime: string) {
   display: flex; align-items: center; gap: var(--gap-sm);
   cursor: pointer; user-select: none;
 }
-.io-btn { width: 100%; justify-content: center; }
+.io-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  margin-bottom: var(--gap-sm);
+}
+.io-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.pwd-item { margin-bottom: var(--gap-md); }
+.io-btn { width: 100%; justify-content: center; margin-top: var(--gap-sm); }
 
 .drop-zone {
   margin-top: var(--gap-sm);
@@ -190,8 +233,8 @@ function downloadFile(content: string, filename: string, mime: string) {
   gap: var(--gap-sm);
   padding: var(--gap-md) var(--gap-lg);
   border-radius: var(--radius-md);
-  border: 1px solid var(--warning-light);
-  background: var(--warning-light);
+  border: 1px solid rgba(180,83,9,.28);
+  background: rgba(251,191,36,.07);
   color: var(--warning);
   font-size: 12.5px;
   line-height: var(--leading-normal);

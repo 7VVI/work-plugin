@@ -9,6 +9,10 @@ export const accountService = {
     return accountRepo.bySystemId(systemId);
   },
 
+  async countBySystem(systemId: string): Promise<number> {
+    return accountRepo.countBySystem(systemId);
+  },
+
   async create(input: AccountInput): Promise<string> {
     requireString(input.role, '角色');
     requireString(input.username, '用户名');

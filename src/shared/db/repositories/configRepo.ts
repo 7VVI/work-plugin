@@ -1,24 +1,24 @@
 import { db } from '../schema';
-import type { ConfigGroup, ConfigGroupInput } from '../../types/entities';
+import type { ConfigProject, ConfigProjectInput } from '../../types/entities';
 import { generateId } from '../../utils/id';
 
 export const configRepo = {
-  async all(): Promise<ConfigGroup[]> {
+  async all(): Promise<ConfigProject[]> {
     return db.configs.orderBy('createdAt').toArray();
   },
 
-  async byId(id: string): Promise<ConfigGroup | undefined> {
+  async byId(id: string): Promise<ConfigProject | undefined> {
     return db.configs.get(id);
   },
 
-  async create(data: ConfigGroupInput): Promise<string> {
+  async create(data: ConfigProjectInput): Promise<string> {
     const now = Date.now();
     const id = generateId();
     await db.configs.add({ ...data, id, createdAt: now, updatedAt: now });
     return id;
   },
 
-  async update(id: string, patch: Partial<ConfigGroup>): Promise<void> {
+  async update(id: string, patch: Partial<ConfigProject>): Promise<void> {
     await db.configs.update(id, { ...patch, updatedAt: Date.now() });
   },
 

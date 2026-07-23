@@ -174,8 +174,8 @@ async function onCopySsh() {
   gap: var(--gap-md);
 }
 .server-icon {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;

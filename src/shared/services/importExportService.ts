@@ -3,25 +3,28 @@ import { serverRepo } from '../db/repositories/serverRepo';
 import { middlewareRepo } from '../db/repositories/middlewareRepo';
 import { tagRepo } from '../db/repositories/tagRepo';
 import { accountRepo } from '../db/repositories/accountRepo';
+import { configRepo } from '../db/repositories/configRepo';
 import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
 import { systemTagRepo } from '../db/repositories/systemTagRepo';
+import { generateId } from '../utils/id';
 
 export interface ImportSummary {
-  created: { systems: number; servers: number; middlewares: number; tags: number };
-  updated: { systems: number; servers: number; middlewares: number };
+  created: { systems: number; servers: number; middlewares: number; configs: number; tags: number };
+  updated: { systems: number; servers: number; middlewares: number; configs: number };
   skipped: { count: number; reasons: string[] };
   errors: string[];
 }
 
 export const importExportService = {
-  async exportMarkdown(options: { includePasswords: boolean }): Promise<string> {
-    const [systems, servers, middlewares, tags] = await Promise.all([
+  async exportMarkdown(options: { includePasswords: boolean; scope?: { systems?: boolean; servers?: boolean; middlewares?: boolean; configs?: boolean } }): Promise<string> {
+    const [systems, servers, middlewares, tags, projects] = await Promise.all([
       systemRepo.all(),
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
+      configRepo.all(),
     ]);
 
     const encrypted = await cryptoService.isEnabled();
@@ -53,23 +56,58 @@ export const importExportService = {
       return { ...s, tags: tagNames, plainAccounts };
     }));
 
+    const scope = options.scope ?? {};
     return serializeMarkdown({
       meta: { encrypted },
-      systems: resolvedSystems as any,
-      servers: serversWithPlain as any,
-      middlewares: middlewaresWithPlain as any,
+      systems: scope.systems === false ? [] : resolvedSystems as any,
+      servers: scope.servers === false ? [] : serversWithPlain as any,
+      middlewares: scope.middlewares === false ? [] : middlewaresWithPlain as any,
+      projects: scope.configs === false ? [] : projects,
       tags,
     }, options);
   },
 
   async exportJSON(): Promise<string> {
-    const [systems, servers, middlewares, tags] = await Promise.all([
+    const [systems, servers, middlewares, tags, projects] = await Promise.all([
       systemRepo.all(),
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
+      configRepo.all(),
     ]);
-    return JSON.stringify({ meta: { version: 1, exportedAt: new Date().toISOString() }, systems, servers, middlewares, tags }, null, 2);
+
+    // 解密密码为明文（与 v3 一致，导出文件即明文备份）
+    const systemsOut = await Promise.all(systems.map(async (s) => {
+      const tagIds = await systemTagRepo.tagsFor(s.id);
+      const tagNames = await Promise.all(tagIds.map(async tid => (await tagRepo.byId(tid))?.name ?? ''));
+      const accounts = await accountRepo.bySystemId(s.id);
+      const plainAccounts = await Promise.all(accounts.map(async a => ({
+        role: a.role,
+        username: a.username,
+        password: await cryptoService.decryptField(a.password).catch(() => ''),
+        isDefault: a.isDefault,
+      })));
+      return { ...s, tags: tagNames, accounts: plainAccounts };
+    }));
+
+    const serversOut = await Promise.all(servers.map(async s => ({
+      ...s,
+      password: await cryptoService.decryptField(s.password).catch(() => ''),
+    })));
+
+    const middlewaresOut = await Promise.all(middlewares.map(async m => ({
+      ...m,
+      password: m.password ? await cryptoService.decryptField(m.password).catch(() => '') : '',
+    })));
+
+    return JSON.stringify({
+      meta: { version: 1, exportedAt: new Date().toISOString(), encrypted: false },
+      systems: systemsOut,
+      servers: serversOut,
+      middlewares: middlewaresOut,
+      projects,
+      tags,
+    }, null, 2);
   },
 
   async importMarkdown(content: string, options: { mode: 'merge' | 'replace' }): Promise<ImportSummary> {
@@ -90,8 +128,8 @@ export const importExportService = {
 
   async upsertParsed(parsed: ParsedBackup): Promise<ImportSummary> {
     const summary: ImportSummary = {
-      created: { systems: 0, servers: 0, middlewares: 0, tags: 0 },
-      updated: { systems: 0, servers: 0, middlewares: 0 },
+      created: { systems: 0, servers: 0, middlewares: 0, configs: 0, tags: 0 },
+      updated: { systems: 0, servers: 0, middlewares: 0, configs: 0 },
       skipped: { count: 0, reasons: [] },
       errors: [],
     };
@@ -178,13 +216,69 @@ export const importExportService = {
       }
     }
 
+    for (const m of parsed.middlewares) {
+      if (!m.name || !m.host) {
+        summary.skipped.count++;
+        summary.skipped.reasons.push('Middleware missing name or host');
+        continue;
+      }
+      const all = await middlewareRepo.all();
+      const existing = all.find(x => x.name === m.name && x.host === m.host);
+      const encryptedPassword = await cryptoService.encryptField(m.plainPassword || '');
+      if (existing) {
+        await middlewareRepo.update(existing.id, { type: m.type, version: m.version, port: m.port, database: m.database, username: m.username, password: encryptedPassword });
+        summary.updated.middlewares++;
+      } else {
+        await middlewareRepo.create({
+          type: (m.type as any) || 'redis',
+          name: m.name,
+          version: m.version,
+          host: m.host,
+          port: m.port ?? 0,
+          database: m.database,
+          username: m.username,
+          password: encryptedPassword,
+          remark: m.remark,
+          favorite: false,
+        });
+        summary.created.middlewares++;
+      }
+    }
+
+    for (const p of parsed.projects) {
+      if (!p.name) {
+        summary.skipped.count++;
+        summary.skipped.reasons.push('Config project missing name');
+        continue;
+      }
+      const all = await configRepo.all();
+      let proj = all.find(x => x.name === p.name);
+      if (!proj) {
+        const id = await configRepo.create({ name: p.name, configs: [] });
+        proj = await configRepo.byId(id);
+        if (!proj) continue;
+      }
+      for (const c of p.configs) {
+        if (!c.name) continue;
+        const fields = c.fields.map(f => ({ key: f.key ?? '', label: f.label, value: f.value }));
+        const cfg = proj.configs.find(x => x.name === c.name);
+        if (cfg) {
+          cfg.fields = fields;
+        } else {
+          proj.configs.push({ id: generateId(), name: c.name, fields });
+          summary.created.configs++;
+        }
+      }
+      await configRepo.update(proj.id, { name: proj.name, configs: proj.configs });
+    }
+
     return summary;
   },
 
   async upsertJson(data: any): Promise<ImportSummary> {
     const summary: ImportSummary = {
-      created: { systems: 0, servers: 0, middlewares: 0, tags: 0 },
-      updated: { systems: 0, servers: 0, middlewares: 0 },
+      created: { systems: 0, servers: 0, middlewares: 0, configs: 0, tags: 0 },
+      updated: { systems: 0, servers: 0, middlewares: 0, configs: 0 },
       skipped: { count: 0, reasons: [] },
       errors: [],
     };
@@ -282,6 +376,37 @@ export const importExportService = {
         });
         summary.created.middlewares++;
       }
+    }
+
+    const projects: Array<any> = data.projects ?? data.configs ?? [];
+    for (const p of projects) {
+      if (!p || !p.name) {
+        summary.skipped.count++;
+        summary.skipped.reasons.push('Config project missing name');
+        continue;
+      }
+      const all = await configRepo.all();
+      let proj = all.find(x => x.name === p.name);
+      if (!proj) {
+        const id = await configRepo.create({ name: p.name, configs: [] });
+        proj = await configRepo.byId(id);
+        if (!proj) continue;
+      }
+      // 兼容旧的两级结构（items → 默认配置）与新的三级结构（configs）
+      const rawConfigs: Array<any> = Array.isArray(p.configs) ? p.configs
+        : (Array.isArray(p.items) ? [{ id: generateId(), name: '默认配置', fields: (p.items as any[]).map((it) => ({ key: it.key ?? '', label: it.label, value: it.value ?? it.defaultValue ?? '' })) }] : []);
+      for (const c of rawConfigs) {
+        if (!c || !c.name) continue;
+        const fields: Array<{ key: string; label?: string; value?: string }> = (c.fields ?? []).map((f: any) => ({ key: f.key ?? '', label: f.label, value: f.value ?? f.defaultValue ?? '' }));
+        const cfg = proj.configs.find(x => x.name === c.name);
+        if (cfg) {
+          cfg.fields = fields;
+        } else {
+          proj.configs.push({ id: generateId(), name: c.name, fields });
+          summary.created.configs++;
+        }
+      }
+      await configRepo.update(proj.id, { name: proj.name, configs: proj.configs });
     }
 
     return summary;

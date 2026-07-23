@@ -67,7 +67,7 @@ async function onDelete(id: string) {
 
 <style scoped>
 .tag-view {
-  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   display: flex;
   flex-direction: column;
   height: 100%;

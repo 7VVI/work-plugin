@@ -106,7 +106,7 @@ async function onClearAll() {
 
 <style scoped>
 .settings-view {
-  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   max-width: 760px;
   height: 100%;
   overflow-y: auto;
