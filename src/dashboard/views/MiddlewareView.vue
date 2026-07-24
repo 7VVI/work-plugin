@@ -1,84 +1,87 @@
 <template>
   <div class="middleware-view">
-    <!-- 操作栏 - v3 风格 -->
-    <div class="action-bar">
-      <button class="btn-p" @click="onCreate">
-        <i class="fa-solid fa-plus"></i>新增中间件
-      </button>
-      <div class="flex-spacer"></div>
-      <div class="search-field">
-        <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
-        <input v-model="search" class="inp search-inp" placeholder="搜索中间件名称、Host…" />
+    <GroupSidebar entity-type="middleware" label="中间件" :records="store.list" v-model="selectedGroupId" />
+    <div class="mw-content">
+      <!-- 操作栏 - v3 风格 -->
+      <div class="action-bar">
+        <button class="btn-p" @click="onCreate">
+          <i class="fa-solid fa-plus"></i>新增中间件
+        </button>
+        <div class="flex-spacer"></div>
+        <div class="search-field">
+          <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
+          <input v-model="search" class="inp search-inp" placeholder="搜索中间件名称、Host…" />
+        </div>
       </div>
-    </div>
 
-    <!-- 中间件网格 - v3 风格 -->
-    <VueDraggable
-      v-model="filtered"
-      class="mw-grid"
-      :animation="200"
-      ghost-class="dragging"
-      @end="onDragEnd"
-    >
-      <div v-for="m in filtered" :key="m.id" class="panel stat-card mw-card" @click="onEdit(m)">
-        <!-- 图标 + 环境 -->
-        <div class="card-top">
-          <span class="card-icon" :style="iconStyle(m)">
-            <i :class="mwMeta(m.type).icon"></i>
-          </span>
-          <div class="card-top-right">
-            <EnvBadge :env="mwEnv(m)" />
-            <div class="card-actions">
-              <button class="ibtn ibtn-sm" title="编辑 / 查看详情" @click.stop="onEdit(m)">
-                <i class="fa-solid fa-pen"></i>
-              </button>
-              <button class="ibtn ibtn-sm danger" title="删除" @click.stop="onDelete(m.id)">
-                <i class="fa-regular fa-trash-can"></i>
-              </button>
+      <!-- 中间件网格 - v3 风格 -->
+      <VueDraggable
+        v-model="filtered"
+        class="mw-grid"
+        :animation="200"
+        ghost-class="dragging"
+        @end="onDragEnd"
+      >
+        <div v-for="m in filtered" :key="m.id" class="panel stat-card mw-card" @click="onEdit(m)">
+          <!-- 图标 + 环境 -->
+          <div class="card-top">
+            <span class="card-icon" :style="iconStyle(m)">
+              <i :class="mwMeta(m.type).icon"></i>
+            </span>
+            <div class="card-top-right">
+              <EnvBadge :env="mwEnv(m)" />
+              <div class="card-actions">
+                <button class="ibtn ibtn-sm" title="编辑 / 查看详情" @click.stop="onEdit(m)">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="ibtn ibtn-sm danger" title="删除" @click.stop="onDelete(m.id)">
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
+              </div>
             </div>
           </div>
+
+          <!-- 名称 + 类型 -->
+          <div class="card-title-row">
+            <span class="card-name t1">{{ m.name }}</span>
+            <span class="type-badge t2">{{ m.type }}{{ m.version ? ' ' + m.version : '' }}</span>
+          </div>
+
+          <!-- 地址 -->
+          <div class="card-addr t3">{{ m.host }}:{{ m.port }}{{ m.database ? ' / ' + m.database : '' }}</div>
+
+          <!-- 详情 -->
+          <dl class="card-dl">
+            <div class="dl-row">
+              <dt class="t3"><i class="fa-regular fa-user"></i>账号</dt>
+              <dd class="mono t2">{{ m.username || '—' }}</dd>
+            </div>
+            <div class="dl-row">
+              <dt class="t3"><i class="fa-regular fa-clock"></i>最后更新</dt>
+              <dd class="t2">{{ formatRelativeTime(m.updatedAt) }}</dd>
+            </div>
+          </dl>
+
+          <!-- 复制按钮 -->
+          <button class="btn-g card-btn-full" @click.stop="onCopyDetails(m)">
+            <i class="fa-regular fa-copy"></i>复制连接信息
+          </button>
         </div>
 
-        <!-- 名称 + 类型 -->
-        <div class="card-title-row">
-          <span class="card-name t1">{{ m.name }}</span>
-          <span class="type-badge t2">{{ m.type }}{{ m.version ? ' ' + m.version : '' }}</span>
-        </div>
-
-        <!-- 地址 -->
-        <div class="card-addr t3">{{ m.host }}:{{ m.port }}{{ m.database ? ' / ' + m.database : '' }}</div>
-
-        <!-- 详情 -->
-        <dl class="card-dl">
-          <div class="dl-row">
-            <dt class="t3"><i class="fa-regular fa-user"></i>账号</dt>
-            <dd class="mono t2">{{ m.username || '—' }}</dd>
-          </div>
-          <div class="dl-row">
-            <dt class="t3"><i class="fa-regular fa-clock"></i>最后更新</dt>
-            <dd class="t2">{{ formatRelativeTime(m.updatedAt) }}</dd>
-          </div>
-        </dl>
-
-        <!-- 复制按钮 -->
-        <button class="btn-g card-btn-full" @click.stop="onCopyDetails(m)">
-          <i class="fa-regular fa-copy"></i>复制连接信息
+        <button v-if="filtered.length > 0" class="add-tile" @click="onCreate">
+          <i class="fa-solid fa-plus add-tile-icon"></i>
+          <span class="add-tile-title">添加中间件</span>
+          <span class="add-tile-sub mono">Redis · MySQL · MongoDB · ES</span>
         </button>
-      </div>
 
-      <button v-if="filtered.length > 0" class="add-tile" @click="onCreate">
-        <i class="fa-solid fa-plus add-tile-icon"></i>
-        <span class="add-tile-title">添加中间件</span>
-        <span class="add-tile-sub mono">Redis · MySQL · MongoDB · ES</span>
-      </button>
+        <div v-if="filtered.length === 0" class="empty-state">
+          <i class="fa-solid fa-layer-group empty-icon t3"></i>
+          <div class="empty-text t3">暂无中间件，点击"新增中间件"添加</div>
+        </div>
+      </VueDraggable>
+    </div>
 
-      <div v-if="filtered.length === 0" class="empty-state">
-        <i class="fa-solid fa-layer-group empty-icon t3"></i>
-        <div class="empty-text t3">暂无中间件，点击"新增中间件"添加</div>
-      </div>
-    </VueDraggable>
-
-    <MiddlewareForm :visible="formVisible" :middleware="editing" @close="formVisible = false" @saved="onSaved" />
+    <MiddlewareForm :visible="formVisible" :middleware="editing" :default-group-id="selectedGroupId === 'all' ? '' : selectedGroupId" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
 
@@ -92,6 +95,7 @@ import type { Middleware, Environment } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
 import MiddlewareForm from '../components/middleware/MiddlewareForm.vue';
 import EnvBadge from '../components/common/EnvBadge.vue';
+import GroupSidebar from '../components/common/GroupSidebar.vue';
 
 const MW_TYPES: Record<string, { icon: string; color: string }> = {
   redis: { icon: 'fa-solid fa-bolt', color: '#DC382D' },
@@ -125,13 +129,18 @@ const dialog = useDialogStore();
 const formVisible = ref(false);
 const editing = ref<Middleware | null>(null);
 const search = ref('');
+const selectedGroupId = ref<string>('all');
 
 onMounted(async () => { await store.load(); });
 
 const filtered = computed(() => {
-  if (!search.value.trim()) return store.list;
+  let result = store.list;
+  if (selectedGroupId.value !== 'all') {
+    result = result.filter(m => m.groupId === selectedGroupId.value);
+  }
+  if (!search.value.trim()) return result;
   const q = search.value.toLowerCase();
-  return store.list.filter(m =>
+  return result.filter(m =>
     m.name.toLowerCase().includes(q) ||
     m.host.toLowerCase().includes(q) ||
     m.type.toLowerCase().includes(q)
@@ -178,10 +187,20 @@ async function onDragEnd(event: any) {
 <style scoped>
 .middleware-view {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
+  gap: var(--gap-lg);
+}
+.mw-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
 }
 
 /* 操作栏 */
@@ -189,7 +208,6 @@ async function onDragEnd(event: any) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 24px 16px;
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -223,7 +241,6 @@ async function onDragEnd(event: any) {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-  padding: 0 24px calc(var(--statusbar-h) + 24px);
   align-content: start;
 }
 @media (min-width: 640px) {
@@ -328,7 +345,7 @@ async function onDragEnd(event: any) {
   text-align: center;
 }
 
-/* 复制按钮（v3 w-full justify-center !py-1.5 !text-xs） */
+/* 复制按钮 */
 .card-btn-full {
   margin-top: 12px;
   width: 100%;

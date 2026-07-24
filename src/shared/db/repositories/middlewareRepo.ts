@@ -5,7 +5,7 @@ import { toPlain } from '../../utils/plain';
 
 export const middlewareRepo = {
   async all(): Promise<Middleware[]> {
-    return db.middlewares.toArray();
+    return db.middlewares.orderBy('sortOrder').toArray();
   },
 
   async byId(id: string): Promise<Middleware | undefined> {

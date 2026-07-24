@@ -1,5 +1,7 @@
 <template>
   <div class="system-view">
+    <GroupSidebar entity-type="system" label="系统" :records="store.list" v-model="selectedGroupId" />
+    <div class="system-content">
     <!-- 操作栏 - v3 风格 -->
     <div class="action-bar rise d1">
       <button class="btn btn-primary btn-create" @click="onCreate">
@@ -132,7 +134,8 @@
       </div>
     </VueDraggable>
 
-    <SystemForm v-if="formVisible" :visible="formVisible" :system="editing" :system-id="editing?.id || ''" @close="formVisible = false" @saved="onSaved" />
+    </div>
+    <SystemForm v-if="formVisible" :visible="formVisible" :system="editing" :system-id="editing?.id || ''" :default-group-id="selectedGroupId === 'all' ? '' : selectedGroupId" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
 
@@ -147,6 +150,7 @@ import { formatRelativeTime } from '@shared/utils/time';
 import { accountService } from '@shared/services/accountService';
 import { copyToClipboard } from '@shared/utils/clipboard';
 import EnvBadge from '../components/common/EnvBadge.vue';
+import GroupSidebar from '../components/common/GroupSidebar.vue';
 import SystemForm from '../components/system/SystemForm.vue';
 
 const store = useSystemStore();
@@ -155,6 +159,7 @@ const dialog = useDialogStore();
 const formVisible = ref(false);
 const editing = ref<System | null>(null);
 const search = ref('');
+const selectedGroupId = ref<string>('all');
 const selectedIds = ref<Set<string>>(new Set());
 const acctCounts = ref<Record<string, number>>({});
 const VIEW_KEY = 'dock-v3-system-view';
@@ -199,9 +204,13 @@ onMounted(async () => {
 });
 
 const filteredSystems = computed(() => {
-  if (!search.value.trim()) return store.list;
+  let result = store.list;
+  if (selectedGroupId.value !== 'all') {
+    result = result.filter(s => s.groupId === selectedGroupId.value);
+  }
+  if (!search.value.trim()) return result;
   const q = search.value.toLowerCase();
-  return store.list.filter(s =>
+  return result.filter(s =>
     s.name.toLowerCase().includes(q) ||
     s.url.toLowerCase().includes(q) ||
     (s.remark || '').toLowerCase().includes(q),
@@ -278,11 +287,19 @@ async function onDragEnd(event: any) {
 <style scoped>
 .system-view {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
   min-height: 0;
   overflow: hidden;
   padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
+  gap: var(--gap-lg);
+}
+.system-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: var(--gap-lg);
 }
 

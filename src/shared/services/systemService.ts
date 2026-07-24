@@ -18,7 +18,7 @@ export const systemService = {
   async create(input: SystemInput): Promise<string> {
     requireString(input.name, '系统名称');
     if (!isValidUrl(input.url)) throw new ValidationError('INVALID_URL', '系统地址格式不正确');
-    const sort = input.sort ?? (await systemRepo.all()).length;
+    const sort = input.sort || (await systemRepo.all()).length;
     return systemRepo.create({ ...input, sort });
   },
 

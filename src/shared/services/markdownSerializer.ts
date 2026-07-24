@@ -1,4 +1,4 @@
-import type { System, Server, Middleware, Tag, ConfigProject } from '../types/entities';
+import type { System, Server, Middleware, Tag, ConfigProject, Group } from '../types/entities';
 import type { ParsedBackup } from './markdownParser';
 
 export interface SerializeOptions {
@@ -11,6 +11,7 @@ interface BackupData {
   servers: Array<Server & { tags?: string[]; plainPassword?: string }>;
   middlewares: Array<Middleware & { tags?: string[]; plainPassword?: string }>;
   projects: ConfigProject[];
+  groups?: Group[];
   tags: Tag[];
 }
 
@@ -26,6 +27,12 @@ function buildTable(headers: string[], rows: string[][]): string[] {
 
 export function serializeMarkdown(data: ParsedBackup | BackupData, options: SerializeOptions): string {
   const lines: string[] = [];
+
+  // groupId → 分组名（用于在资产里以名称引用分组）
+  const groupNameById = new Map<string, string>(
+    ((data.groups as Array<{ id?: string; name?: string }>) ?? []).map(g => [g.id ?? '', g.name ?? '']),
+  );
+  const groupName = (id?: string) => (id ? (groupNameById.get(id) ?? '') : '');
 
   lines.push('---');
   lines.push('navPortalVersion: 1');
@@ -48,6 +55,7 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
       if (s.environment) rows.push(['环境', s.environment]);
       if (s.icon) rows.push(['图标', s.icon]);
       if (s.color) rows.push(['颜色', s.color]);
+      if (groupName(s.groupId)) rows.push(['分组', groupName(s.groupId)]);
       if (s.tags && s.tags.length > 0) rows.push(['标签', s.tags.join(', ')]);
       if (s.remark) rows.push(['备注', s.remark]);
       if (rows.length > 0) {
@@ -83,6 +91,7 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
       if (s.username) rows.push(['账号', s.username]);
       rows.push(['密码', options.includePasswords && pwd ? pwd : '********']);
       if (s.environment) rows.push(['环境', s.environment]);
+      if (groupName(s.groupId)) rows.push(['分组', groupName(s.groupId)]);
       if (s.purpose) rows.push(['用途', s.purpose]);
       if (s.remark) rows.push(['备注', s.remark]);
       if (rows.length > 0) {
@@ -101,6 +110,7 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
       const pwd = (m as any).plainPassword;
       const rows: string[][] = [];
       if (m.type) rows.push(['类型', m.type]);
+      if (groupName(m.groupId)) rows.push(['分组', groupName(m.groupId)]);
       if (m.version) rows.push(['版本', m.version]);
       if (m.host) rows.push(['Host', m.host]);
       if (m.port) rows.push(['端口', String(m.port)]);
@@ -139,6 +149,14 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
         }
       }
     }
+  }
+
+  if (data.groups && data.groups.length > 0) {
+    lines.push('## 分组');
+    lines.push('');
+    const rows = data.groups.map(g => [g.entityType ?? '', g.name ?? '', g.color ?? '']);
+    lines.push(...buildTable(['类型', '名称', '颜色'], rows));
+    lines.push('');
   }
 
   if (data.tags.length > 0) {

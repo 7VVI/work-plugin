@@ -5,7 +5,7 @@ import { toPlain } from '../../utils/plain';
 
 export const serverRepo = {
   async all(): Promise<Server[]> {
-    return db.servers.toArray();
+    return db.servers.orderBy('sortOrder').toArray();
   },
 
   async byId(id: string): Promise<Server | undefined> {

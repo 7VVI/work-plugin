@@ -3,22 +3,22 @@
     <!-- 操作栏 -->
     <div class="action-bar">
       <button class="btn-p" @click="startAddProject">
-        <i class="fa-solid fa-plus"></i>新增项目
+        <i class="fa-solid fa-plus"></i>新增分组
       </button>
       <div class="flex-spacer"></div>
       <div class="search-field">
         <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
-        <input v-model="search" class="inp search-inp" placeholder="搜索项目、配置…" />
+        <input v-model="search" class="inp search-inp" placeholder="搜索分组、配置…" />
       </div>
     </div>
 
     <div class="split-body">
-      <!-- 左侧项目列表 -->
+      <!-- 左侧分组列表 -->
       <div class="sidebar">
         <div class="panel proj-panel">
           <div class="proj-panel-head">
-            <span class="proj-panel-title t3">项目</span>
-            <button class="ibtn ibtn-mini" title="新增项目" @click="startAddProject">
+            <span class="proj-panel-title t3">分组</span>
+            <button class="ibtn ibtn-mini" title="新增分组" @click="startAddProject">
               <i class="fa-solid fa-plus"></i>
             </button>
           </div>
@@ -62,7 +62,7 @@
               </template>
             </div>
           </VueDraggable>
-          <div v-if="filteredProjects.length === 0" class="proj-empty t3">暂无项目</div>
+          <div v-if="filteredProjects.length === 0" class="proj-empty t3">暂无分组</div>
         </div>
       </div>
 
@@ -200,24 +200,24 @@
 
         <div v-else class="no-project t3">
           <i class="fa-regular fa-folder-open no-project-icon"></i>
-          <div class="no-project-text">选择左侧项目，或点击「新增项目」开始</div>
+          <div class="no-project-text">选择左侧分组，或点击「新增分组」开始</div>
         </div>
       </div>
     </div>
 
-    <!-- 新增项目弹窗 -->
+    <!-- 新增分组弹窗 -->
     <teleport to="body">
       <Transition name="cfg-modal">
         <div v-if="projectModalOpen" class="proj-modal-overlay" @click.self="cancelProjectModal">
           <div class="proj-modal panel-solid" role="dialog" aria-modal="true">
             <div class="proj-modal-head">
-              <h2>新增项目</h2>
+              <h2>新增分组</h2>
               <button class="ibtn" type="button" @click="cancelProjectModal" aria-label="关闭">
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
             <div class="proj-modal-body">
-              <label class="proj-lbl">项目名称</label>
+              <label class="proj-lbl">分组名称</label>
               <input
                 ref="projectNameInput"
                 v-model="projectModalName"
@@ -252,7 +252,7 @@ const toast = useToastStore();
 
 const search = ref('');
 
-// 项目：弹窗新建 / 重命名
+// 分组：弹窗新建 / 重命名
 const projectModalOpen = ref(false);
 const projectModalName = ref('');
 const projectNameInput = ref<HTMLInputElement | null>(null);
@@ -294,7 +294,7 @@ const filteredProjects = computed(() => {
   );
 });
 
-// 切换项目 / 配置时重置 inline 编辑态
+// 切换分组 / 配置时重置 inline 编辑态
 watch(() => store.selectedProjectId, resetInline);
 watch(() => store.selectedConfigId, () => { resetNf(); });
 
@@ -312,7 +312,7 @@ function resetNf() {
   nfValue.value = '';
 }
 
-/* ---------- 项目拖拽 ---------- */
+/* ---------- 分组拖拽 ---------- */
 async function onProjectDragEnd(event: any) {
   const { oldIndex, newIndex } = event;
   if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
@@ -321,7 +321,7 @@ async function onProjectDragEnd(event: any) {
   newList.splice(newIndex, 0, moved);
   const orderedIds = newList.map(p => p.id);
   await store.reorderProjects(orderedIds);
-  toast.success('项目排序已更新');
+  toast.success('分组排序已更新');
 }
 
 /* ---------- 配置拖拽 ---------- */
@@ -338,7 +338,7 @@ async function onConfigDragEnd(event: any) {
   }
 }
 
-/* ---------- 项目 ---------- */
+/* ---------- 分组 ---------- */
 function startAddProject() {
   projectModalOpen.value = true;
   projectModalName.value = '';
@@ -350,11 +350,11 @@ function cancelProjectModal() {
 }
 async function confirmProjectModal() {
   const name = projectModalName.value.trim();
-  if (!name) { toast.error('请填写项目名称'); return; }
+  if (!name) { toast.error('请填写分组名称'); return; }
   projectModalOpen.value = false;
   projectModalName.value = '';
   await store.createProject(name);
-  toast.success('项目已创建');
+  toast.success('分组已创建');
 }
 
 function startRenameProject(p: ConfigProject) {
@@ -375,17 +375,17 @@ async function commitRenameProject(save: boolean) {
   const p = store.projects.find(x => x.id === id);
   if (p && p.name !== name) {
     await store.renameProject(id, name);
-    toast.success('项目已重命名');
+    toast.success('分组已重命名');
   }
 }
 async function onDeleteProject(id: string) {
   await store.deleteProject(id);
-  toast.success('项目已删除');
+  toast.success('分组已删除');
 }
 
 /* ---------- 配置 ---------- */
 function startAddConfig() {
-  if (!store.selectedProject) { toast.error('请先创建一个项目'); return; }
+  if (!store.selectedProject) { toast.error('请先创建一个分组'); return; }
   addingConfig.value = true;
   newConfigName.value = '';
 }
@@ -542,7 +542,7 @@ async function onCopy(value?: string) {
 }
 .sidebar { width: 240px; flex: none; min-height: 0; display: flex; }
 
-/* 项目面板 —— 与右侧详情面板等高、铺满内容区，超出在面板内滚动 */
+/* 分组面板 —— 与右侧详情面板等高、铺满内容区，超出在面板内滚动 */
 .proj-panel {
   padding: 8px;
   flex: 1;
@@ -788,7 +788,7 @@ async function onCopy(value?: string) {
 }
 .field-hint i { margin-right: 4px; }
 
-/* 无配置 / 无项目 */
+/* 无配置 / 无分组 */
 .no-config {
   margin-top: 32px;
   display: flex;
@@ -817,7 +817,7 @@ async function onCopy(value?: string) {
   box-shadow: 0 8px 24px rgba(46, 107, 240, 0.3) !important;
 }
 
-/* ================= 新增项目弹窗 ================= */
+/* ================= 新增分组弹窗 ================= */
 .proj-modal-overlay {
   position: fixed;
   inset: 0;

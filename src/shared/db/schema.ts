@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type {
   System, Account, Server, Middleware, Tag,
   SystemTag, ServerTag, MiddlewareTag, Recent, MetaEntry, ConfigGroup,
-  ConfigProject, ConfigDef,
+  ConfigProject, ConfigDef, Group,
 } from '../types/entities';
 
 export class NavPortalDB extends Dexie {
@@ -19,6 +19,7 @@ export class NavPortalDB extends Dexie {
   configs!: Table<ConfigGroup, string>;
   configProjects!: Table<ConfigProject, string>;
   configDefs!: Table<ConfigDef, string>;
+  groups!: Table<Group, string>;
 
   constructor() {
     super('NavPortalDB');
@@ -40,6 +41,13 @@ export class NavPortalDB extends Dexie {
     this.version(3).stores({
       configProjects: 'id, name, sortOrder, createdAt, updatedAt',
       configDefs:     'id, projectId, name, sortOrder, createdAt, updatedAt',
+    });
+    this.version(4).stores({
+      // 给系统/服务器/中间件增加 groupId 索引，并新增通用分组表
+      systems:     'id, name, url, environment, favorite, sort, sortOrder, createdAt, updatedAt, groupId',
+      servers:     'id, name, ip, environment, favorite, sortOrder, createdAt, groupId',
+      middlewares: 'id, type, name, host, favorite, sortOrder, createdAt, groupId',
+      groups:      'id, entityType, name, sortOrder, createdAt, updatedAt',
     });
   }
 }

@@ -10,7 +10,8 @@
           <label class="scope-item"><input type="checkbox" v-model="scope.systems" class="form-check" /><span>系统（含账号密码）</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.servers" class="form-check" /><span>服务器</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.middlewares" class="form-check" /><span>中间件</span></label>
-          <label class="scope-item"><input type="checkbox" v-model="scope.configs" class="form-check" /><span>配置（项目 / 字段）</span></label>
+          <label class="scope-item"><input type="checkbox" v-model="scope.configs" class="form-check" /><span>配置（分组 / 字段）</span></label>
+          <label class="scope-item"><input type="checkbox" v-model="scope.groups" class="form-check" /><span>分组（系统 / 服务器 / 中间件）</span></label>
         </div>
 
         <div class="io-row">
@@ -67,7 +68,7 @@ import { useToastStore } from '@shared/stores/toastStore';
 
 const toast = useToastStore();
 
-const scope = ref({ systems: true, servers: true, middlewares: true, configs: true });
+const scope = ref({ systems: true, servers: true, middlewares: true, configs: true, groups: true });
 const format = ref<'json' | 'md'>('json');
 const includePasswords = ref(false);
 const dragOver = ref(false);
@@ -90,6 +91,7 @@ async function onExport() {
       if (scope.value.servers) out.servers = full.servers ?? [];
       if (scope.value.middlewares) out.middlewares = full.middlewares ?? [];
       if (scope.value.configs) out.projects = full.projects ?? [];
+      if (scope.value.groups) out.groups = full.groups ?? [];
       downloadFile(JSON.stringify(out, null, 2), `dock-backup-${stamp}.json`, 'application/json');
       toast.success('JSON 备份已导出');
     }

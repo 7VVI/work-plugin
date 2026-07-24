@@ -38,6 +38,7 @@ export const middlewareService = {
       extra: cleanExtra,
       remark: input.remark,
       favorite: input.favorite,
+      groupId: input.groupId,
     });
   },
 

@@ -4,11 +4,13 @@ import { middlewareRepo } from '../db/repositories/middlewareRepo';
 import { tagRepo } from '../db/repositories/tagRepo';
 import { accountRepo } from '../db/repositories/accountRepo';
 import { configRepo } from '../db/repositories/configRepo';
+import { groupRepo } from '../db/repositories/groupRepo';
 import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
 import { systemTagRepo } from '../db/repositories/systemTagRepo';
 import { generateId } from '../utils/id';
+import type { EntityType } from '../types/entities';
 
 export interface ImportSummary {
   created: { systems: number; servers: number; middlewares: number; configs: number; tags: number };
@@ -18,13 +20,14 @@ export interface ImportSummary {
 }
 
 export const importExportService = {
-  async exportMarkdown(options: { includePasswords: boolean; scope?: { systems?: boolean; servers?: boolean; middlewares?: boolean; configs?: boolean } }): Promise<string> {
-    const [systems, servers, middlewares, tags, projects] = await Promise.all([
+  async exportMarkdown(options: { includePasswords: boolean; scope?: { systems?: boolean; servers?: boolean; middlewares?: boolean; configs?: boolean; groups?: boolean } }): Promise<string> {
+    const [systems, servers, middlewares, tags, projects, groups] = await Promise.all([
       systemRepo.all(),
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
       configRepo.all(),
+      groupRepo.all(),
     ]);
 
     const encrypted = await cryptoService.isEnabled();
@@ -63,17 +66,19 @@ export const importExportService = {
       servers: scope.servers === false ? [] : serversWithPlain as any,
       middlewares: scope.middlewares === false ? [] : middlewaresWithPlain as any,
       projects: scope.configs === false ? [] : projects,
+      groups: scope.groups === false ? [] : groups,
       tags,
     }, options);
   },
 
   async exportJSON(): Promise<string> {
-    const [systems, servers, middlewares, tags, projects] = await Promise.all([
+    const [systems, servers, middlewares, tags, projects, groups] = await Promise.all([
       systemRepo.all(),
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
       configRepo.all(),
+      groupRepo.all(),
     ]);
 
     // 解密密码为明文（与 v3 一致，导出文件即明文备份）
@@ -106,6 +111,7 @@ export const importExportService = {
       servers: serversOut,
       middlewares: middlewaresOut,
       projects,
+      groups,
       tags,
     }, null, 2);
   },
@@ -144,6 +150,21 @@ export const importExportService = {
       }
     }
 
+    // 分组：Markdown 用名称引用，按 entityType+name 建立名称→id 映射
+    const groupNameToId = new Map<string, string>();
+    for (const g of parsed.groups) {
+      if (g.entityType && g.name) {
+        const et = g.entityType as EntityType;
+        const key = `${et}:${g.name}`;
+        if (!groupNameToId.has(key)) {
+          const existing = (await groupRepo.allByType(et)).find(x => x.name === g.name);
+          const id = existing ? existing.id : await groupRepo.create({ entityType: et, name: g.name, color: g.color || '#2E6BF0', sortOrder: 0 });
+          groupNameToId.set(key, id);
+        }
+      }
+    }
+    const resolveGroupId = (entityType: string, name?: string) => (name ? groupNameToId.get(`${entityType}:${name}`) : undefined);
+
     for (const s of parsed.systems) {
       if (!s.name || !s.url) {
         summary.skipped.count++;
@@ -154,7 +175,7 @@ export const importExportService = {
       const existing = all.find(x => x.name === s.name && x.url === s.url);
       let systemId: string;
       if (existing) {
-        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color });
+        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color, groupId: resolveGroupId('system', s.groupName) });
         systemId = existing.id;
         summary.updated.systems++;
       } else {
@@ -167,6 +188,7 @@ export const importExportService = {
           remark: s.remark,
           icon: s.icon,
           color: s.color,
+          groupId: resolveGroupId('system', s.groupName),
         });
         summary.created.systems++;
       }
@@ -200,7 +222,7 @@ export const importExportService = {
       const existing = all.find(x => x.name === s.name && x.ip === s.ip);
       const encryptedPassword = await cryptoService.encryptField(s.plainPassword || '');
       if (existing) {
-        await serverRepo.update(existing.id, { sshPort: s.sshPort, username: s.username, password: encryptedPassword, environment: s.environment });
+        await serverRepo.update(existing.id, { sshPort: s.sshPort, username: s.username, password: encryptedPassword, environment: s.environment, groupId: resolveGroupId('server', s.groupName) });
         summary.updated.servers++;
       } else {
         await serverRepo.create({
@@ -211,6 +233,7 @@ export const importExportService = {
           password: encryptedPassword,
           environment: s.environment || 'development',
           favorite: false,
+          groupId: resolveGroupId('server', s.groupName),
         });
         summary.created.servers++;
       }
@@ -226,7 +249,7 @@ export const importExportService = {
       const existing = all.find(x => x.name === m.name && x.host === m.host);
       const encryptedPassword = await cryptoService.encryptField(m.plainPassword || '');
       if (existing) {
-        await middlewareRepo.update(existing.id, { type: m.type, version: m.version, port: m.port, database: m.database, username: m.username, password: encryptedPassword });
+        await middlewareRepo.update(existing.id, { type: m.type, version: m.version, port: m.port, database: m.database, username: m.username, password: encryptedPassword, groupId: resolveGroupId('middleware', m.groupName) });
         summary.updated.middlewares++;
       } else {
         await middlewareRepo.create({
@@ -240,6 +263,7 @@ export const importExportService = {
           password: encryptedPassword,
           remark: m.remark,
           favorite: false,
+          groupId: resolveGroupId('middleware', m.groupName),
         });
         summary.created.middlewares++;
       }
@@ -294,6 +318,22 @@ export const importExportService = {
       }
     }
 
+    // 分组：按原 id 直接写入（插入或覆盖），保证记录的 groupId 仍能命中
+    const groupsIn: Array<any> = data.groups ?? [];
+    for (const g of groupsIn) {
+      if (g && g.id && g.entityType && g.name) {
+        await groupRepo.put({
+          id: g.id,
+          entityType: g.entityType,
+          name: g.name,
+          color: g.color || '#2E6BF0',
+          sortOrder: g.sortOrder,
+          createdAt: g.createdAt || Date.now(),
+          updatedAt: g.updatedAt || Date.now(),
+        });
+      }
+    }
+
     const systems: Array<any> = data.systems ?? [];
     for (const s of systems) {
       if (!s.name || !s.url) {
@@ -303,11 +343,13 @@ export const importExportService = {
       }
       const all = await systemRepo.all();
       const existing = all.find(x => x.name === s.name && x.url === s.url);
+      let systemId: string;
       if (existing) {
-        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color });
+        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color, groupId: s.groupId });
+        systemId = existing.id;
         summary.updated.systems++;
       } else {
-        await systemRepo.create({
+        systemId = await systemRepo.create({
           name: s.name,
           url: s.url,
           environment: s.environment || 'development',
@@ -316,8 +358,27 @@ export const importExportService = {
           remark: s.remark,
           icon: s.icon,
           color: s.color,
+          groupId: s.groupId,
         });
         summary.created.systems++;
+      }
+      // 导入该系统的账号
+      if (s.accounts && s.accounts.length > 0) {
+        const existingAccounts = await accountRepo.bySystemId(systemId);
+        for (const acc of s.accounts) {
+          if (!acc.username) continue;
+          const alreadyExists = existingAccounts.some(a => a.username === acc.username && a.role === acc.role);
+          if (!alreadyExists) {
+            const encryptedPwd = await cryptoService.encryptField(acc.password || '');
+            await accountRepo.create({
+              systemId,
+              role: acc.role || 'admin',
+              username: acc.username,
+              password: encryptedPwd,
+              isDefault: acc.isDefault ?? false,
+            });
+          }
+        }
       }
     }
 
@@ -332,7 +393,7 @@ export const importExportService = {
       const existing = all.find(x => x.name === s.name && x.ip === s.ip);
       const password = s.password ?? { __encrypted: false, value: '' };
       if (existing) {
-        await serverRepo.update(existing.id, { sshPort: s.sshPort, username: s.username, password, environment: s.environment });
+        await serverRepo.update(existing.id, { sshPort: s.sshPort, username: s.username, password, environment: s.environment, groupId: s.groupId });
         summary.updated.servers++;
       } else {
         await serverRepo.create({
@@ -343,6 +404,7 @@ export const importExportService = {
           password,
           environment: s.environment || 'development',
           favorite: s.favorite ?? false,
+          groupId: s.groupId,
         });
         summary.created.servers++;
       }
@@ -358,7 +420,7 @@ export const importExportService = {
       const all = await middlewareRepo.all();
       const existing = all.find(x => x.name === m.name && x.host === m.host);
       if (existing) {
-        await middlewareRepo.update(existing.id, { port: m.port, username: m.username, password: m.password, database: m.database });
+        await middlewareRepo.update(existing.id, { port: m.port, username: m.username, password: m.password, database: m.database, groupId: m.groupId });
         summary.updated.middlewares++;
       } else {
         await middlewareRepo.create({
@@ -373,6 +435,7 @@ export const importExportService = {
           extra: m.extra,
           remark: m.remark,
           favorite: m.favorite ?? false,
+          groupId: m.groupId,
         });
         summary.created.middlewares++;
       }
@@ -418,6 +481,7 @@ export const importExportService = {
       serverRepo.all().then(all => Promise.all(all.map(s => serverRepo.delete(s.id)))),
       middlewareRepo.all().then(all => Promise.all(all.map(m => middlewareRepo.delete(m.id)))),
       tagRepo.all().then(all => Promise.all(all.map(t => tagRepo.delete(t.id)))),
+      groupRepo.clear(),
     ]);
   },
 };

@@ -18,6 +18,7 @@ export interface System {
   favorite: boolean;
   sort: number;
   sortOrder?: number;
+  groupId?: string;
   remark?: string;
   createdAt: number;
   updatedAt: number;
@@ -49,6 +50,7 @@ export interface Server {
   remark?: string;
   favorite: boolean;
   sortOrder?: number;
+  groupId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -67,6 +69,7 @@ export interface Middleware {
   remark?: string;
   favorite: boolean;
   sortOrder?: number;
+  groupId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -79,6 +82,18 @@ export interface Tag {
 }
 
 export interface SystemTag { systemId: string; tagId: string; }
+
+// 分组：系统 / 服务器 / 中间件 各自一组（entityType 区分）
+export interface Group {
+  id: string;
+  entityType: EntityType;
+  name: string;
+  color: string;
+  sortOrder?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+export type GroupInput = Omit<Group, 'id' | 'createdAt' | 'updatedAt'>;
 export interface ServerTag { serverId: string; tagId: string; }
 export interface MiddlewareTag { middlewareId: string; tagId: string; }
 

@@ -32,6 +32,7 @@ export const serverService = {
       purpose: input.purpose,
       remark: input.remark,
       favorite: input.favorite,
+      groupId: input.groupId,
     });
   },
 

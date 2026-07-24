@@ -58,6 +58,14 @@
               </div>
 
               <div class="field">
+                <label class="lbl">分组</label>
+                <select v-model="form.groupId" class="inp">
+                  <option value="">未分组</option>
+                  <option v-for="g in groupStore.groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                </select>
+              </div>
+
+              <div class="field">
                 <label class="lbl">图标</label>
                 <div class="icon-grid">
                   <button
@@ -150,18 +158,20 @@ import { ENVIRONMENTS } from '@shared/types/enums';
 import { useAccountStore } from '@shared/stores/accountStore';
 import { useSystemStore } from '@shared/stores/systemStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { useGroupStore } from '@shared/stores/groupStore';
 import { systemService } from '@shared/services/systemService';
 import { tagService } from '@shared/services/tagService';
 import { accountService } from '@shared/services/accountService';
 import { isValidUrl } from '@shared/utils/url';
 
 // ---- external contract (preserved) ----
-const props = defineProps<{ visible: boolean; system: System | null; systemId: string }>();
+const props = defineProps<{ visible: boolean; system: System | null; systemId: string; defaultGroupId?: string }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const accountStore = useAccountStore();
 const systemStore = useSystemStore();
 const toast = useToastStore();
+const groupStore = useGroupStore();
 
 // ---- v3 verbatim constants ----
 const QUICK_ICONS = [
@@ -197,6 +207,7 @@ function blankForm(): SystemInput {
     iconColor: '#2E6BF0',
     favorite: false,
     sort: 0,
+    groupId: '',
     remark: '',
   };
 }
@@ -261,6 +272,7 @@ watch(
   () => props.visible,
   async (v) => {
     if (!v) return;
+    if (groupStore.currentType !== 'system') await groupStore.load('system');
     tab.value = 'basic';
     tagInput.value = '';
     acctRows.value = [];
@@ -269,6 +281,7 @@ watch(
         ...props.system,
         icon: props.system.icon || 'fa-solid fa-globe',
         iconColor: props.system.iconColor || props.system.color || '#2E6BF0',
+        groupId: props.system.groupId ?? '',
       };
       // tags (v3 stores names; backend resolves names ↔ ids)
       try {
@@ -303,6 +316,7 @@ watch(
       }
     } else {
       form.value = blankForm();
+      form.value.groupId = props.defaultGroupId || '';
       tags.value = [];
     }
   },

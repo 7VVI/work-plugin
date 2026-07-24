@@ -13,12 +13,15 @@ export interface ParsedConfigField { key: string; label?: string; value?: string
 export interface ParsedConfig { name: string; fields: ParsedConfigField[] }
 export interface ParsedProject { name: string; configs: ParsedConfig[] }
 
+export interface ParsedGroup { entityType?: string; name?: string; color?: string }
+
 export interface ParsedBackup {
   meta: FrontMatter;
-  systems: Array<Partial<System> & { tags?: string[]; accounts?: Array<{ role: string; username: string; password: string; isDefault?: boolean }> }>;
-  servers: Array<Partial<Server> & { tags?: string[]; plainPassword?: string }>;
-  middlewares: Array<Partial<Middleware> & { tags?: string[]; plainPassword?: string }>;
+  systems: Array<Partial<System> & { tags?: string[]; accounts?: Array<{ role: string; username: string; password: string; isDefault?: boolean }>; groupName?: string }>;
+  servers: Array<Partial<Server> & { tags?: string[]; plainPassword?: string; groupName?: string }>;
+  middlewares: Array<Partial<Middleware> & { tags?: string[]; plainPassword?: string; groupName?: string }>;
   projects: ParsedProject[];
+  groups: ParsedGroup[];
   tags: Array<Partial<Tag>>;
 }
 
@@ -30,6 +33,7 @@ export function parseMarkdown(content: string): ParsedBackup {
     servers: [],
     middlewares: [],
     projects: [],
+    groups: [],
     tags: [],
   };
 
@@ -45,12 +49,43 @@ export function parseMarkdown(content: string): ParsedBackup {
       result.middlewares = parseMiddlewares(section.body);
     } else if (heading === '配置' || heading === 'Configs') {
       result.projects = parseProjects(section.body);
+    } else if (heading === '分组' || heading === 'Groups') {
+      result.groups = parseGroups(section.body);
     } else if (heading === '标签' || heading === 'Tags') {
       result.tags = parseTags(section.body);
     }
   }
 
   return result;
+}
+
+/* 分组：H2 下的三列表格（类型 / 名称 / 颜色） */
+function parseGroups(body: string): ParsedGroup[] {
+  const groups: ParsedGroup[] = [];
+  const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+  let inTable = false;
+  let headers: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.slice(1, -1).split('|').map(c => c.trim());
+      if (cells.every(c => /^-+$/.test(c))) { inTable = true; continue; }
+      if (!inTable) { headers = cells; continue; }
+      const etIdx = headers.findIndex(h => h === '类型' || h === 'EntityType');
+      const nameIdx = headers.findIndex(h => h === '名称' || h === 'Name');
+      const colorIdx = headers.findIndex(h => h === '颜色' || h === 'Color');
+      const name = nameIdx >= 0 ? cells[nameIdx] : '';
+      if (name) {
+        groups.push({
+          entityType: (etIdx >= 0 ? cells[etIdx] : '') || undefined,
+          name,
+          color: colorIdx >= 0 ? (cells[colorIdx] || undefined) : undefined,
+        });
+      }
+    } else {
+      inTable = false;
+    }
+  }
+  return groups;
 }
 
 /* 配置：H3 = 项目，H4 = 配置，配置体为三列表格（字段标识 / 字段名称 / 默认值） */
@@ -147,6 +182,7 @@ function parseSystems(body: string): ParsedBackup['systems'] {
       icon: fields['图标'],
       color: fields['颜色'],
       remark: fields['备注'],
+      groupName: fields['分组'],
       tags: tagLine ? tagLine.split(',').map(s => s.trim()) : [],
       accounts,
     });
@@ -206,6 +242,7 @@ function parseServers(body: string): ParsedBackup['servers'] {
       environment: (fields['环境'] as Server['environment']) || 'development',
       purpose: fields['用途'],
       remark: fields['备注'],
+      groupName: fields['分组'],
     });
   }
   return servers;
@@ -228,6 +265,7 @@ function parseMiddlewares(body: string): ParsedBackup['middlewares'] {
       username: fields['账号'],
       plainPassword: fields['密码'],
       remark: fields['备注'],
+      groupName: fields['分组'],
     });
   }
   return middlewares;

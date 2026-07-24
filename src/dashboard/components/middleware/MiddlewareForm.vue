@@ -26,6 +26,14 @@
               </div>
             </div>
 
+            <div class="field">
+              <label class="lbl">分组</label>
+              <select v-model="form.groupId" class="inp">
+                <option value="">未分组</option>
+                <option v-for="g in groupStore.groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+              </select>
+            </div>
+
             <div class="grid-2">
               <div class="field">
                 <label class="lbl">版本</label>
@@ -118,14 +126,16 @@ import { MIDDLEWARE_TYPES } from '@shared/types/enums';
 import type { MiddlewareType } from '@shared/types/enums';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { useGroupStore } from '@shared/stores/groupStore';
 import { cryptoService } from '@shared/services/cryptoService';
 
 // ---- external contract (preserved): { visible, middleware } / { close, saved } ----
-const props = defineProps<{ visible: boolean; middleware: Middleware | null }>();
+const props = defineProps<{ visible: boolean; middleware: Middleware | null; defaultGroupId?: string }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const store = useMiddlewareStore();
 const toast = useToastStore();
+const groupStore = useGroupStore();
 
 // v3 环境 option 顺序：开发 / 测试 / 预发 / 生产
 const ENV_OPTS: { value: Environment; label: string }[] = [
@@ -169,6 +179,7 @@ function blankForm(): MiddlewareInput {
     extra: {},
     remark: '',
     favorite: false,
+    groupId: '',
   };
 }
 
@@ -178,10 +189,11 @@ watch(
   () => props.visible,
   async (v) => {
     if (!v) return;
+    if (groupStore.currentType !== 'middleware') await groupStore.load('middleware');
     showPwd.value = false;
     if (props.middleware) {
       const { password: _p, ...rest } = props.middleware;
-      form.value = { ...rest, password: '' } as MiddlewareInput;
+      form.value = { ...rest, password: '', groupId: props.middleware.groupId ?? '' } as MiddlewareInput;
       if (props.middleware.password) {
         try {
           form.value.password = await cryptoService.decryptField(props.middleware.password);
@@ -195,6 +207,7 @@ watch(
       env.value = (ex.environment as Environment) ?? 'development';
     } else {
       form.value = blankForm();
+      form.value.groupId = props.defaultGroupId || '';
       dbIndex.value = 0;
       extraParams.value = '';
       env.value = 'development';

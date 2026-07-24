@@ -18,6 +18,14 @@
               <input v-model="form.name" class="inp" type="text" placeholder="如：应用服务器-01" />
             </div>
 
+            <div class="field">
+              <label class="lbl">分组</label>
+              <select v-model="form.groupId" class="inp">
+                <option value="">未分组</option>
+                <option v-for="g in groupStore.groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+              </select>
+            </div>
+
             <div class="grid-ip">
               <div class="field">
                 <label class="lbl">IP <i class="fa-solid fa-asterisk req-mark"></i></label>
@@ -102,14 +110,16 @@ import { ref, watch } from 'vue';
 import type { Server, ServerInput, Environment } from '@shared/types/entities';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { useGroupStore } from '@shared/stores/groupStore';
 import { cryptoService } from '@shared/services/cryptoService';
 
 // ---- external contract (preserved): { visible, server } / { close, saved } ----
-const props = defineProps<{ visible: boolean; server: Server | null }>();
+const props = defineProps<{ visible: boolean; server: Server | null; defaultGroupId?: string }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const store = useServerStore();
 const toast = useToastStore();
+const groupStore = useGroupStore();
 
 // v3 环境 option 顺序：开发 / 测试 / 预发 / 生产
 const ENV_OPTS: { value: Environment; label: string }[] = [
@@ -133,6 +143,7 @@ function blankForm(): ServerInput {
     purpose: '',
     remark: '',
     favorite: false,
+    groupId: '',
   };
 }
 
@@ -142,10 +153,11 @@ watch(
   () => props.visible,
   async (v) => {
     if (!v) return;
+    if (groupStore.currentType !== 'server') await groupStore.load('server');
     showPwd.value = false;
     if (props.server) {
       const { password: _p, sshKey: _s, ...rest } = props.server;
-      form.value = { ...rest, password: '', sshKey: '' } as ServerInput;
+      form.value = { ...rest, password: '', sshKey: '', groupId: props.server.groupId ?? '' } as ServerInput;
       if (props.server.password) {
         try {
           form.value.password = await cryptoService.decryptField(props.server.password);
@@ -162,6 +174,7 @@ watch(
       }
     } else {
       form.value = blankForm();
+      form.value.groupId = props.defaultGroupId || '';
     }
   },
 );
