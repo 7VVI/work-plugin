@@ -12,3 +12,7 @@ Thumbs.db
 npm-debug.log*
 coverage/
 .nyc_output/
+
+# local tooling & build artifacts
+.claude/
+*.zip

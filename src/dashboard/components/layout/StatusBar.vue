@@ -5,7 +5,7 @@
     <div class="sb-spacer"></div>
     <span class="sb-item">chrome.storage.local</span>
     <span class="sb-item sb-clock t2">{{ clock }}</span>
-    <span class="sb-item sb-ver">Dock v3.0.0</span>
+    <span class="sb-item sb-ver">Dock 1.0.0</span>
   </footer>
 </template>
 

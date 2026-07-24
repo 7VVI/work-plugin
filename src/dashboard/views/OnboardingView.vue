@@ -1,7 +1,7 @@
 <template>
   <div class="onboarding">
     <div class="wizard-card">
-      <h2>欢迎使用 Nav Portal</h2>
+      <h2>欢迎使用 Dock</h2>
       <div class="steps">
         <div class="step" :class="{ active: step === 1 }">1. 创建第一个系统</div>
         <div class="step" :class="{ active: step === 2 }">2. 设置主密码（可选）</div>

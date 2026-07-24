@@ -25,17 +25,20 @@ tailwind.config = { theme: { extend: {
   --border:#E1E8F2; --border2:#C6D2E4;
   --ink:#0F1726; --ink2:#4E5D75; --ink3:#8593A9;
   --accent:#2E6BF0; --accent2:#0891B2; --glow:rgba(46,107,240,.25);
-  --ok:#059669; --warn:#B45309; --danger:#DC2626; --info:#2563EB;
+  --ok:#059669; --warn:#B45309; --danger:#DC2626; --info:#2563EB; --violet:#7C3AED;
   --grid-line:rgba(46,107,240,.055);
+  --shadow-pop:rgba(15,23,38,.25); --shadow-hover:rgba(15,23,38,.14);
 }
+/* Graphite 石墨暗色：中性炭灰阶梯 · 实心面板 · 明度分层 */
 html.dark{
-  --bg:#060A11; --bg2:#0A0F19; --panel:rgba(148,178,255,.05); --panel2:rgba(148,178,255,.09);
-  --solid:#0C1322; --solid2:#111A2C;
-  --border:rgba(148,178,255,.13); --border2:rgba(148,178,255,.24);
-  --ink:#E9EEF8; --ink2:#93A1B8; --ink3:#56657D;
-  --accent:#3D7FFF; --accent2:#22D3EE; --glow:rgba(61,127,255,.4);
-  --ok:#34D399; --warn:#FBBF24; --danger:#F87171; --info:#60A5FA;
-  --grid-line:rgba(148,178,255,.05);
+  --bg:#0F1113; --bg2:#16191D; --panel:#1A1E23; --panel2:#22272E;
+  --solid:#1C2026; --solid2:#262B33;
+  --border:rgba(255,255,255,.075); --border2:rgba(255,255,255,.15);
+  --ink:#E8EAED; --ink2:#9BA3AE; --ink3:#6B7480;
+  --accent:#5B8DEF; --accent2:#22B8CF; --glow:rgba(91,141,239,.3);
+  --ok:#34D399; --warn:#FBBF24; --danger:#F87171; --info:#60A5FA; --violet:#A78BFA;
+  --grid-line:rgba(255,255,255,.022);
+  --shadow-pop:rgba(0,0,0,.6); --shadow-hover:rgba(0,0,0,.5);
 }
 *{-webkit-font-smoothing:antialiased}
 html,body{height:100%}
@@ -57,16 +60,14 @@ body::after{ /* 顶部淡蓝光晕 */
     radial-gradient(720px 300px at 18% -8%, rgba(46,107,240,.10), transparent 65%),
     radial-gradient(620px 300px at 88% -8%, rgba(8,145,178,.07), transparent 65%);
 }
-html.dark body::after{background:
-  radial-gradient(640px 320px at 12% -6%, rgba(61,127,255,.14), transparent 65%),
-  radial-gradient(560px 320px at 95% 108%, rgba(34,211,238,.09), transparent 65%);}
+html.dark body::after{background:radial-gradient(760px 320px at 20% -8%, rgba(91,141,239,.07), transparent 65%);}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:#C4CEDE;border-radius:8px;border:3px solid transparent;background-clip:content-box}
-html.dark ::-webkit-scrollbar-thumb{background:rgba(148,178,255,.18)}
+html.dark ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14)}
 
 /* ================= 组件 ================= */
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 2px rgba(15,23,38,.03)}
-html.dark .panel{box-shadow:none;backdrop-filter:blur(10px)}
+html.dark .panel{box-shadow:0 1px 2px rgba(0,0,0,.35)}
 .panel-solid{background:var(--solid);border:1px solid var(--border);border-radius:16px}
 .t1{color:var(--ink)} .t2{color:var(--ink2)} .t3{color:var(--ink3)}
 .mono{font-family:'JetBrains Mono',monospace}
@@ -91,13 +92,13 @@ html.dark .btn-g:hover{background:var(--panel2)}
 .ibtn.danger:hover{background:rgba(220,38,38,.08);color:var(--danger)}
 .kbd{display:inline-flex;align-items:center;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:var(--panel2);padding:2px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--ink3)}
 .chip{display:inline-flex;align-items:center;gap:4px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);padding:2px 7px;font-size:10.5px;font-weight:500;color:var(--ink2)}
-/* 环境徽章（发光点签名） */
-.env{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:500;box-shadow:inset 0 0 0 1px}
+/* 环境徽章（发光点签名 · 双主题自适应） */
+.env{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:500;background:color-mix(in srgb,currentColor 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 22%,transparent)}
 .env::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
-.env-生产{color:var(--ok);background:rgba(5,150,105,.08);box-shadow:inset 0 0 0 1px rgba(5,150,105,.22)}
-.env-开发{color:var(--info);background:rgba(37,99,235,.08);box-shadow:inset 0 0 0 1px rgba(37,99,235,.2)}
-.env-测试{color:var(--warn);background:rgba(180,83,9,.08);box-shadow:inset 0 0 0 1px rgba(180,83,9,.22)}
-.env-预发{color:#7C3AED;background:rgba(124,58,237,.07);box-shadow:inset 0 0 0 1px rgba(124,58,237,.2)}
+.env-生产{color:var(--ok)}
+.env-开发{color:var(--info)}
+.env-测试{color:var(--warn)}
+.env-预发{color:var(--violet)}
 /* 顶部 Tab（滑动指示条） */
 .tab-btn{display:flex;align-items:center;gap:6px;padding:10px 14px;font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;transition:color .18s;background:none;border:none;white-space:nowrap}
 .tab-btn:hover{color:var(--ink)}
@@ -114,7 +115,7 @@ html.dark .btn-g:hover{background:var(--panel2)}
 /* 统计卡（顶部渐变高光） */
 .stat-card{position:relative;overflow:hidden;transition:.2s}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2),transparent 80%);opacity:0;transition:opacity .25s}
-.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px -12px rgba(15,23,38,.14)}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px -12px var(--shadow-hover)}
 .stat-card:hover::before{opacity:1}
 .stat-num{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--ink)}
 /* 弹窗动画 */
@@ -388,7 +389,7 @@ html.dark .row-h:hover{background:rgba(148,178,255,.05)}
 <!-- ================= 弹窗：新增/编辑系统 ================= -->
 <div id="modal-system" class="modal fixed inset-0 z-50 hidden items-center justify-center p-6">
   <div class="modal-overlay absolute inset-0" style="background:rgba(15,23,38,.35);backdrop-filter:blur(3px)" onclick="closeModal('modal-system')"></div>
-  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px rgba(15,23,38,.3),0 0 40px -16px var(--glow)">
+  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px var(--shadow-pop),0 0 40px -16px var(--glow)">
     <div class="flex items-center justify-between px-5 pt-4">
       <h2 id="system-modal-title" class="text-[15px] font-semibold t1">新增系统</h2>
       <button class="ibtn" onclick="closeModal('modal-system')"><i class="fa-solid fa-xmark"></i></button>
@@ -456,7 +457,7 @@ html.dark .row-h:hover{background:rgba(148,178,255,.05)}
 <!-- ================= 弹窗：新增服务器 ================= -->
 <div id="modal-server" class="modal fixed inset-0 z-50 hidden items-center justify-center p-6">
   <div class="modal-overlay absolute inset-0" style="background:rgba(15,23,38,.35);backdrop-filter:blur(3px)" onclick="closeModal('modal-server')"></div>
-  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px rgba(15,23,38,.3),0 0 40px -16px var(--glow)">
+  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px var(--shadow-pop),0 0 40px -16px var(--glow)">
     <div class="flex items-center justify-between px-5 pb-3 pt-4">
       <h2 class="text-[15px] font-semibold t1">新增服务器</h2>
       <button class="ibtn" onclick="closeModal('modal-server')"><i class="fa-solid fa-xmark"></i></button>
@@ -494,7 +495,7 @@ html.dark .row-h:hover{background:rgba(148,178,255,.05)}
 <!-- ================= 弹窗：新增中间件 ================= -->
 <div id="modal-mw" class="modal fixed inset-0 z-50 hidden items-center justify-center p-6">
   <div class="modal-overlay absolute inset-0" style="background:rgba(15,23,38,.35);backdrop-filter:blur(3px)" onclick="closeModal('modal-mw')"></div>
-  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px rgba(15,23,38,.3),0 0 40px -16px var(--glow)">
+  <div class="modal-panel panel-solid relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !rounded-2xl" style="box-shadow:0 24px 70px -16px var(--shadow-pop),0 0 40px -16px var(--glow)">
     <div class="flex items-center justify-between px-5 pb-3 pt-4">
       <h2 class="text-[15px] font-semibold t1">新增中间件</h2>
       <button class="ibtn" onclick="closeModal('modal-mw')"><i class="fa-solid fa-xmark"></i></button>
@@ -612,7 +613,7 @@ function toast(msg, type = 'success') {
   const conf = { success: ['fa-circle-check','var(--ok)'], info: ['fa-circle-info','var(--accent)'], error: ['fa-circle-exclamation','var(--danger)'] }[type];
   const el = document.createElement('div');
   el.className = 'toast-item pointer-events-auto flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-[13px] font-medium t1';
-  el.style.cssText = 'background:var(--solid);border:1px solid var(--border);box-shadow:0 12px 32px -10px rgba(15,23,38,.25),0 0 24px -10px var(--glow)';
+  el.style.cssText = 'background:var(--solid);border:1px solid var(--border);box-shadow:0 12px 32px -10px var(--shadow-pop),0 0 24px -10px var(--glow)';
   el.innerHTML = `<i class="fa-solid ${conf[0]}" style="color:${conf[1]}"></i><span>${esc(msg)}</span>`;
   $('toast-wrap').appendChild(el);
   setTimeout(() => { el.classList.add('leaving'); setTimeout(() => el.remove(), 200); }, 2600);

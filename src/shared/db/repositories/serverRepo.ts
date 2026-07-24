@@ -1,6 +1,7 @@
 import { db } from '../schema';
 import type { Server } from '../../types/entities';
 import { generateId } from '../../utils/id';
+import { toPlain } from '../../utils/plain';
 
 export const serverRepo = {
   async all(): Promise<Server[]> {
@@ -14,12 +15,12 @@ export const serverRepo = {
   async create(data: Omit<Server, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const now = Date.now();
     const id = generateId();
-    await db.servers.add({ ...data, id, createdAt: now, updatedAt: now });
+    await db.servers.add(toPlain({ ...data, id, createdAt: now, updatedAt: now }));
     return id;
   },
 
   async update(id: string, patch: Partial<Server>): Promise<void> {
-    await db.servers.update(id, { ...patch, updatedAt: Date.now() });
+    await db.servers.update(id, toPlain({ ...patch, updatedAt: Date.now() }));
   },
 
   async delete(id: string): Promise<void> {

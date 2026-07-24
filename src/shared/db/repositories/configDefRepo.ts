@@ -1,6 +1,7 @@
 import { db } from '../schema';
 import type { ConfigDef, ConfigField } from '../../types/entities';
 import { generateId } from '../../utils/id';
+import { toPlain } from '../../utils/plain';
 
 export const configDefRepo = {
   async byProject(projectId: string): Promise<ConfigDef[]> {
@@ -34,7 +35,7 @@ export const configDefRepo = {
   },
 
   async setFields(id: string, fields: ConfigField[]): Promise<void> {
-    await db.configDefs.update(id, { fields, updatedAt: Date.now() });
+    await db.configDefs.update(id, { fields: toPlain(fields), updatedAt: Date.now() });
   },
 
   async reorder(_projectId: string, orderedIds: string[]): Promise<void> {

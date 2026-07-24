@@ -1,6 +1,7 @@
 import { db } from '../schema';
 import type { Tag } from '../../types/entities';
 import { generateId } from '../../utils/id';
+import { toPlain } from '../../utils/plain';
 
 export const tagRepo = {
   async all(): Promise<Tag[]> {
@@ -17,12 +18,12 @@ export const tagRepo = {
 
   async create(data: Omit<Tag, 'id' | 'createdAt'>): Promise<string> {
     const id = generateId();
-    await db.tags.add({ ...data, id, createdAt: Date.now() });
+    await db.tags.add(toPlain({ ...data, id, createdAt: Date.now() }));
     return id;
   },
 
   async update(id: string, patch: Partial<Tag>): Promise<void> {
-    await db.tags.update(id, patch);
+    await db.tags.update(id, toPlain(patch));
   },
 
   async delete(id: string): Promise<void> {

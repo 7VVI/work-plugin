@@ -65,7 +65,11 @@ function onSaved() {
   width: 378px;
   height: 560px;
   overflow: hidden;
-  background: rgba(255, 255, 255, .96);
+  /* v3 配色：底色 + 顶部蓝/底部青径向辉光（玻璃拟态） */
+  background:
+    radial-gradient(420px 220px at 18% -10%, rgba(46,107,240,.12), transparent 60%),
+    radial-gradient(360px 220px at 92% 112%, rgba(8,145,178,.08), transparent 65%),
+    rgba(255, 255, 255, .96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   display: flex;
@@ -77,7 +81,10 @@ function onSaved() {
   from { opacity: 0; transform: translateY(-10px) scale(.9); }
 }
 [data-theme="dark"] .popup-root {
-  background: rgba(12, 19, 34, .9);
+  /* Graphite 暗色：石墨底 + 顶部淡蓝辉光 */
+  background:
+    radial-gradient(420px 220px at 20% -8%, rgba(91,141,239,.08), transparent 60%),
+    rgba(15, 17, 19, .94);
 }
 .top-header {
   display: flex;

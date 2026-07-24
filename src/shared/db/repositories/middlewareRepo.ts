@@ -1,6 +1,7 @@
 import { db } from '../schema';
 import type { Middleware } from '../../types/entities';
 import { generateId } from '../../utils/id';
+import { toPlain } from '../../utils/plain';
 
 export const middlewareRepo = {
   async all(): Promise<Middleware[]> {
@@ -18,12 +19,12 @@ export const middlewareRepo = {
   async create(data: Omit<Middleware, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const now = Date.now();
     const id = generateId();
-    await db.middlewares.add({ ...data, id, createdAt: now, updatedAt: now });
+    await db.middlewares.add(toPlain({ ...data, id, createdAt: now, updatedAt: now }));
     return id;
   },
 
   async update(id: string, patch: Partial<Middleware>): Promise<void> {
-    await db.middlewares.update(id, { ...patch, updatedAt: Date.now() });
+    await db.middlewares.update(id, toPlain({ ...patch, updatedAt: Date.now() }));
   },
 
   async delete(id: string): Promise<void> {

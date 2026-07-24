@@ -51,7 +51,6 @@
         >
           <tr v-for="s in filteredSystems" :key="s.id" class="row-group">
             <td class="col-check">
-              <i class="fa-solid fa-grip-vertical drag-handle drag-icon"></i>
               <input type="checkbox" class="row-checkbox" style="accent-color:var(--accent)" :checked="selectedIds.has(s.id)" @change="toggleOne(s.id)" />
             </td>
             <td class="col-name">
@@ -61,7 +60,6 @@
                 </span>
                 <span class="name-text">
                   <span class="sys-name t1">{{ s.name }}</span>
-                  <span v-if="s.remark" class="sys-remark t3">{{ s.remark }}</span>
                 </span>
               </div>
             </td>
@@ -86,6 +84,7 @@
                 <button class="ibtn" title="编辑" @click.stop="onEdit(s)"><i class="fa-solid fa-pen"></i></button>
                 <button class="ibtn" title="打开系统" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
                 <button class="ibtn danger" title="删除" @click.stop="onDelete(s.id)"><i class="fa-regular fa-trash-can"></i></button>
+                <i class="fa-solid fa-grip-vertical drag-handle row-grip" title="拖动排序"></i>
               </div>
             </td>
           </tr>
@@ -117,7 +116,6 @@
         </div>
         <div class="grid-card-name t1">{{ s.name }}</div>
         <div class="grid-card-url t3" :title="s.url">{{ s.url }}</div>
-        <div v-if="s.remark" class="grid-card-remark t3">{{ s.remark }}</div>
         <div class="grid-card-footer">
           <span class="grid-card-meta t3">
             <i class="fa-solid fa-key icon-10"></i>{{ acctCounts[s.id] ?? 0 }} 个账号 · {{ formatRelativeTime(s.updatedAt) }}
@@ -284,7 +282,7 @@ async function onDragEnd(event: any) {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: var(--gap-lg) var(--page-pad) var(--page-pad);
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
   gap: var(--gap-lg);
 }
 
@@ -389,7 +387,7 @@ async function onDragEnd(event: any) {
 .col-env { width: 96px; }
 .col-acct { width: 96px; }
 .col-updated { width: 112px; }
-.col-actions { width: 128px; text-align: right !important; padding-right: 16px !important; }
+.col-actions { width: 156px; text-align: right !important; padding-right: 16px !important; }
 
 .row-checkbox {
   width: 14px;
@@ -613,17 +611,22 @@ async function onDragEnd(event: any) {
   background: var(--accent) !important;
   box-shadow: 0 8px 24px rgba(46, 107, 240, 0.3) !important;
 }
+/* 拖动手柄（放在操作列末尾，删除按钮右侧） */
 .drag-handle {
   cursor: move;
-  opacity: 0;
-  transition: opacity 0.15s;
-  margin-right: 8px;
-}
-.drag-icon {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 2px;
+  border-radius: var(--radius-sm);
   color: var(--ink3);
+  font-size: 12px;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.row-group:hover .drag-handle {
-  opacity: 1;
+.drag-handle:hover {
+  background: var(--panel2);
+  color: var(--ink);
 }
 </style>

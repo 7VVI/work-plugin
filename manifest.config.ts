@@ -3,12 +3,12 @@ import pkg from './package.json';
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'Nav Portal',
+  name: 'Dock',
   version: pkg.version,
   description: pkg.description,
   action: {
     default_popup: 'popup.html',
-    default_title: 'Nav Portal',
+    default_title: 'Dock',
     default_icon: {
       '16': 'icons/icon-16.png',
       '32': 'icons/icon-32.png',

@@ -34,7 +34,7 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
   lines.push(`passwordsIncluded: ${options.includePasswords}`);
   lines.push('---');
   lines.push('');
-  lines.push('# Nav Portal Backup');
+  lines.push('# Dock Backup');
   lines.push('');
 
   if (data.systems.length > 0) {

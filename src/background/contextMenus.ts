@@ -33,7 +33,7 @@ async function openDashboardWithPrefill(tab: chrome.tabs.Tab) {
 async function copyMatchedSystemInfo(tab: chrome.tabs.Tab) {
   const system = await autoFillService.findSystemByUrl(tab.url!);
   if (!system) {
-    chrome.notifications.create({ type: 'basic', iconUrl: 'icons/icon-48.png', title: 'Nav Portal', message: '未找到匹配的系统' });
+    chrome.notifications.create({ type: 'basic', iconUrl: 'icons/icon-48.png', title: 'Dock', message: '未找到匹配的系统' });
     return;
   }
   const info = `# ${system.name}\nURL: ${system.url}\n环境: ${system.environment}\n备注: ${system.remark ?? ''}`;

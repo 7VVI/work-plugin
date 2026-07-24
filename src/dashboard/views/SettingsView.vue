@@ -68,7 +68,7 @@
       <div class="about-logo">D</div>
       <div class="about-info">
         <div class="about-name">Dock for Chrome</div>
-        <div class="about-version mono">v3.0.0 · Manifest V3 · Light Lab</div>
+        <div class="about-version mono">1.0.0</div>
       </div>
       <div class="about-spacer"></div>
       <button class="btn btn-danger" @click="onClearAll"><i class="fa-solid fa-trash-can"></i> 清除所有数据</button>

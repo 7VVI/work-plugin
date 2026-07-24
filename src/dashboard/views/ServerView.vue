@@ -3,19 +3,19 @@
     <!-- 操作栏 - v3 风格 -->
     <div class="action-bar">
       <button class="btn-p" @click="onCreate">
-        <i class="fa-solid fa-plus text-[11px]"></i>新增服务器
+        <i class="fa-solid fa-plus"></i>新增服务器
       </button>
-      <div class="flex-1"></div>
-      <div class="relative">
-        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] t3"></i>
-        <input v-model="search" class="inp w-72 !pl-8" placeholder="搜索服务器名称、IP…" />
+      <div class="flex-spacer"></div>
+      <div class="search-field">
+        <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
+        <input v-model="search" class="inp search-inp" placeholder="搜索服务器名称、IP…" />
       </div>
     </div>
 
     <!-- 服务器网格 - v3 风格 -->
     <VueDraggable
       v-model="filteredServers"
-      class="server-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+      class="server-grid"
       :animation="200"
       ghost-class="dragging"
       @end="onDragEnd"
@@ -29,17 +29,16 @@
       />
       <button
         v-if="filteredServers.length > 0"
-        class="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed t3 transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-        style="border-color:var(--border2)"
+        class="add-tile"
         @click="onCreate"
       >
-        <i class="fa-solid fa-plus text-lg"></i>
-        <span class="text-[13px] font-medium">添加服务器</span>
-        <span class="text-[11px]">快速创建新的服务器连接</span>
+        <i class="fa-solid fa-plus add-tile-icon"></i>
+        <span class="add-tile-title">添加服务器</span>
+        <span class="add-tile-sub">快速创建新的服务器连接</span>
       </button>
-      <div v-if="filteredServers.length === 0 && !store.loading" class="py-16 text-center">
-        <i class="fa-solid fa-server text-2xl t3"></i>
-        <div class="mt-2 text-[13px] t3">暂无服务器，点击"新增服务器"添加</div>
+      <div v-if="filteredServers.length === 0 && !store.loading" class="empty-state">
+        <i class="fa-solid fa-server empty-icon t3"></i>
+        <div class="empty-text t3">暂无服务器，点击"新增服务器"添加</div>
       </div>
     </VueDraggable>
 
@@ -109,22 +108,92 @@ async function onDragEnd(event: any) {
   overflow: hidden;
 }
 
+/* 操作栏 */
 .action-bar {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 20px 24px 16px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.flex-spacer { flex: 1; min-width: 0; }
+.btn-p i { font-size: 11px; }
+
+/* 搜索框（v3 .inp w-72 !pl-8） */
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.search-ico {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  pointer-events: none;
+}
+.search-inp {
+  width: 288px;
+  padding-left: 32px;
 }
 
+/* 服务器网格（v3 grid-cols-1 sm:2 xl:3 2xl:4 gap-4） */
 .server-grid {
-  padding: 0 24px 24px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  padding: 0 24px calc(var(--statusbar-h) + 24px);
   align-content: start;
 }
+@media (min-width: 640px) {
+  .server-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1280px) {
+  .server-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1536px) {
+  .server-grid { grid-template-columns: repeat(4, 1fr); }
+}
 
+/* 添加占位卡（v3 min-h-[220px] dashed） */
+.add-tile {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 14px;
+  border: 2px dashed var(--border2);
+  background: transparent;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+.add-tile:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.add-tile-icon { font-size: 18px; }
+.add-tile-title { font-size: 13px; font-weight: var(--font-medium); }
+.add-tile-sub { font-size: 11px; }
+
+/* 空状态 */
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 64px 0;
+  text-align: center;
+}
+.empty-icon { font-size: 24px; display: block; margin-bottom: 8px; }
+.empty-text { font-size: 13px; }
+
+/* 拖拽 */
 .dragging {
   opacity: 0.5;
   background: var(--accent) !important;

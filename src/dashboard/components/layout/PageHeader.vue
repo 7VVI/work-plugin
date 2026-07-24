@@ -7,9 +7,8 @@
     </div>
     <div class="header-actions">
       <button class="icon-btn" @click="toggleTheme" :title="isDark ? '切换到亮色' : '切换到暗色'">
-        <i :class="isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon'"></i>
+        <i class="fa-solid fa-circle-half-stroke"></i>
       </button>
-      <div class="avatar" title="admin">A</div>
     </div>
   </div>
 </template>
@@ -60,12 +59,4 @@ function toggleTheme() {
 }
 .icon-btn:hover { background: var(--panel2); color: var(--ink); }
 .icon-btn i { font-size: var(--text-sm); }
-.avatar {
-  width: 32px; height: 32px; border-radius: var(--radius-pill);
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #F59E0B, #EA580C);
-  color: #fff; font-size: var(--text-xs); font-weight: var(--font-bold);
-  margin-left: var(--gap-xs); cursor: pointer;
-  box-shadow: 0 0 0 2px var(--bg), 0 4px 10px -2px rgba(245,158,11,.4);
-}
 </style>

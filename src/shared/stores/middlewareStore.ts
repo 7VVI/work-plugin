@@ -34,6 +34,7 @@ export const useMiddlewareStore = defineStore('middleware', () => {
 
   async function copyConnectionString(id: string) { await middlewareService.copyConnectionString(id); }
   async function copyPassword(id: string) { await middlewareService.copyPassword(id); }
+  async function copyDetails(id: string) { await middlewareService.copyDetails(id); }
 
   async function reorder(orderedIds: string[]) {
     await middlewareService.reorder(orderedIds);
@@ -53,6 +54,6 @@ export const useMiddlewareStore = defineStore('middleware', () => {
   return {
     list, loading, selectedId, searchQuery, filtered, selected,
     load, create, update, remove, reorder,
-    copyConnectionString, copyPassword,
+    copyConnectionString, copyPassword, copyDetails,
   };
 });

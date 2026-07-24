@@ -85,6 +85,22 @@ export const middlewareService = {
     await copyToClipboard(plain);
   },
 
+  // 复制「名称 / 地址 / 端口 / 用户 / 明文密码 [ / 数据库 ]」多行信息
+  async copyDetails(id: string): Promise<void> {
+    const mw = await middlewareRepo.byId(id);
+    if (!mw) return;
+    const plainPwd = mw.password ? await cryptoService.decryptField(mw.password).catch(() => '') : '';
+    const lines = [
+      `名称: ${mw.name}`,
+      `地址: ${mw.host}`,
+      `端口: ${mw.port}`,
+      `用户: ${mw.username || ''}`,
+      `密码: ${plainPwd}`,
+    ];
+    if (mw.database) lines.push(`数据库: ${mw.database}`);
+    await copyToClipboard(lines.join('\n'));
+  },
+
   async setTags(middlewareId: string, tagIds: string[]): Promise<void> {
     await middlewareTagRepo.replaceAll(middlewareId, tagIds);
   },

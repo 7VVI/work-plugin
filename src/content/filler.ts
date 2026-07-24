@@ -16,7 +16,7 @@ function setNativeValue(el: HTMLInputElement, value: string) {
 
 export function flashFilledIndicator() {
   const banner = document.createElement('div');
-  banner.textContent = '✓ Nav Portal 已填充';
+  banner.textContent = '✓ Dock 已填充';
   banner.style.cssText = `
     position: fixed; top: 16px; right: 16px; z-index: 2147483647;
     background: #10b981; color: white; padding: 8px 14px;

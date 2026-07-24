@@ -1,4 +1,5 @@
 import { db } from '../schema';
+import { toPlain } from '../../utils/plain';
 
 export const metaRepo = {
   async get<T = unknown>(key: string): Promise<T | undefined> {
@@ -7,7 +8,7 @@ export const metaRepo = {
   },
 
   async set(key: string, value: unknown): Promise<void> {
-    await db.meta.put({ key, value });
+    await db.meta.put({ key, value: toPlain(value) });
   },
 
   async remove(key: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { db } from '../schema';
 import type { Account } from '../../types/entities';
 import { generateId } from '../../utils/id';
+import { toPlain } from '../../utils/plain';
 
 export const accountRepo = {
   async bySystemId(systemId: string): Promise<Account[]> {
@@ -18,12 +19,12 @@ export const accountRepo = {
   async create(data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const now = Date.now();
     const id = generateId();
-    await db.accounts.add({ ...data, id, createdAt: now, updatedAt: now });
+    await db.accounts.add(toPlain({ ...data, id, createdAt: now, updatedAt: now }));
     return id;
   },
 
   async update(id: string, patch: Partial<Account>): Promise<void> {
-    await db.accounts.update(id, { ...patch, updatedAt: Date.now() });
+    await db.accounts.update(id, toPlain({ ...patch, updatedAt: Date.now() }));
   },
 
   async delete(id: string): Promise<void> {

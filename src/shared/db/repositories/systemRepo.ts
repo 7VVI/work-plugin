@@ -1,6 +1,7 @@
 import { db } from '../schema';
 import type { System, SystemInput } from '../../types/entities';
 import { generateId } from '../../utils/id';
+import { toPlain } from '../../utils/plain';
 
 export const systemRepo = {
   async all(): Promise<System[]> {
@@ -18,13 +19,13 @@ export const systemRepo = {
   async create(data: SystemInput): Promise<string> {
     const now = Date.now();
     const id = generateId();
-    const system: System = { ...data, id, createdAt: now, updatedAt: now };
+    const system = toPlain<System>({ ...data, id, createdAt: now, updatedAt: now });
     await db.systems.add(system);
     return id;
   },
 
   async update(id: string, patch: Partial<System>): Promise<void> {
-    await db.systems.update(id, { ...patch, updatedAt: Date.now() });
+    await db.systems.update(id, toPlain({ ...patch, updatedAt: Date.now() }));
   },
 
   async delete(id: string): Promise<void> {

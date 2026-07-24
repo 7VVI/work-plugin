@@ -8,4 +8,4 @@ setupTabMonitor();
 setupCommands();
 setupMessaging();
 
-console.log('[Nav Portal] background service worker started');
+console.log('[Dock] background service worker started');
