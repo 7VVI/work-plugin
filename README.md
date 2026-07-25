@@ -2,6 +2,32 @@
 
 > Chrome 扩展：一站式管理内部系统、账号、服务器、中间件和配置信息。
 
+## 界面预览
+
+### 系统管理
+
+![系统管理](./images/system-dock.png)
+
+### 服务器管理
+
+![服务器管理](./images/ssh-dock.png)
+
+### 中间件管理
+
+![中间件管理](./images/middle-dock.png)
+
+### 配置中心
+
+![配置中心](./images/config-dock.png)
+
+### 导入导出
+
+![导入导出](./images/Snipaste_2026-07-25_10-06-26.png)
+
+### 系统设置
+
+![系统设置](./images/systemconfig-dock.png)
+
 ## 功能特性
 
 ### 系统管理
