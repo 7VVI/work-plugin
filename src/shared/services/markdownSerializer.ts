@@ -1,4 +1,4 @@
-import type { System, Server, Middleware, Tag, ConfigProject, Group } from '../types/entities';
+import type { System, Server, Middleware, Tag, ConfigProject, ConfigDef, Group } from '../types/entities';
 import type { ParsedBackup } from './markdownParser';
 
 export interface SerializeOptions {
@@ -10,7 +10,7 @@ interface BackupData {
   systems: Array<System & { tags?: string[]; plainAccounts?: Array<{ role: string; username: string; password: string; isDefault?: boolean }> }>;
   servers: Array<Server & { tags?: string[]; plainPassword?: string }>;
   middlewares: Array<Middleware & { tags?: string[]; plainPassword?: string }>;
-  projects: ConfigProject[];
+  projects: Array<ConfigProject & { configs: ConfigDef[] }>;
   groups?: Group[];
   tags: Tag[];
 }
@@ -54,7 +54,9 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
       if (s.url) rows.push(['URL', s.url]);
       if (s.environment) rows.push(['环境', s.environment]);
       if (s.icon) rows.push(['图标', s.icon]);
-      if (s.color) rows.push(['颜色', s.color]);
+      // 图标颜色优先取 iconColor（表单实际写入的字段），兼容旧版 color
+      const iconColorVal = (s as { iconColor?: string }).iconColor || s.color;
+      if (iconColorVal) rows.push(['颜色', iconColorVal]);
       if (groupName(s.groupId)) rows.push(['分组', groupName(s.groupId)]);
       if (s.tags && s.tags.length > 0) rows.push(['标签', s.tags.join(', ')]);
       if (s.remark) rows.push(['备注', s.remark]);
@@ -139,6 +141,10 @@ export function serializeMarkdown(data: ParsedBackup | BackupData, options: Seri
       for (const c of p.configs) {
         lines.push(`#### ${c.name}`);
         lines.push('');
+        if (c.environment) {
+          lines.push(`环境: ${c.environment}`);
+          lines.push('');
+        }
         const fieldRows = c.fields.map(f => [f.key ?? '', f.label ?? '', f.value ?? '']);
         if (fieldRows.length > 0) {
           lines.push(...buildTable(['字段标识', '字段名称', '默认值'], fieldRows));

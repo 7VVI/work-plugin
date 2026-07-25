@@ -116,6 +116,7 @@ async function onCopySsh() {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  min-height: 220px;
 }
 
 /* 顶部状态 + hover 操作 */

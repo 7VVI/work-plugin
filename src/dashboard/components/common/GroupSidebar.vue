@@ -9,44 +9,54 @@
       </div>
 
       <div class="group-list">
-        <!-- 全部（虚拟默认项） -->
+        <!-- 全部（虚拟默认项，固定置顶，不参与拖拽） -->
         <div class="group-item" :class="{ active: modelValue === 'all' }" @click="select('all')">
           <span class="group-dot all-dot"></span>
           <span class="group-name">全部{{ label }}</span>
           <span class="group-count t3">{{ records.length }}</span>
         </div>
 
-        <!-- 自定义分组 -->
-        <div
-          v-for="g in store.groups"
-          :key="g.id"
-          class="group-item"
-          :class="{ active: modelValue === g.id }"
-          @click="select(g.id)"
+        <!-- 自定义分组（支持拖拽排序） -->
+        <VueDraggable
+          v-model="orderedGroups"
+          class="group-drag"
+          :animation="200"
+          ghost-class="dragging"
+          :filter="'input'"
+          :prevent-on-filter="false"
+          @end="onDragEnd"
         >
-          <span class="group-dot" :style="{ background: g.color }"></span>
-          <template v-if="renamingId === g.id">
-            <input
-              ref="renamingInput"
-              v-model="renamingName"
-              class="inp group-rename-inp"
-              @click.stop
-              @keyup.enter="commitRename(true)"
-              @keyup.escape="commitRename(false)"
-              @blur="commitRename(true)"
-            />
-          </template>
-          <template v-else>
-            <span class="group-name" @dblclick.stop="startRename(g)" title="双击重命名">{{ g.name }}</span>
-            <span class="group-count t3">{{ countOf(g.id) }}</span>
-            <button class="ibtn ibtn-mini group-act" title="重命名" @click.stop="startRename(g)">
-              <i class="fa-solid fa-pen"></i>
-            </button>
-            <button class="ibtn ibtn-mini danger group-act" title="删除分组" @click.stop="onDelete(g)">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </template>
-        </div>
+          <div
+            v-for="g in orderedGroups"
+            :key="g.id"
+            class="group-item"
+            :class="{ active: modelValue === g.id }"
+            @click="select(g.id)"
+          >
+            <span class="group-dot" :style="{ background: g.color }"></span>
+            <template v-if="renamingId === g.id">
+              <input
+                ref="renamingInput"
+                v-model="renamingName"
+                class="inp group-rename-inp"
+                @click.stop
+                @keyup.enter="commitRename(true)"
+                @keyup.escape="commitRename(false)"
+                @blur="commitRename(true)"
+              />
+            </template>
+            <template v-else>
+              <span class="group-name" @dblclick.stop="startRename(g)" title="双击重命名">{{ g.name }}</span>
+              <span class="group-count t3">{{ countOf(g.id) }}</span>
+              <button class="ibtn ibtn-mini group-act" title="重命名" @click.stop="startRename(g)">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="ibtn ibtn-mini danger group-act" title="删除分组" @click.stop="onDelete(g)">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </template>
+          </div>
+        </VueDraggable>
       </div>
     </div>
 
@@ -99,7 +109,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue';
+import { ref, nextTick, onMounted, watch } from 'vue';
+import { VueDraggable } from 'vue-draggable-plus';
 import { useGroupStore } from '@shared/stores/groupStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
@@ -120,6 +131,23 @@ const toast = useToastStore();
 const COLORS = ['#2E6BF0', '#10B981', '#7C3AED', '#0891B2', '#F59E0B', '#EC4899', '#EF4444', '#64748B'];
 
 onMounted(() => store.load(props.entityType));
+
+/* ---------- 拖拽排序 ---------- */
+// 本地镜像，拖拽时只改本地副本，@end 后再持久化，避免直接变更 store 状态
+const orderedGroups = ref<Group[]>([]);
+watch(
+  () => store.groups,
+  (v) => { orderedGroups.value = [...v]; },
+  { immediate: true, deep: true },
+);
+
+async function onDragEnd(event: { oldIndex?: number; newIndex?: number }) {
+  const { oldIndex, newIndex } = event;
+  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
+  const orderedIds = orderedGroups.value.map(g => g.id);
+  await store.reorder(orderedIds);
+  toast.success('分组排序已更新');
+}
 
 function select(id: string) {
   emit('update:modelValue', id);
@@ -223,6 +251,11 @@ async function onDelete(g: Group) {
   min-height: 0;
   overflow-y: auto;
 }
+.group-drag {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .group-item {
   display: flex;
   align-items: center;
@@ -275,6 +308,13 @@ async function onDelete(g: Group) {
   height: 26px;
   padding: 0 8px;
   font-size: 13px;
+}
+
+/* 拖拽中的占位样式 */
+.dragging {
+  opacity: 0.5;
+  background: rgba(46, 107, 240, .12);
+  box-shadow: inset 0 0 0 1px rgba(46, 107, 240, .35);
 }
 
 /* ================= 新建分组弹窗 ================= */

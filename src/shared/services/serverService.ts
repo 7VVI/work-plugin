@@ -20,6 +20,9 @@ export const serverService = {
     requireNumber(input.sshPort, 'SSH 端口');
     const encryptedPassword = await cryptoService.encryptField(input.password);
     const encryptedSshKey = input.sshKey ? await cryptoService.encryptField(input.sshKey) : undefined;
+    // sortOrder 必须显式赋值：serverRepo.all() 使用 orderBy('sortOrder')，
+    // IndexedDB 会排除该索引键为 undefined 的记录，否则新建服务器不会显示。
+    const sortOrder = input.sortOrder ?? (await serverRepo.all()).length;
     return serverRepo.create({
       name: input.name,
       ip: input.ip,
@@ -32,6 +35,7 @@ export const serverService = {
       purpose: input.purpose,
       remark: input.remark,
       favorite: input.favorite,
+      sortOrder,
       groupId: input.groupId,
     });
   },

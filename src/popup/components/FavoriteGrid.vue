@@ -92,7 +92,7 @@ const listRef = ref<HTMLElement | null>(null);
 
 onMounted(async () => {
   const all = await systemRepo.all();
-  systems.value = all.sort((a, b) => a.sort - b.sort || b.updatedAt - a.updatedAt);
+  systems.value = all.sort((a, b) => a.sort - b.sort);
   if (systems.value.length) activeId.value = systems.value[0].id;
   emit('count', systems.value.length);
   window.addEventListener('keydown', onKeydown);

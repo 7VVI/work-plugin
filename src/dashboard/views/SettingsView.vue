@@ -38,6 +38,86 @@
         </div>
         <div class="sw" :class="{ on: masterPwdOn }" @click="toggleMasterPwd"></div>
       </div>
+
+      <!-- 主密码设置 / 修改 -->
+      <div v-if="masterPwdOn" class="master-pwd-section">
+        <div v-if="hasMasterPwd" class="setting-row bordered">
+          <div class="setting-meta">
+            <div class="setting-name">修改主密码</div>
+            <div class="setting-desc">输入当前密码和新密码来更新</div>
+          </div>
+          <button class="btn-p btn-sm" @click="showChangePwd = !showChangePwd">
+            <i class="fa-solid fa-key"></i>{{ showChangePwd ? '收起' : '修改密码' }}
+          </button>
+        </div>
+        <div v-if="hasMasterPwd && showChangePwd" class="pwd-form">
+          <div class="pwd-field">
+            <label class="pwd-label">当前密码</label>
+            <input
+              v-model="currentPwd"
+              type="password"
+              class="inp pwd-input"
+              placeholder="输入当前主密码"
+              @keyup.enter="onChangePwd"
+            />
+          </div>
+          <div class="pwd-field">
+            <label class="pwd-label">新密码</label>
+            <input
+              v-model="newPwd"
+              type="password"
+              class="inp pwd-input"
+              placeholder="输入新主密码（至少 4 位）"
+              @keyup.enter="onChangePwd"
+            />
+          </div>
+          <div class="pwd-field">
+            <label class="pwd-label">确认新密码</label>
+            <input
+              v-model="confirmPwd"
+              type="password"
+              class="inp pwd-input"
+              placeholder="再次输入新密码"
+              @keyup.enter="onChangePwd"
+            />
+          </div>
+          <button class="btn-p" :disabled="changePwdLoading" @click="onChangePwd">
+            <i class="fa-solid fa-check"></i>确认修改
+          </button>
+        </div>
+
+        <div v-if="!hasMasterPwd" class="pwd-form">
+          <div class="setting-row bordered">
+            <div class="setting-meta">
+              <div class="setting-name">设置主密码</div>
+              <div class="setting-desc">首次设置后，解锁需输入此密码</div>
+            </div>
+          </div>
+          <div class="pwd-field">
+            <label class="pwd-label">主密码</label>
+            <input
+              v-model="newPwd"
+              type="password"
+              class="inp pwd-input"
+              placeholder="输入主密码（至少 4 位）"
+              @keyup.enter="onSetPwd"
+            />
+          </div>
+          <div class="pwd-field">
+            <label class="pwd-label">确认密码</label>
+            <input
+              v-model="confirmPwd"
+              type="password"
+              class="inp pwd-input"
+              placeholder="再次输入主密码"
+              @keyup.enter="onSetPwd"
+            />
+          </div>
+          <button class="btn-p" :disabled="changePwdLoading" @click="onSetPwd">
+            <i class="fa-solid fa-check"></i>设置密码
+          </button>
+        </div>
+      </div>
     </section>
 
     <!-- 快捷键 -->
@@ -77,21 +157,96 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { usePrefStore } from '@shared/stores/prefStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { importExportService } from '@shared/services/importExportService';
+import { cryptoStorage } from '@shared/crypto/storage';
+import { generateSalt, deriveKey } from '@shared/crypto/masterKey';
+import { cryptoSession, VERIFIER_PLAINTEXT } from '@shared/crypto/session';
 
 const prefStore = usePrefStore();
 const toast = useToastStore();
 const dialog = useDialogStore();
 
 const masterPwdOn = ref(false);
+const hasMasterPwd = ref(false);
+const showChangePwd = ref(false);
+const currentPwd = ref('');
+const newPwd = ref('');
+const confirmPwd = ref('');
+const changePwdLoading = ref(false);
 
-function toggleMasterPwd() {
-  masterPwdOn.value = !masterPwdOn.value;
-  toast.info(masterPwdOn.value ? '主密码已启用' : '主密码已关闭');
+onMounted(async () => {
+  hasMasterPwd.value = await cryptoStorage.hasMasterPassword();
+  masterPwdOn.value = hasMasterPwd.value;
+});
+
+async function toggleMasterPwd() {
+  if (masterPwdOn.value) {
+    // 关闭主密码
+    const ok = await dialog.confirm('关闭主密码', '关闭后将清除已保存的主密码，确认？');
+    if (!ok) return;
+    await cryptoStorage.clear();
+    cryptoSession.lock();
+    masterPwdOn.value = false;
+    hasMasterPwd.value = false;
+    toast.info('主密码已关闭');
+  } else {
+    masterPwdOn.value = true;
+  }
+}
+
+async function onSetPwd() {
+  if (newPwd.value.length < 4) { toast.error('密码至少 4 位'); return; }
+  if (newPwd.value !== confirmPwd.value) { toast.error('两次输入不一致'); return; }
+  changePwdLoading.value = true;
+  try {
+    const salt = generateSalt();
+    const key = await deriveKey(newPwd.value, salt);
+    await cryptoStorage.setSalt(salt);
+    await cryptoStorage.setVerifier(key, VERIFIER_PLAINTEXT);
+    cryptoSession.setKey(key);
+    hasMasterPwd.value = true;
+    newPwd.value = '';
+    confirmPwd.value = '';
+    toast.success('主密码已设置');
+  } catch (e: any) {
+    toast.error('设置失败: ' + (e.message || e));
+  } finally {
+    changePwdLoading.value = false;
+  }
+}
+
+async function onChangePwd() {
+  if (!currentPwd.value) { toast.error('请输入当前密码'); return; }
+  if (newPwd.value.length < 4) { toast.error('新密码至少 4 位'); return; }
+  if (newPwd.value !== confirmPwd.value) { toast.error('两次输入不一致'); return; }
+  changePwdLoading.value = true;
+  try {
+    // 验证当前密码
+    const oldSalt = await cryptoStorage.getSalt();
+    if (!oldSalt) { toast.error('当前无主密码记录'); return; }
+    const oldKey = await deriveKey(currentPwd.value, oldSalt);
+    const valid = await cryptoStorage.verifyKey(oldKey, VERIFIER_PLAINTEXT);
+    if (!valid) { toast.error('当前密码错误'); changePwdLoading.value = false; return; }
+    // 设置新密码
+    const salt = generateSalt();
+    const key = await deriveKey(newPwd.value, salt);
+    await cryptoStorage.setSalt(salt);
+    await cryptoStorage.setVerifier(key, VERIFIER_PLAINTEXT);
+    cryptoSession.setKey(key);
+    currentPwd.value = '';
+    newPwd.value = '';
+    confirmPwd.value = '';
+    showChangePwd.value = false;
+    toast.success('主密码已更新');
+  } catch (e: any) {
+    toast.error('修改失败: ' + (e.message || e));
+  } finally {
+    changePwdLoading.value = false;
+  }
 }
 
 async function onClearAll() {
@@ -161,6 +316,35 @@ async function onClearAll() {
   color: var(--text-tertiary);
 }
 .auto-lock-select { width: 144px; flex: none; }
+
+/* 主密码 */
+.master-pwd-section { margin-top: var(--gap-md); }
+.pwd-form {
+  margin-top: var(--gap-lg);
+  padding-top: var(--gap-lg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+  max-width: 380px;
+}
+.pwd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pwd-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+.pwd-input {
+  width: 100%;
+}
+.btn-sm {
+  padding: 4px 12px;
+  font-size: var(--text-xs);
+}
 
 .kbd-list {
   list-style: none;

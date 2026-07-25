@@ -24,9 +24,11 @@ import DialogHost from './components/common/DialogHost.vue';
 import StatusBar from './components/layout/StatusBar.vue';
 import { usePrefStore } from '@shared/stores/prefStore';
 import { useCryptoStore } from '@shared/stores/cryptoStore';
+import { useConfigStore } from '@shared/stores/configStore';
 
 const prefStore = usePrefStore();
 const cryptoStore = useCryptoStore();
+const configStore = useConfigStore();
 
 function resolveTheme(theme: string): 'light' | 'dark' {
   if (theme === 'system') {
@@ -51,6 +53,7 @@ onMounted(async () => {
   mq = window.matchMedia('(prefers-color-scheme: dark)');
   mq.addEventListener('change', onSystemThemeChange);
   await cryptoStore.checkStatus();
+  await configStore.load();
 });
 
 onBeforeUnmount(() => {

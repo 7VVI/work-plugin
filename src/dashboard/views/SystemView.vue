@@ -10,6 +10,14 @@
       <button v-if="selectedIds.size > 0" class="btn btn-danger" @click="onBulkDelete">
         <i class="fa-regular fa-trash-can icon-11"></i>删除选中<span v-if="selectedIds.size" class="sel-count">（{{ selectedIds.size }}）</span>
       </button>
+      <!-- 环境筛选 -->
+      <div class="env-filter">
+        <button class="env-btn" :class="{ active: selectedEnv === 'all' }" @click="selectedEnv = 'all'">全部</button>
+        <button class="env-btn env-prod" :class="{ active: selectedEnv === 'production' }" @click="selectedEnv = 'production'">生产</button>
+        <button class="env-btn env-dev" :class="{ active: selectedEnv === 'development' }" @click="selectedEnv = 'development'">开发</button>
+        <button class="env-btn env-test" :class="{ active: selectedEnv === 'test' }" @click="selectedEnv = 'test'">测试</button>
+        <button class="env-btn env-staging" :class="{ active: selectedEnv === 'staging' }" @click="selectedEnv = 'staging'">预发</button>
+      </div>
       <div class="flex-spacer"></div>
       <!-- 视图切换 - v3 风格 -->
       <div class="view-toggle">
@@ -83,6 +91,7 @@
             <td class="col-updated t3">{{ formatRelativeTime(s.updatedAt) }}</td>
             <td class="col-actions">
               <div class="row-actions-fade">
+                <button class="ibtn" title="复制（URL+默认账号密码）" @click.stop="onCopySystem(s)"><i class="fa-regular fa-copy"></i></button>
                 <button class="ibtn" title="编辑" @click.stop="onEdit(s)"><i class="fa-solid fa-pen"></i></button>
                 <button class="ibtn" title="打开系统" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
                 <button class="ibtn danger" title="删除" @click.stop="onDelete(s.id)"><i class="fa-regular fa-trash-can"></i></button>
@@ -123,6 +132,7 @@
             <i class="fa-solid fa-key icon-10"></i>{{ acctCounts[s.id] ?? 0 }} 个账号 · {{ formatRelativeTime(s.updatedAt) }}
           </span>
           <div class="grid-card-actions">
+            <button class="ibtn" @click.stop="onCopySystem(s)" title="复制（URL+默认账号密码）"><i class="fa-regular fa-copy icon-11"></i></button>
             <button class="ibtn" @click.stop="onEdit(s)" title="编辑"><i class="fa-solid fa-pen icon-11"></i></button>
             <button class="ibtn danger" @click.stop="onDelete(s.id)" title="删除"><i class="fa-regular fa-trash-can icon-11"></i></button>
           </div>
@@ -145,9 +155,10 @@ import { VueDraggable } from 'vue-draggable-plus';
 import { useSystemStore } from '@shared/stores/systemStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
-import type { System } from '@shared/types/entities';
+import type { System, Environment } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
 import { accountService } from '@shared/services/accountService';
+import { accountRepo } from '@shared/db/repositories/accountRepo';
 import { copyToClipboard } from '@shared/utils/clipboard';
 import EnvBadge from '../components/common/EnvBadge.vue';
 import GroupSidebar from '../components/common/GroupSidebar.vue';
@@ -160,6 +171,7 @@ const formVisible = ref(false);
 const editing = ref<System | null>(null);
 const search = ref('');
 const selectedGroupId = ref<string>('all');
+const selectedEnv = ref<Environment | 'all'>('all');
 const selectedIds = ref<Set<string>>(new Set());
 const acctCounts = ref<Record<string, number>>({});
 const VIEW_KEY = 'dock-v3-system-view';
@@ -178,8 +190,9 @@ const iconPalettes = [
 ];
 
 function iconStyle(s: System) {
-  const bg = s.iconColor || iconPalettes[Math.abs(s.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) % iconPalettes.length];
-  const solid = s.iconColor || '#2E6BF0';
+  const color = s.iconColor || s.color;
+  const bg = color || iconPalettes[Math.abs(s.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) % iconPalettes.length];
+  const solid = color || '#2E6BF0';
   return { background: bg, boxShadow: `0 5px 14px -4px ${solid}66` };
 }
 
@@ -207,6 +220,9 @@ const filteredSystems = computed(() => {
   let result = store.list;
   if (selectedGroupId.value !== 'all') {
     result = result.filter(s => s.groupId === selectedGroupId.value);
+  }
+  if (selectedEnv.value !== 'all') {
+    result = result.filter(s => s.environment === selectedEnv.value);
   }
   if (!search.value.trim()) return result;
   const q = search.value.toLowerCase();
@@ -271,6 +287,27 @@ async function copyUrl(url: string) {
   }
 }
 
+async function onCopySystem(s: System) {
+  try {
+    const defaultAccount = await accountRepo.getDefault(s.id);
+    let text = s.url;
+    if (defaultAccount) {
+      const { plainPassword } = await accountService.getDecrypted(defaultAccount.id);
+      text += `\n${defaultAccount.username}\n${plainPassword}`;
+    }
+    await copyToClipboard(text);
+    toast.success(defaultAccount ? '已复制 URL + 默认账号密码' : '已复制 URL（无默认账号）');
+  } catch {
+    // fallback: just copy URL
+    try {
+      await copyToClipboard(s.url);
+      toast.success('已复制 URL（账号解密失败）');
+    } catch {
+      toast.error('复制失败');
+    }
+  }
+}
+
 async function onDragEnd(event: any) {
   const { oldIndex, newIndex } = event;
   if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
@@ -326,6 +363,41 @@ async function onDragEnd(event: any) {
 .icon-10 { font-size: 10px; }
 .flex-spacer { flex: 1; min-width: 0; }
 .sel-count { margin-left: 2px; }
+
+/* 环境筛选 */
+.env-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.env-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+.env-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+.env-btn.active {
+  color: #fff;
+  border-color: transparent;
+  background: var(--ink2);
+  box-shadow: 0 0 6px currentColor;
+}
+.env-btn.env-prod.active { background: var(--env-prod-fg); }
+.env-btn.env-dev.active { background: var(--env-dev-fg); }
+.env-btn.env-test.active { background: var(--env-test-fg); }
+.env-btn.env-staging.active { background: var(--env-staging-fg); }
 
 /* 视图切换 */
 .view-toggle {
@@ -521,10 +593,13 @@ async function onDragEnd(event: any) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
   grid-template-columns: repeat(1, 1fr);
   gap: 16px;
   align-content: start;
+  /* 行高按内容撑开，禁止卡片被压缩/拉伸导致文字被裁切遮挡 */
+  grid-auto-rows: max-content;
 }
 @media (min-width: 640px) {
   .systems-grid { grid-template-columns: repeat(2, 1fr); }
@@ -542,6 +617,8 @@ async function onDragEnd(event: any) {
   flex-direction: column;
   gap: 4px;
   cursor: pointer;
+  /* 保证卡片最小高度，避免内容被压缩裁切 */
+  min-height: 150px;
 }
 .grid-card-top {
   display: flex;

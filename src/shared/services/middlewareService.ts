@@ -38,6 +38,9 @@ export const middlewareService = {
       extra: cleanExtra,
       remark: input.remark,
       favorite: input.favorite,
+      // sortOrder 必须显式赋值：middlewareRepo.all() 使用 orderBy('sortOrder')，
+      // IndexedDB 会排除该索引键为 undefined 的记录，否则新建中间件不会显示。
+      sortOrder: input.sortOrder ?? (await middlewareRepo.all()).length,
       groupId: input.groupId,
     });
   },

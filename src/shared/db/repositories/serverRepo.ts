@@ -5,7 +5,14 @@ import { toPlain } from '../../utils/plain';
 
 export const serverRepo = {
   async all(): Promise<Server[]> {
-    return db.servers.orderBy('sortOrder').toArray();
+    // 不能用 orderBy('sortOrder')：IndexedDB 基于索引的 orderBy 会排除
+    // sortOrder 为 undefined 的记录（如导入时未设置 sortOrder 的服务器），
+    // 导致“导入的服务器不显示”。改为取全部后在内存排序。
+    const list = await db.servers.toArray();
+    return list.sort(
+      (a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER)
+        || a.createdAt - b.createdAt,
+    );
   },
 
   async byId(id: string): Promise<Server | undefined> {

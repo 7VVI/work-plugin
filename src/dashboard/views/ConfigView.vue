@@ -1,49 +1,28 @@
 <template>
   <div class="config-view">
-    <!-- 操作栏 -->
-    <div class="action-bar">
-      <button class="btn-p" @click="startAddProject">
-        <i class="fa-solid fa-plus"></i>新增分组
-      </button>
-      <div class="flex-spacer"></div>
-      <div class="search-field">
-        <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
-        <input v-model="search" class="inp search-inp" placeholder="搜索分组、配置…" />
-      </div>
-    </div>
-
     <div class="split-body">
-      <!-- 左侧分组列表 -->
+      <!-- 左侧树形菜单 -->
       <div class="sidebar">
-        <div class="panel proj-panel">
-          <div class="proj-panel-head">
-            <span class="proj-panel-title t3">分组</span>
-            <button class="ibtn ibtn-mini" title="新增分组" @click="startAddProject">
-              <i class="fa-solid fa-plus"></i>
-            </button>
-          </div>
-          <VueDraggable
-            v-model="filteredProjects"
-            class="proj-list"
-            :animation="200"
-            ghost-class="dragging"
-            :filter="'input'"
-            :prevent-on-filter="false"
-            @end="onProjectDragEnd"
-          >
+        <div class="sidebar-head">
+          <span class="sidebar-title"><i class="fa-solid fa-sliders"></i> 配置中心</span>
+          <button class="ibtn ibtn-mini" title="新增分组" @click="startAddProject">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+        <div class="tree-wrap">
+          <div v-for="p in filteredProjects" :key="p.id" class="tree-group">
+            <!-- 分组节点 -->
             <div
-              v-for="p in filteredProjects"
-              :key="p.id"
-              class="proj-item"
-              :class="{ active: p.id === store.selectedProjectId }"
-              @click="store.selectProject(p.id)"
+              class="tree-node tree-project"
+              :class="{ expanded: expandedSet.has(p.id) }"
+              @click="toggleProject(p.id)"
             >
-              <i class="fa-regular fa-folder proj-folder" :style="{ color: p.id === store.selectedProjectId ? 'var(--accent)' : 'var(--ink3)' }"></i>
+              <i class="fa-solid tree-arrow" :class="expandedSet.has(p.id) ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+              <i class="fa-solid fa-cubes tree-proj-icon" :class="{ active: p.id === store.selectedProjectId }"></i>
               <template v-if="renamingProjectId === p.id">
                 <input
-                  ref="renamingProjectInput"
                   v-model="renamingProjectName"
-                  class="inp proj-rename-inp"
+                  class="inp tree-rename-inp"
                   @click.stop
                   @keyup.enter="commitRenameProject(true)"
                   @keyup.escape="commitRenameProject(false)"
@@ -51,157 +30,189 @@
                 />
               </template>
               <template v-else>
-                <span class="proj-name" @dblclick.stop="startRenameProject(p)" title="双击重命名">{{ p.name }}</span>
-                <span class="proj-count t3">{{ store.configs.length }}</span>
-                <button class="ibtn ibtn-mini proj-act" title="重命名" @click.stop="startRenameProject(p)">
-                  <i class="fa-solid fa-pen"></i>
-                </button>
-                <button class="ibtn ibtn-mini danger proj-act" title="删除" @click.stop="onDeleteProject(p.id)">
-                  <i class="fa-solid fa-xmark"></i>
-                </button>
+                <span class="tree-node-name" :class="{ active: p.id === store.selectedProjectId }">{{ p.name }}</span>
+                <span class="tree-count">{{ store.configCounts[p.id] ?? 0 }}</span>
               </template>
+              <button class="ibtn ibtn-tiny tree-act" title="重命名" @click.stop="startRenameProject(p)">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="ibtn ibtn-tiny danger tree-act" title="删除" @click.stop="onDeleteProject(p.id)">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
             </div>
-          </VueDraggable>
-          <div v-if="filteredProjects.length === 0" class="proj-empty t3">暂无分组</div>
+            <!-- 展开的配置子节点 -->
+            <Transition name="tree-expand">
+              <div v-if="expandedSet.has(p.id)" class="tree-children">
+                <VueDraggable
+                  :model-value="getProjectConfigs(p.id)"
+                  class="tree-config-list"
+                  :animation="200"
+                  ghost-class="dragging"
+                  :group="'configs-' + p.id"
+                  @end="(e: any) => onConfigDragEnd(p.id, e)"
+                >
+                  <div
+                    v-for="c in getProjectConfigs(p.id)"
+                    :key="c.id"
+                    class="tree-node tree-config"
+                    :class="{ active: c.id === store.selectedConfigId }"
+                    @click.stop="onSelectConfig(p.id, c.id)"
+                  >
+                    <template v-if="renamingConfigId === c.id">
+                      <input
+                        v-model="renamingConfigName"
+                        class="inp tree-rename-cfg-inp"
+                        @click.stop
+                        @keyup.enter="commitRenameConfig(true)"
+                        @keyup.escape="commitRenameConfig(false)"
+                        @blur="commitRenameConfig(true)"
+                      />
+                    </template>
+                    <template v-else>
+                      <span class="tree-config-name" @dblclick.stop="startRenameConfig(c)" title="双击重命名">{{ c.name }}</span>
+                      <span class="tree-count">{{ c.fields.length }}</span>
+                      <button class="ibtn ibtn-tiny tree-copy-act" title="复制所有字段" @click.stop="onCopyConfig(c)">
+                        <i class="fa-regular fa-copy"></i>
+                      </button>
+                      <button class="ibtn ibtn-tiny danger tree-copy-act" title="删除配置" @click.stop="onDeleteConfig(c.id)">
+                        <i class="fa-solid fa-xmark"></i>
+                      </button>
+                    </template>
+                  </div>
+                </VueDraggable>
+              </div>
+            </Transition>
+          </div>
+          <div v-if="filteredProjects.length === 0" class="tree-empty t3">暂无分组</div>
         </div>
       </div>
 
       <!-- 右侧配置详情 -->
-      <div class="panel config-detail">
-        <template v-if="store.selectedProject">
-          <div class="detail-head">
-            <span class="detail-icon"><i class="fa-regular fa-folder-open"></i></span>
-            <span class="detail-title t1">{{ store.selectedProject.name }}</span>
-            <span v-if="showSaveHint" class="save-hint">
-              <i class="fa-solid fa-check"></i>已自动保存
-            </span>
-            <div class="flex-spacer"></div>
+      <div class="main-panel">
+        <template v-if="store.selectedConfig">
+          <!-- 面包屑 -->
+          <div class="breadcrumb">
+            <span class="bc-item">配置中心</span>
+            <i class="fa-solid fa-chevron-right bc-sep"></i>
+            <span class="bc-item" v-if="store.selectedProject">{{ store.selectedProject.name }}</span>
+            <i class="fa-solid fa-chevron-right bc-sep"></i>
+            <span class="bc-item bc-current">{{ store.selectedConfig.name }}</span>
           </div>
 
-          <div class="cfg-chips">
-            <VueDraggable
-              v-model="store.configs"
-              class="cfg-chips-drag"
-              :animation="200"
-              ghost-class="dragging"
-              :filter="'input'"
-              :prevent-on-filter="false"
-              @end="onConfigDragEnd"
-            >
-              <span
-                v-for="c in store.configs"
-                :key="c.id"
-                class="cfg-chip"
-                :class="{ active: c.id === store.selectedConfigId }"
-                @click="store.selectConfig(c.id)"
-              >
-                <template v-if="renamingConfigId === c.id">
-                  <input
-                    ref="renamingConfigInput"
-                    v-model="renamingConfigName"
-                    class="inp cfg-rename-inp"
-                    @click.stop
-                    @keyup.enter="commitRenameConfig(true)"
-                    @keyup.escape="commitRenameConfig(false)"
-                    @blur="commitRenameConfig(true)"
-                  />
-                </template>
-                <template v-else>
-                  <span class="cfg-chip-name" @dblclick.stop="startRenameConfig(c)" title="双击重命名">{{ c.name }}</span>
-                  <span class="cfg-chip-count t3">{{ c.fields.length }}</span>
-                  <button class="ibtn ibtn-tiny cfg-chip-act" title="重命名" @click.stop="startRenameConfig(c)">
-                    <i class="fa-solid fa-pen"></i>
-                  </button>
-                  <button class="ibtn ibtn-tiny danger cfg-chip-act" title="删除" @click.stop="onDeleteConfig(c.id)">
-                    <i class="fa-solid fa-xmark"></i>
-                  </button>
-                </template>
-              </span>
-            </VueDraggable>
-            <button
-              v-if="!addingConfig"
-              class="cfg-add-chip"
-              @click="startAddConfig"
-            >
-              <i class="fa-solid fa-plus"></i>新增配置
-            </button>
-            <span v-else class="cfg-chip-add-wrap">
-              <input
-                v-model="newConfigName"
-                class="inp cfg-chip-add-inp"
-                placeholder="配置名 · 回车"
-                @keyup.enter="commitAddConfig"
-                @keyup.escape="cancelAddConfig"
-                @blur="commitAddConfig"
-              />
-            </span>
-          </div>
-
-          <div v-if="store.selectedConfig" class="field-table-wrap">
-            <table class="field-table">
-              <thead>
-                <tr class="field-head t3">
-                  <th class="fh-key">字段标识</th>
-                  <th class="fh-label">字段名称</th>
-                  <th class="fh-value">默认值</th>
-                  <th class="fh-actions">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(f, i) in store.selectedConfig.fields"
-                  :key="i"
-                  class="field-row"
-                >
-                  <td class="fc-key">
-                    <input class="finput mono" :value="f.key" @blur="onFieldBlur(i, 'key', $event)" @keydown="fieldEnter($event, $event.target)" />
-                  </td>
-                  <td class="fc-label">
-                    <input class="finput" :value="f.label" @blur="onFieldBlur(i, 'label', $event)" @keydown="fieldEnter($event, $event.target)" />
-                  </td>
-                  <td class="fc-value">
-                    <input class="finput mono" :value="f.value" @blur="onFieldBlur(i, 'value', $event)" @keydown="fieldEnter($event, $event.target)" />
-                  </td>
-                  <td class="fc-actions">
-                    <div class="field-actions">
-                      <button class="ibtn ibtn-sm" title="复制值" @click="onCopy(f.value)">
-                        <i class="fa-regular fa-copy"></i>
-                      </button>
-                      <button class="ibtn ibtn-sm danger" title="删除" @click="onDeleteField(i)">
-                        <i class="fa-regular fa-trash-can"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr class="field-row">
-                  <td class="fc-key">
-                    <input ref="nfKeyRef" v-model="nfKey" class="finput mono" placeholder="+ 字段标识" @blur="onNfBlur" @keydown="newFieldEnter($event, nfLabelRef)" />
-                  </td>
-                  <td class="fc-label">
-                    <input ref="nfLabelRef" v-model="nfLabel" class="finput" placeholder="字段名称" @blur="onNfBlur" @keydown="newFieldEnter($event, nfValueRef)" />
-                  </td>
-                  <td class="fc-value">
-                    <input ref="nfValueRef" v-model="nfValue" class="finput mono" placeholder="默认值 · 回车保存" @blur="onNfBlur" @keydown="newFieldEnter($event, null)" />
-                  </td>
-                  <td></td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="field-hint t3">
-              <i class="fa-regular fa-lightbulb"></i>末行输入后回车 / 失焦即自动保存 · 点击任意单元格直接修改，失焦自动保存
+          <!-- 环境标签 + 搜索 + 新增配置 -->
+          <div class="toolbar">
+            <div class="env-filter">
+              <button class="env-btn" :class="{ active: selectedEnv === 'all' }" @click="selectedEnv = 'all'">全部</button>
+              <button class="env-btn env-prod" :class="{ active: selectedEnv === 'production' }" @click="selectedEnv = 'production'">生产</button>
+              <button class="env-btn env-dev" :class="{ active: selectedEnv === 'development' }" @click="selectedEnv = 'development'">开发</button>
+              <button class="env-btn env-test" :class="{ active: selectedEnv === 'test' }" @click="selectedEnv = 'test'">测试</button>
+              <button class="env-btn env-staging" :class="{ active: selectedEnv === 'staging' }" @click="selectedEnv = 'staging'">预发</button>
+            </div>
+            <div class="toolbar-right">
+              <div class="search-field">
+                <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
+                <input v-model="search" class="inp search-inp" placeholder="搜索配置项…" />
+              </div>
+              <button class="btn-p btn-add-cfg" @click="startAddConfig">
+                <i class="fa-solid fa-plus"></i>新增配置
+              </button>
             </div>
           </div>
 
-          <div v-else class="no-config t3">
-            <i class="fa-regular fa-file-lines no-config-icon"></i>
-            <div class="no-config-text">点击上方「新增配置」创建第一组字段</div>
+          <!-- 当前配置环境选择 -->
+          <div class="cfg-env-row">
+            <span class="cfg-env-lbl t3">当前配置环境</span>
+            <select class="inp env-select" :value="store.selectedConfig.environment || ''" @change="onChangeConfigEnv" title="配置所属环境">
+              <option value="">未分类环境</option>
+              <option value="production">生产</option>
+              <option value="development">开发</option>
+              <option value="test">测试</option>
+              <option value="staging">预发布</option>
+            </select>
+            <span v-if="showSaveHint" class="save-hint">
+              <i class="fa-solid fa-check"></i>已自动保存
+            </span>
+          </div>
+
+          <!-- 字段表头 -->
+          <div class="field-header">
+            <span class="fh-key">字段标识</span>
+            <span class="fh-label">字段名称</span>
+            <span class="fh-value">默认值</span>
+            <span class="fh-actions">操作</span>
+          </div>
+
+          <!-- 字段列表 -->
+          <div class="field-list">
+            <div
+              v-for="(f, i) in filteredFields"
+              :key="i"
+              class="field-row"
+            >
+              <div class="fc-key">
+                <input class="finput mono" :value="f.key" @blur="onFieldBlur(i, 'key', $event)" @keydown="fieldEnter($event, $event.target)" />
+              </div>
+              <div class="fc-label">
+                <input class="finput" :value="f.label" @blur="onFieldBlur(i, 'label', $event)" @keydown="fieldEnter($event, $event.target)" />
+              </div>
+              <div class="fc-value">
+                <input class="finput mono" :value="f.value" @blur="onFieldBlur(i, 'value', $event)" @keydown="fieldEnter($event, $event.target)" />
+              </div>
+              <div class="fc-actions">
+                <button class="ibtn ibtn-sm" title="复制值" @click="onCopy(f.value)">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+                <button class="ibtn ibtn-sm danger" title="删除" @click="onDeleteField(i)">
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+            <!-- 新增字段行 -->
+            <div class="field-row field-row-new">
+              <div class="fc-key">
+                <input ref="nfKeyRef" v-model="nfKey" class="finput mono" placeholder="+ 字段标识" @blur="onNfBlur" @keydown="newFieldEnter($event, nfLabelRef)" />
+              </div>
+              <div class="fc-label">
+                <input ref="nfLabelRef" v-model="nfLabel" class="finput" placeholder="字段名称" @blur="onNfBlur" @keydown="newFieldEnter($event, nfValueRef)" />
+              </div>
+              <div class="fc-value">
+                <input ref="nfValueRef" v-model="nfValue" class="finput mono" placeholder="默认值 · 回车保存" @blur="onNfBlur" @keydown="newFieldEnter($event, null)" />
+              </div>
+              <div class="fc-actions"></div>
+            </div>
+          </div>
+          <div class="field-hint t3">
+            <i class="fa-regular fa-lightbulb"></i>末行输入后回车 / 失焦即自动保存 · 点击任意单元格直接修改，失焦自动保存
           </div>
         </template>
 
-        <div v-else class="no-project t3">
-          <i class="fa-regular fa-folder-open no-project-icon"></i>
-          <div class="no-project-text">选择左侧分组，或点击「新增分组」开始</div>
-        </div>
+        <!-- 无选中配置时 -->
+        <template v-else-if="store.selectedProject">
+          <div class="breadcrumb">
+            <span class="bc-item">配置中心</span>
+            <i class="fa-solid fa-chevron-right bc-sep"></i>
+            <span class="bc-item bc-current">{{ store.selectedProject.name }}</span>
+          </div>
+          <div class="toolbar">
+            <div class="env-filter"></div>
+            <div class="toolbar-right">
+              <button class="btn-p btn-add-cfg" @click="startAddConfig">
+                <i class="fa-solid fa-plus"></i>新增配置
+              </button>
+            </div>
+          </div>
+          <div class="empty-state">
+            <i class="fa-regular fa-file-lines empty-icon"></i>
+            <div class="empty-text t3">点击「新增配置」创建第一组字段</div>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="empty-state">
+            <i class="fa-regular fa-folder-open empty-icon"></i>
+            <div class="empty-text t3">选择左侧分组中的配置，或新增分组开始</div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -237,6 +248,39 @@
         </div>
       </Transition>
     </teleport>
+
+    <!-- 新增配置弹窗 -->
+    <teleport to="body">
+      <Transition name="cfg-modal">
+        <div v-if="configModalOpen" class="proj-modal-overlay" @click.self="cancelConfigModal">
+          <div class="proj-modal panel-solid" role="dialog" aria-modal="true">
+            <div class="proj-modal-head">
+              <h2>新增配置</h2>
+              <button class="ibtn" type="button" @click="cancelConfigModal" aria-label="关闭">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="proj-modal-body">
+              <label class="proj-lbl">配置名称</label>
+              <input
+                ref="configNameInput"
+                v-model="configModalName"
+                class="inp"
+                placeholder="如：数据库配置"
+                @keyup.enter="confirmConfigModal"
+                @keyup.escape="cancelConfigModal"
+              />
+            </div>
+            <div class="proj-modal-foot">
+              <button class="btn-g" type="button" @click="cancelConfigModal">取消</button>
+              <button class="btn-p" type="button" @click="confirmConfigModal">
+                <i class="fa-solid fa-check"></i>创建
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </teleport>
   </div>
 </template>
 
@@ -245,12 +289,18 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useConfigStoreV3 } from '@shared/stores/configStoreV3';
 import { useToastStore } from '@shared/stores/toastStore';
-import type { ConfigProject, ConfigDef } from '@shared/types/entities';
+import { useDialogStore } from '@shared/stores/dialogStore';
+import type { ConfigProject, ConfigDef, Environment } from '@shared/types/entities';
 
 const store = useConfigStoreV3();
 const toast = useToastStore();
+const dialog = useDialogStore();
 
 const search = ref('');
+const selectedEnv = ref<Environment | 'all'>('all');
+
+// 树形展开状态
+const expandedSet = ref<Set<string>>(new Set());
 
 // 分组：弹窗新建 / 重命名
 const projectModalOpen = ref(false);
@@ -258,14 +308,13 @@ const projectModalName = ref('');
 const projectNameInput = ref<HTMLInputElement | null>(null);
 const renamingProjectId = ref<string | null>(null);
 const renamingProjectName = ref('');
-const renamingProjectInput = ref<HTMLInputElement | null>(null);
 
-// 配置：inline 新建 / 重命名
-const addingConfig = ref(false);
-const newConfigName = ref('');
+// 配置：弹窗新建 / 重命名
+const configModalOpen = ref(false);
+const configModalName = ref('');
+const configNameInput = ref<HTMLInputElement | null>(null);
 const renamingConfigId = ref<string | null>(null);
 const renamingConfigName = ref('');
-const renamingConfigInput = ref<HTMLInputElement | null>(null);
 
 // 新增字段行
 const nfKey = ref('');
@@ -284,27 +333,43 @@ function showSave() {
   saveTimer = window.setTimeout(() => { showSaveHint.value = false; }, 1400);
 }
 
-onMounted(async () => { await store.loadProjects(); });
+onMounted(async () => {
+  await store.loadProjects();
+  // 默认展开选中项目
+  if (store.selectedProjectId) {
+    expandedSet.value.add(store.selectedProjectId);
+  }
+});
 
+// 筛选分组（搜索）
 const filteredProjects = computed(() => {
   const q = search.value.trim().toLowerCase();
   if (!q) return store.projects;
-  return store.projects.filter(p =>
-    p.name.toLowerCase().includes(q)
+  return store.projects.filter(p => p.name.toLowerCase().includes(q));
+});
+
+// 获取某个分组下的配置列表（按环境筛选）
+function getProjectConfigs(projectId: string): ConfigDef[] {
+  const cfgs = store.projectConfigs[projectId] || [];
+  if (selectedEnv.value === 'all') return cfgs;
+  return cfgs.filter(c => c.environment === selectedEnv.value);
+}
+
+// 当前选中配置的字段（搜索过滤）
+const filteredFields = computed(() => {
+  const cfg = store.selectedConfig;
+  if (!cfg) return [];
+  const q = search.value.trim().toLowerCase();
+  if (!q) return cfg.fields;
+  return cfg.fields.filter(f =>
+    f.key.toLowerCase().includes(q) ||
+    f.label.toLowerCase().includes(q) ||
+    f.value.toLowerCase().includes(q)
   );
 });
 
-// 切换分组 / 配置时重置 inline 编辑态
-watch(() => store.selectedProjectId, resetInline);
+// 切换分组 / 配置时重置
 watch(() => store.selectedConfigId, () => { resetNf(); });
-
-function resetInline() {
-  renamingProjectId.value = null;
-  addingConfig.value = false;
-  newConfigName.value = '';
-  renamingConfigId.value = null;
-  resetNf();
-}
 
 function resetNf() {
   nfKey.value = '';
@@ -312,30 +377,24 @@ function resetNf() {
   nfValue.value = '';
 }
 
-/* ---------- 分组拖拽 ---------- */
-async function onProjectDragEnd(event: any) {
-  const { oldIndex, newIndex } = event;
-  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
-  const newList = [...filteredProjects.value];
-  const [moved] = newList.splice(oldIndex, 1);
-  newList.splice(newIndex, 0, moved);
-  const orderedIds = newList.map(p => p.id);
-  await store.reorderProjects(orderedIds);
-  toast.success('分组排序已更新');
+/* ---------- 树形操作 ---------- */
+function toggleProject(id: string) {
+  const s = new Set(expandedSet.value);
+  if (s.has(id)) {
+    s.delete(id);
+  } else {
+    s.add(id);
+  }
+  expandedSet.value = s;
+  // 选中该项目
+  store.selectProject(id);
 }
 
-/* ---------- 配置拖拽 ---------- */
-async function onConfigDragEnd(event: any) {
-  const { oldIndex, newIndex } = event;
-  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
-  const newList = [...store.configs];
-  const [moved] = newList.splice(oldIndex, 1);
-  newList.splice(newIndex, 0, moved);
-  const orderedIds = newList.map(c => c.id);
-  if (store.selectedProjectId) {
-    await store.reorderConfigs(store.selectedProjectId, orderedIds);
-    toast.success('配置排序已更新');
+function onSelectConfig(projectId: string, configId: string) {
+  if (store.selectedProjectId !== projectId) {
+    store.selectProject(projectId);
   }
+  store.selectConfig(configId);
 }
 
 /* ---------- 分组 ---------- */
@@ -353,7 +412,11 @@ async function confirmProjectModal() {
   if (!name) { toast.error('请填写分组名称'); return; }
   projectModalOpen.value = false;
   projectModalName.value = '';
-  await store.createProject(name);
+  const id = await store.createProject(name);
+  // 展开新建的分组
+  const s = new Set(expandedSet.value);
+  s.add(id);
+  expandedSet.value = s;
   toast.success('分组已创建');
 }
 
@@ -361,8 +424,9 @@ function startRenameProject(p: ConfigProject) {
   renamingProjectId.value = p.id;
   renamingProjectName.value = p.name;
   nextTick(() => {
-    renamingProjectInput.value?.focus();
-    renamingProjectInput.value?.select();
+    const el = document.querySelector('.tree-rename-inp') as HTMLInputElement | null;
+    el?.focus();
+    el?.select();
   });
 }
 async function commitRenameProject(save: boolean) {
@@ -375,37 +439,54 @@ async function commitRenameProject(save: boolean) {
   const p = store.projects.find(x => x.id === id);
   if (p && p.name !== name) {
     await store.renameProject(id, name);
-    toast.success('分组已重命名');
+    showSave();
   }
 }
 async function onDeleteProject(id: string) {
+  const ok = await dialog.confirm('确认删除', '确认删除该分组？其下所有配置将一并删除。');
+  if (!ok) return;
   await store.deleteProject(id);
+  const s = new Set(expandedSet.value);
+  s.delete(id);
+  expandedSet.value = s;
   toast.success('分组已删除');
 }
 
 /* ---------- 配置 ---------- */
 function startAddConfig() {
   if (!store.selectedProject) { toast.error('请先创建一个分组'); return; }
-  addingConfig.value = true;
-  newConfigName.value = '';
+  configModalOpen.value = true;
+  configModalName.value = '';
+  nextTick(() => configNameInput.value?.focus());
 }
-async function commitAddConfig() {
-  if (!addingConfig.value) return;
-  const name = newConfigName.value.trim();
-  addingConfig.value = false;
-  newConfigName.value = '';
-  if (!name || !store.selectedProject) return;
-  await store.addConfig(store.selectedProject.id, name);
+function cancelConfigModal() {
+  configModalOpen.value = false;
+  configModalName.value = '';
+}
+async function confirmConfigModal() {
+  const name = configModalName.value.trim();
+  if (!name || !store.selectedProject) { toast.error('请填写配置名称'); return; }
+  configModalOpen.value = false;
+  configModalName.value = '';
+  const env = selectedEnv.value === 'all' ? undefined : selectedEnv.value;
+  await store.addConfig(store.selectedProject.id, name, env);
   toast.success('配置已创建');
 }
-function cancelAddConfig() { addingConfig.value = false; newConfigName.value = ''; }
+
+async function onDeleteConfig(id: string) {
+  const ok = await dialog.confirm('确认删除', '确认删除该配置？');
+  if (!ok) return;
+  await store.deleteConfig(id);
+  toast.success('配置已删除');
+}
 
 function startRenameConfig(c: ConfigDef) {
   renamingConfigId.value = c.id;
   renamingConfigName.value = c.name;
   nextTick(() => {
-    renamingConfigInput.value?.focus();
-    renamingConfigInput.value?.select();
+    const el = document.querySelector('.tree-rename-cfg-inp') as HTMLInputElement | null;
+    el?.focus();
+    el?.select();
   });
 }
 async function commitRenameConfig(save: boolean) {
@@ -415,15 +496,33 @@ async function commitRenameConfig(save: boolean) {
   renamingConfigId.value = null;
   renamingConfigName.value = '';
   if (!save || !name) return;
-  const c = store.configs.find(x => x.id === id);
+  const cfgs = store.configs;
+  const c = cfgs.find(x => x.id === id);
   if (c && c.name !== name) {
     await store.renameConfig(id, name);
-    toast.success('配置已重命名');
+    showSave();
   }
 }
-async function onDeleteConfig(id: string) {
-  await store.deleteConfig(id);
-  toast.success('配置已删除');
+
+async function onConfigDragEnd(projectId: string, event: any) {
+  const { oldIndex, newIndex } = event;
+  if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
+  const cfgs = getProjectConfigs(projectId);
+  const newList = [...cfgs];
+  const [moved] = newList.splice(oldIndex, 1);
+  newList.splice(newIndex, 0, moved);
+  const orderedIds = newList.map(c => c.id);
+  await store.reorderConfigs(projectId, orderedIds);
+  toast.success('配置排序已更新');
+}
+
+async function onChangeConfigEnv(e: Event) {
+  const cfg = store.selectedConfig;
+  if (!cfg) return;
+  const value = (e.target as HTMLSelectElement).value;
+  const env = (value || undefined) as Environment | undefined;
+  await store.setConfigEnvironment(cfg.id, env);
+  showSave();
 }
 
 /* ---------- 字段（自动保存） ---------- */
@@ -462,7 +561,6 @@ async function commitNewField(refocus: boolean) {
   if (committingField) return;
   const cfg = store.selectedConfig;
   if (!cfg) { resetNf(); return; }
-  // 先读取三列的值，再清空，避免 resetNf() 把 label/value 清掉导致只存到 key
   const key = nfKey.value.trim();
   const label = nfLabel.value.trim();
   const value = nfValue.value;
@@ -490,6 +588,13 @@ async function onCopy(value?: string) {
   await store.copyValue(value);
   toast.success('字段值已复制');
 }
+
+async function onCopyConfig(c: ConfigDef) {
+  if (!c.fields.length) { toast.error('该配置暂无字段'); return; }
+  const text = c.fields.map(f => `${f.key}: ${f.value}`).join('\n');
+  await store.copyValue(text);
+  toast.success(`已复制「${c.name}」的 ${c.fields.length} 个字段`);
+}
 </script>
 
 <style scoped>
@@ -499,98 +604,91 @@ async function onCopy(value?: string) {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 20px 24px calc(var(--statusbar-h) + 24px);
-  gap: 16px;
+  padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
 }
 
-/* 操作栏 */
-.action-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.flex-spacer { flex: 1; min-width: 0; }
-.btn-p i { font-size: 11px; }
-
-.search-field {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.search-ico {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  pointer-events: none;
-}
-.search-inp {
-  width: 288px;
-  padding-left: 32px;
-}
-
-/* 分栏主体（v3 flex gap-4，左 w-60 右 flex-1） */
+/* 分栏 */
 .split-body {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 16px;
+  gap: var(--gap-lg);
   overflow: hidden;
 }
-.sidebar { width: 240px; flex: none; min-height: 0; display: flex; }
 
-/* 分组面板 —— 与右侧详情面板等高、铺满内容区，超出在面板内滚动 */
-.proj-panel {
-  padding: 8px;
-  flex: 1;
-  min-height: 0;
+/* ===== 左侧树形侧栏 ===== */
+.sidebar {
+  width: 260px;
+  flex: none;
   display: flex;
   flex-direction: column;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  overflow: hidden;
 }
-.proj-panel-head {
+.sidebar-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px 6px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.proj-panel-title {
-  font-size: 10px;
+.sidebar-title {
+  font-size: 14px;
   font-weight: var(--font-semibold);
-  letter-spacing: 0.16em;
-}
-.ibtn-mini { width: 20px; height: 20px; }
-.ibtn-mini i { font-size: 10px; }
-
-.proj-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-.proj-item {
+  color: var(--ink);
   display: flex;
   align-items: center;
   gap: 8px;
-  border-radius: 10px;
-  padding: 8px 10px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-  color: var(--ink2);
 }
-.proj-item:hover { background: var(--panel2); }
-.proj-item.active {
-  background: rgba(46, 107, 240, .09);
+.sidebar-title i {
+  font-size: 13px;
   color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(46, 107, 240, .25);
 }
-.proj-folder { font-size: var(--text-xs); flex-shrink: 0; }
-.proj-name {
+
+.tree-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+/* 树节点 */
+.tree-group {
+  margin-bottom: 2px;
+}
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px 7px 14px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  color: var(--ink2);
+  border-radius: 0;
+  position: relative;
+}
+.tree-node:hover {
+  background: var(--panel2);
+}
+.tree-arrow {
+  width: 12px;
+  font-size: 9px;
+  color: var(--ink3);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.tree-proj-icon {
+  font-size: 12px;
+  color: var(--ink3);
+  flex-shrink: 0;
+}
+.tree-proj-icon.active {
+  color: var(--accent);
+}
+.tree-node-name {
   flex: 1;
   font-size: 13px;
   font-weight: var(--font-medium);
@@ -598,59 +696,229 @@ async function onCopy(value?: string) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.proj-rename-inp {
+.tree-node-name.active {
+  color: var(--accent);
+  font-weight: var(--font-semibold);
+}
+.tree-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink3);
+  background: var(--panel2);
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.tree-rename-inp {
   flex: 1;
   min-width: 0;
-  height: 26px;
+  height: 24px;
   padding: 0 8px;
   font-size: 13px;
 }
-.proj-count {
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-.proj-act {
+.tree-act {
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.12s ease;
 }
-.proj-item:hover .proj-act { opacity: 1; }
+.tree-node:hover .tree-act { opacity: 1; }
+.ibtn-tiny { width: 18px; height: 18px; }
+.ibtn-tiny i { font-size: 9px; }
+.ibtn-mini { width: 22px; height: 22px; }
+.ibtn-mini i { font-size: 10px; }
 
-.proj-empty {
-  padding: 24px 12px;
-  text-align: center;
-  font-size: var(--text-xs);
+/* 配置子节点 */
+.tree-children {
+  overflow: hidden;
 }
-
-/* 配置详情面板（v3 panel min-h-[340px] flex-1 p-5） */
-.config-detail {
+.tree-config-list {
+  display: flex;
+  flex-direction: column;
+}
+.tree-config {
+  padding: 6px 12px 6px 44px;
+  font-size: 13px;
+  gap: 8px;
+}
+.tree-config.active {
+  background: rgba(46, 107, 240, .08);
+  color: var(--accent);
+}
+.tree-config.active .tree-config-name {
+  color: var(--accent);
+  font-weight: var(--font-medium);
+}
+.tree-config-name {
   flex: 1;
-  min-height: 340px;
-  padding: 20px;
-  overflow: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.detail-head {
+.tree-rename-cfg-inp {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12.5px;
+}
+.tree-copy-act {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.tree-config:hover .tree-copy-act { opacity: 1; }
+
+/* 拖拽 */
+.dragging {
+  opacity: 0.5;
+  background: rgba(46, 107, 240, .12) !important;
+}
+
+/* 展开收起动画 */
+.tree-expand-enter-active { transition: max-height 0.2s ease, opacity 0.2s ease; }
+.tree-expand-leave-active { transition: max-height 0.15s ease, opacity 0.15s ease; }
+.tree-expand-enter-from,
+.tree-expand-leave-to { max-height: 0; opacity: 0; }
+.tree-expand-enter-to,
+.tree-expand-leave-from { max-height: 600px; opacity: 1; }
+
+.tree-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* ===== 右侧主面板 ===== */
+.main-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+/* 面包屑 */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+.bc-item {
+  font-size: 13px;
+  color: var(--ink3);
+}
+.bc-current {
+  color: var(--ink);
+  font-weight: var(--font-medium);
+}
+.bc-sep {
+  font-size: 8px;
+  color: var(--ink3);
+}
+
+/* 工具栏：环境标签 + 搜索 + 按钮 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.env-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.env-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+.env-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+.env-btn.active {
+  color: #fff;
+  border-color: transparent;
+  background: var(--ink2);
+  box-shadow: 0 0 6px currentColor;
+}
+.env-btn.env-prod.active { background: var(--env-prod-fg); }
+.env-btn.env-dev.active { background: var(--env-dev-fg); }
+.env-btn.env-test.active { background: var(--env-test-fg); }
+.env-btn.env-staging.active { background: var(--env-staging-fg); }
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.detail-icon {
-  width: 32px;
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.search-ico {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  pointer-events: none;
+}
+.search-inp {
+  width: 200px;
+  padding-left: 30px;
   height: 32px;
+  font-size: 12.5px;
+}
+.btn-add-cfg {
+  white-space: nowrap;
+  gap: 5px;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.btn-add-cfg i { font-size: 10px; }
+
+/* 配置环境行 */
+.cfg-env-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: rgba(46, 107, 240, .09);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(46, 107, 240, .2);
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
 }
-.detail-icon i { font-size: var(--text-xs); }
-.detail-title {
-  font-size: 15px;
+.cfg-env-lbl {
+  font-size: 11px;
   font-weight: var(--font-semibold);
+  letter-spacing: 0.04em;
+}
+.env-select {
+  width: auto;
+  height: 28px;
+  padding: 0 28px 0 10px;
+  font-size: 12px;
 }
 .save-hint {
-  margin-left: 4px;
+  margin-left: 8px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -660,164 +928,72 @@ async function onCopy(value?: string) {
 }
 .save-hint i { font-size: 9px; }
 
-/* 配置 chips */
-.cfg-chips {
-  margin-top: 12px;
+/* 字段表头 */
+.field-header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-.cfg-chips-drag {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.cfg-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  padding: 6px 8px 6px 12px;
-  font-size: 12.5px;
-  color: var(--ink2);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.cfg-chip:hover { border-color: var(--border-strong); }
-.cfg-chip.active {
-  font-weight: var(--font-medium);
-  color: var(--accent);
-  background: rgba(46, 107, 240, .08);
-  border-color: rgba(46, 107, 240, .4);
-}
-.cfg-chip-count {
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-.cfg-chip-act { opacity: 0; transition: opacity 0.15s ease; }
-.cfg-chip:hover .cfg-chip-act { opacity: 1; }
-.ibtn-tiny { width: 16px; height: 16px; }
-.ibtn-tiny i { font-size: 8px; }
-
-.cfg-add-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 8px;
-  border: 1px dashed var(--border2);
-  background: transparent;
-  padding: 6px 10px;
-  font-size: 12px;
+.field-header span {
+  font-size: 11px;
+  font-weight: var(--font-semibold);
   color: var(--ink3);
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
-.cfg-add-chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.cfg-add-chip i { font-size: 9px; }
-.cfg-chip-add-wrap {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  padding: 6px 8px 6px 12px;
-  font-size: 12.5px;
-}
-.cfg-chip-add-inp {
-  width: 112px;
-  padding: 2px 12px;
-  font-size: var(--text-xs);
-}
-.cfg-rename-inp {
-  width: 110px;
-  height: 24px;
-  padding: 0 8px;
-  font-size: 12.5px;
-}
+.fh-key { flex: 2; padding-right: 12px; }
+.fh-label { flex: 2; padding: 0 12px; }
+.fh-value { flex: 3; padding: 0 12px; }
+.fh-actions { width: 72px; text-align: right; flex-shrink: 0; }
 
-/* 字段表 */
-.field-table-wrap { margin-top: 16px; }
-.field-table {
-  width: 100%;
-  border-collapse: collapse;
+/* 字段行 */
+.field-list {
+  flex: 1;
+  min-height: 0;
 }
-.field-head {
+.field-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border);
 }
-.field-head th {
-  text-align: left;
-  padding: 8px 0;
-  font-size: 10.5px;
-  font-weight: var(--font-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.fh-key { padding-right: 16px; }
-.fh-label { padding: 8px 16px; }
-.fh-value { padding: 8px 16px; }
-.fh-actions { width: 80px; padding: 8px 0; text-align: right; }
-
-.field-row { border-bottom: 1px solid var(--border); }
-.fc-key { padding-right: 16px; }
-.fc-label { padding: 4px 16px; }
-.fc-value { padding: 4px 16px; }
-.fc-actions { padding: 4px 0; text-align: right; }
-
-.field-actions {
+.field-row:hover .fc-actions button { opacity: 1; }
+.fc-key { flex: 2; padding-right: 12px; }
+.fc-label { flex: 2; padding: 0 12px; }
+.fc-value { flex: 3; padding: 0 12px; }
+.fc-actions {
+  width: 72px;
   display: flex;
   justify-content: flex-end;
   gap: 2px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  flex-shrink: 0;
 }
-.field-row:hover .field-actions { opacity: 1; }
+.fc-actions button { opacity: 0; transition: opacity 0.12s ease; }
 .ibtn-sm { width: 24px; height: 24px; }
 .ibtn-sm i { font-size: 10px; }
 
 .field-hint {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 11px;
+  flex-shrink: 0;
 }
 .field-hint i { margin-right: 4px; }
 
-/* 无配置 / 无分组 */
-.no-config {
-  margin-top: 32px;
+/* 空状态 */
+.empty-state {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 0;
+  min-height: 240px;
 }
-.no-config-icon { font-size: 24px; }
-.no-config-text { margin-top: 8px; font-size: 13px; }
+.empty-icon { font-size: 28px; color: var(--ink3); }
+.empty-text { margin-top: 10px; font-size: 13px; }
 
-.no-project {
-  min-height: 300px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.no-project-icon { font-size: 24px; }
-.no-project-text { margin-top: 8px; font-size: 13px; }
-
-/* 拖拽 */
-.dragging {
-  opacity: 0.5;
-  background: var(--accent) !important;
-  box-shadow: 0 8px 24px rgba(46, 107, 240, 0.3) !important;
-}
-
-/* ================= 新增分组弹窗 ================= */
+/* ===== 弹窗 ===== */
 .proj-modal-overlay {
   position: fixed;
   inset: 0;

@@ -3,14 +3,27 @@ import { serverRepo } from '../db/repositories/serverRepo';
 import { middlewareRepo } from '../db/repositories/middlewareRepo';
 import { tagRepo } from '../db/repositories/tagRepo';
 import { accountRepo } from '../db/repositories/accountRepo';
-import { configRepo } from '../db/repositories/configRepo';
+import { configProjectRepo } from '../db/repositories/configProjectRepo';
+import { configDefRepo } from '../db/repositories/configDefRepo';
+import { configService } from './configService';
 import { groupRepo } from '../db/repositories/groupRepo';
 import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
 import { systemTagRepo } from '../db/repositories/systemTagRepo';
-import { generateId } from '../utils/id';
-import type { EntityType } from '../types/entities';
+import type { EntityType, EncryptedField } from '../types/entities';
+
+/**
+ * 将导入数据中的密码字段归一化为 EncryptedField：
+ * - JSON 备份导出的是明文字符串 → 重新加密（未启用主密码时包装为明文字段）
+ * - 旧备份可能已是 EncryptedField 对象 → 直接沿用
+ */
+async function normalizeEncryptedField(pwd: unknown): Promise<EncryptedField> {
+  if (pwd && typeof pwd === 'object' && '__encrypted' in (pwd as Record<string, unknown>)) {
+    return pwd as EncryptedField;
+  }
+  return cryptoService.encryptField(typeof pwd === 'string' ? pwd : '');
+}
 
 export interface ImportSummary {
   created: { systems: number; servers: number; middlewares: number; configs: number; tags: number };
@@ -26,7 +39,7 @@ export const importExportService = {
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
-      configRepo.all(),
+      configService.allProjectsWithConfigs(),
       groupRepo.all(),
     ]);
 
@@ -77,7 +90,7 @@ export const importExportService = {
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
-      configRepo.all(),
+      configService.allProjectsWithConfigs(),
       groupRepo.all(),
     ]);
 
@@ -175,7 +188,7 @@ export const importExportService = {
       const existing = all.find(x => x.name === s.name && x.url === s.url);
       let systemId: string;
       if (existing) {
-        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color, groupId: resolveGroupId('system', s.groupName) });
+        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, iconColor: s.iconColor, color: s.color, groupId: resolveGroupId('system', s.groupName) });
         systemId = existing.id;
         summary.updated.systems++;
       } else {
@@ -187,6 +200,7 @@ export const importExportService = {
           sort: 0,
           remark: s.remark,
           icon: s.icon,
+          iconColor: s.iconColor,
           color: s.color,
           groupId: resolveGroupId('system', s.groupName),
         });
@@ -212,6 +226,7 @@ export const importExportService = {
       }
     }
 
+    let serverOrder = (await serverRepo.all()).length;
     for (const s of parsed.servers) {
       if (!s.name || !s.ip) {
         summary.skipped.count++;
@@ -233,12 +248,15 @@ export const importExportService = {
           password: encryptedPassword,
           environment: s.environment || 'development',
           favorite: false,
+          // sortOrder 必须为数字，否则 serverRepo 会因索引缺失而排除该记录
+          sortOrder: serverOrder++,
           groupId: resolveGroupId('server', s.groupName),
         });
         summary.created.servers++;
       }
     }
 
+    let mwOrder = (await middlewareRepo.all()).length;
     for (const m of parsed.middlewares) {
       if (!m.name || !m.host) {
         summary.skipped.count++;
@@ -263,6 +281,8 @@ export const importExportService = {
           password: encryptedPassword,
           remark: m.remark,
           favorite: false,
+          // sortOrder 必须为数字，否则 middlewareRepo 会因索引缺失而排除该记录
+          sortOrder: mwOrder++,
           groupId: resolveGroupId('middleware', m.groupName),
         });
         summary.created.middlewares++;
@@ -275,25 +295,25 @@ export const importExportService = {
         summary.skipped.reasons.push('Config project missing name');
         continue;
       }
-      const all = await configRepo.all();
-      let proj = all.find(x => x.name === p.name);
-      if (!proj) {
-        const id = await configRepo.create({ name: p.name, configs: [] });
-        proj = await configRepo.byId(id);
-        if (!proj) continue;
-      }
+      const allProjects = await configProjectRepo.all();
+      const existingProject = allProjects.find(x => x.name === p.name);
+      const projectId = existingProject ? existingProject.id : await configProjectRepo.create(p.name);
+      const existingConfigs = await configDefRepo.byProject(projectId);
       for (const c of p.configs) {
         if (!c.name) continue;
-        const fields = c.fields.map(f => ({ key: f.key ?? '', label: f.label, value: f.value }));
-        const cfg = proj.configs.find(x => x.name === c.name);
-        if (cfg) {
-          cfg.fields = fields;
+        const fields = c.fields.map(f => ({ key: f.key ?? '', label: f.label ?? '', value: f.value ?? '' }));
+        const existingCfg = existingConfigs.find(x => x.name === c.name);
+        if (existingCfg) {
+          await configDefRepo.setFields(existingCfg.id, fields);
+          if (c.environment && existingCfg.environment !== c.environment) {
+            await configDefRepo.setEnvironment(existingCfg.id, c.environment as any);
+          }
         } else {
-          proj.configs.push({ id: generateId(), name: c.name, fields });
+          const cfgId = await configDefRepo.create(projectId, c.name, c.environment as any);
+          await configDefRepo.setFields(cfgId, fields);
           summary.created.configs++;
         }
       }
-      await configRepo.update(proj.id, { name: proj.name, configs: proj.configs });
     }
 
     return summary;
@@ -345,7 +365,7 @@ export const importExportService = {
       const existing = all.find(x => x.name === s.name && x.url === s.url);
       let systemId: string;
       if (existing) {
-        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, color: s.color, groupId: s.groupId });
+        await systemRepo.update(existing.id, { environment: s.environment, remark: s.remark, icon: s.icon, iconColor: s.iconColor, color: s.color, groupId: s.groupId });
         systemId = existing.id;
         summary.updated.systems++;
       } else {
@@ -357,6 +377,7 @@ export const importExportService = {
           sort: s.sort ?? 0,
           remark: s.remark,
           icon: s.icon,
+          iconColor: s.iconColor,
           color: s.color,
           groupId: s.groupId,
         });
@@ -383,6 +404,7 @@ export const importExportService = {
     }
 
     const servers: Array<any> = data.servers ?? [];
+    let serverOrder = (await serverRepo.all()).length;
     for (const s of servers) {
       if (!s.name || !s.ip) {
         summary.skipped.count++;
@@ -391,9 +413,22 @@ export const importExportService = {
       }
       const all = await serverRepo.all();
       const existing = all.find(x => x.name === s.name && x.ip === s.ip);
-      const password = s.password ?? { __encrypted: false, value: '' };
+      const password = await normalizeEncryptedField(s.password);
+      const sshKey = (s.sshKey !== undefined && s.sshKey !== null && s.sshKey !== '')
+        ? await normalizeEncryptedField(s.sshKey)
+        : undefined;
       if (existing) {
-        await serverRepo.update(existing.id, { sshPort: s.sshPort, username: s.username, password, environment: s.environment, groupId: s.groupId });
+        await serverRepo.update(existing.id, {
+          sshPort: s.sshPort,
+          username: s.username,
+          password,
+          sshKey,
+          environment: s.environment,
+          status: s.status,
+          purpose: s.purpose,
+          remark: s.remark,
+          groupId: s.groupId,
+        });
         summary.updated.servers++;
       } else {
         await serverRepo.create({
@@ -402,8 +437,14 @@ export const importExportService = {
           sshPort: s.sshPort ?? 22,
           username: s.username ?? '',
           password,
+          sshKey,
           environment: s.environment || 'development',
+          status: s.status,
+          purpose: s.purpose,
+          remark: s.remark,
           favorite: s.favorite ?? false,
+          // sortOrder 必须为数字，否则 serverRepo 会因索引缺失而排除该记录
+          sortOrder: typeof s.sortOrder === 'number' ? s.sortOrder : serverOrder++,
           groupId: s.groupId,
         });
         summary.created.servers++;
@@ -411,6 +452,7 @@ export const importExportService = {
     }
 
     const middlewares: Array<any> = data.middlewares ?? [];
+    let mwOrder = (await middlewareRepo.all()).length;
     for (const m of middlewares) {
       if (!m.name || !m.host) {
         summary.skipped.count++;
@@ -419,8 +461,11 @@ export const importExportService = {
       }
       const all = await middlewareRepo.all();
       const existing = all.find(x => x.name === m.name && x.host === m.host);
+      const password = (m.password !== undefined && m.password !== null)
+        ? await normalizeEncryptedField(m.password)
+        : undefined;
       if (existing) {
-        await middlewareRepo.update(existing.id, { port: m.port, username: m.username, password: m.password, database: m.database, groupId: m.groupId });
+        await middlewareRepo.update(existing.id, { type: m.type, version: m.version, port: m.port, username: m.username, password, database: m.database, extra: m.extra, remark: m.remark, groupId: m.groupId });
         summary.updated.middlewares++;
       } else {
         await middlewareRepo.create({
@@ -431,10 +476,12 @@ export const importExportService = {
           port: m.port ?? 0,
           database: m.database,
           username: m.username,
-          password: m.password,
+          password,
           extra: m.extra,
           remark: m.remark,
           favorite: m.favorite ?? false,
+          // sortOrder 必须为数字，否则 middlewareRepo 会因索引缺失而排除该记录
+          sortOrder: typeof m.sortOrder === 'number' ? m.sortOrder : mwOrder++,
           groupId: m.groupId,
         });
         summary.created.middlewares++;
@@ -448,28 +495,28 @@ export const importExportService = {
         summary.skipped.reasons.push('Config project missing name');
         continue;
       }
-      const all = await configRepo.all();
-      let proj = all.find(x => x.name === p.name);
-      if (!proj) {
-        const id = await configRepo.create({ name: p.name, configs: [] });
-        proj = await configRepo.byId(id);
-        if (!proj) continue;
-      }
+      const allProjects = await configProjectRepo.all();
+      const existingProject = allProjects.find(x => x.name === p.name);
+      const projectId = existingProject ? existingProject.id : await configProjectRepo.create(p.name);
+      const existingConfigs = await configDefRepo.byProject(projectId);
       // 兼容旧的两级结构（items → 默认配置）与新的三级结构（configs）
       const rawConfigs: Array<any> = Array.isArray(p.configs) ? p.configs
-        : (Array.isArray(p.items) ? [{ id: generateId(), name: '默认配置', fields: (p.items as any[]).map((it) => ({ key: it.key ?? '', label: it.label, value: it.value ?? it.defaultValue ?? '' })) }] : []);
+        : (Array.isArray(p.items) ? [{ name: '默认配置', fields: (p.items as any[]).map((it) => ({ key: it.key ?? '', label: it.label ?? '', value: it.value ?? it.defaultValue ?? '' })) }] : []);
       for (const c of rawConfigs) {
         if (!c || !c.name) continue;
-        const fields: Array<{ key: string; label?: string; value?: string }> = (c.fields ?? []).map((f: any) => ({ key: f.key ?? '', label: f.label, value: f.value ?? f.defaultValue ?? '' }));
-        const cfg = proj.configs.find(x => x.name === c.name);
-        if (cfg) {
-          cfg.fields = fields;
+        const fields = (c.fields ?? []).map((f: any) => ({ key: f.key ?? '', label: f.label ?? '', value: f.value ?? f.defaultValue ?? '' }));
+        const existingCfg = existingConfigs.find(x => x.name === c.name);
+        if (existingCfg) {
+          await configDefRepo.setFields(existingCfg.id, fields);
+          if (c.environment && existingCfg.environment !== c.environment) {
+            await configDefRepo.setEnvironment(existingCfg.id, c.environment);
+          }
         } else {
-          proj.configs.push({ id: generateId(), name: c.name, fields });
+          const cfgId = await configDefRepo.create(projectId, c.name, c.environment);
+          await configDefRepo.setFields(cfgId, fields);
           summary.created.configs++;
         }
       }
-      await configRepo.update(proj.id, { name: proj.name, configs: proj.configs });
     }
 
     return summary;
@@ -481,6 +528,7 @@ export const importExportService = {
       serverRepo.all().then(all => Promise.all(all.map(s => serverRepo.delete(s.id)))),
       middlewareRepo.all().then(all => Promise.all(all.map(m => middlewareRepo.delete(m.id)))),
       tagRepo.all().then(all => Promise.all(all.map(t => tagRepo.delete(t.id)))),
+      configProjectRepo.all().then(all => Promise.all(all.map(p => configProjectRepo.delete(p.id)))),
       groupRepo.clear(),
     ]);
   },

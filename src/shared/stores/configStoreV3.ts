@@ -1,18 +1,29 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { configService } from '../services/configService';
-import type { ConfigProject, ConfigDef, ConfigField } from '../types/entities';
+import type { ConfigProject, ConfigDef, ConfigField, Environment } from '../types/entities';
 
 export const useConfigStoreV3 = defineStore('configV3', () => {
   const projects = ref<ConfigProject[]>([]);
   const configs = ref<ConfigDef[]>([]);
+  const projectConfigs = ref<Record<string, ConfigDef[]>>({});
+  const configCounts = ref<Record<string, number>>({});
   const selectedProjectId = ref<string | null>(null);
   const selectedConfigId = ref<string | null>(null);
   const loading = ref(false);
 
   async function loadProjects() {
     loading.value = true;
-    projects.value = await configService.allProjects();
+    const all = await configService.allProjectsWithConfigs();
+    projects.value = all.map(({ configs: _, ...p }) => p);
+    const counts: Record<string, number> = {};
+    const pcMap: Record<string, ConfigDef[]> = {};
+    for (const p of all) {
+      counts[p.id] = p.configs.length;
+      pcMap[p.id] = p.configs;
+    }
+    configCounts.value = counts;
+    projectConfigs.value = pcMap;
     if (!selectedProjectId.value && projects.value.length > 0) {
       selectedProjectId.value = projects.value[0].id;
       await loadConfigs(selectedProjectId.value);
@@ -22,12 +33,15 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
 
   async function loadConfigs(projectId: string) {
     configs.value = await configService.configsByProject(projectId);
+    configCounts.value = { ...configCounts.value, [projectId]: configs.value.length };
+    projectConfigs.value = { ...projectConfigs.value, [projectId]: configs.value };
     if (configs.value.length > 0 && !selectedConfigId.value) {
       selectedConfigId.value = configs.value[0].id;
     }
   }
 
   function selectProject(id: string) {
+    if (id === selectedProjectId.value) return;
     selectedProjectId.value = id;
     selectedConfigId.value = null;
     loadConfigs(id);
@@ -41,6 +55,8 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
     const id = await configService.createProject(name);
     await loadProjects();
     selectedProjectId.value = id;
+    selectedConfigId.value = null;
+    configs.value = [];
     return id;
   }
 
@@ -64,8 +80,8 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
     await loadProjects();
   }
 
-  async function addConfig(projectId: string, name: string) {
-    const id = await configService.createConfig(projectId, name);
+  async function addConfig(projectId: string, name: string, environment?: Environment) {
+    const id = await configService.createConfig(projectId, name, environment);
     await loadConfigs(projectId);
     selectedConfigId.value = id;
     return id;
@@ -73,6 +89,13 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
 
   async function renameConfig(id: string, name: string) {
     await configService.renameConfig(id, name);
+    if (selectedProjectId.value) {
+      await loadConfigs(selectedProjectId.value);
+    }
+  }
+
+  async function setConfigEnvironment(id: string, environment?: Environment) {
+    await configService.setConfigEnvironment(id, environment);
     if (selectedProjectId.value) {
       await loadConfigs(selectedProjectId.value);
     }
@@ -113,11 +136,11 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
   );
 
   return {
-    projects, configs, selectedProjectId, selectedConfigId, loading,
+    projects, configs, projectConfigs, configCounts, selectedProjectId, selectedConfigId, loading,
     selectedProject, selectedConfig,
     loadProjects, loadConfigs, selectProject, selectConfig,
     createProject, renameProject, deleteProject, reorderProjects,
-    addConfig, renameConfig, deleteConfig, setFields, reorderConfigs,
+    addConfig, renameConfig, deleteConfig, setFields, reorderConfigs, setConfigEnvironment,
     copyValue,
   };
 });

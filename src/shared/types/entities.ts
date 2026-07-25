@@ -135,6 +135,7 @@ export interface ConfigDef {
   id: string;
   projectId: string;
   name: string;
+  environment?: Environment;
   fields: ConfigField[];
   sortOrder?: number;
   createdAt: number;

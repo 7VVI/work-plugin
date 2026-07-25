@@ -10,8 +10,12 @@ export function setupTabMonitor() {
   });
 
   chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    const tab = await chrome.tabs.get(activeInfo.tabId);
-    if (tab.url) await checkTab(tab, false);
+    try {
+      const tab = await chrome.tabs.get(activeInfo.tabId);
+      if (tab.url) await checkTab(tab, false);
+    } catch {
+      // 标签页已在读取前关闭（No tab with id），忽略
+    }
   });
 }
 

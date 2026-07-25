@@ -7,6 +7,14 @@
         <button class="btn-p" @click="onCreate">
           <i class="fa-solid fa-plus"></i>新增中间件
         </button>
+        <!-- 环境筛选 -->
+        <div class="env-filter">
+          <button class="env-btn" :class="{ active: selectedEnv === 'all' }" @click="selectedEnv = 'all'">全部</button>
+          <button class="env-btn env-prod" :class="{ active: selectedEnv === 'production' }" @click="selectedEnv = 'production'">生产</button>
+          <button class="env-btn env-dev" :class="{ active: selectedEnv === 'development' }" @click="selectedEnv = 'development'">开发</button>
+          <button class="env-btn env-test" :class="{ active: selectedEnv === 'test' }" @click="selectedEnv = 'test'">测试</button>
+          <button class="env-btn env-staging" :class="{ active: selectedEnv === 'staging' }" @click="selectedEnv = 'staging'">预发</button>
+        </div>
         <div class="flex-spacer"></div>
         <div class="search-field">
           <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
@@ -130,6 +138,7 @@ const formVisible = ref(false);
 const editing = ref<Middleware | null>(null);
 const search = ref('');
 const selectedGroupId = ref<string>('all');
+const selectedEnv = ref<Environment | 'all'>('all');
 
 onMounted(async () => { await store.load(); });
 
@@ -137,6 +146,9 @@ const filtered = computed(() => {
   let result = store.list;
   if (selectedGroupId.value !== 'all') {
     result = result.filter(m => m.groupId === selectedGroupId.value);
+  }
+  if (selectedEnv.value !== 'all') {
+    result = result.filter(m => mwEnv(m) === selectedEnv.value);
   }
   if (!search.value.trim()) return result;
   const q = search.value.toLowerCase();
@@ -214,6 +226,41 @@ async function onDragEnd(event: any) {
 .flex-spacer { flex: 1; min-width: 0; }
 .btn-p i { font-size: 11px; }
 
+/* 环境筛选 */
+.env-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.env-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+.env-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+.env-btn.active {
+  color: #fff;
+  border-color: transparent;
+  background: var(--ink2);
+  box-shadow: 0 0 6px currentColor;
+}
+.env-btn.env-prod.active { background: var(--env-prod-fg); }
+.env-btn.env-dev.active { background: var(--env-dev-fg); }
+.env-btn.env-test.active { background: var(--env-test-fg); }
+.env-btn.env-staging.active { background: var(--env-staging-fg); }
+
 /* 搜索框 */
 .search-field {
   position: relative;
@@ -238,10 +285,13 @@ async function onDragEnd(event: any) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
   align-content: start;
+  /* 行高按内容撑开，禁止卡片被压缩/拉伸 */
+  grid-auto-rows: max-content;
 }
 @media (min-width: 640px) {
   .mw-grid { grid-template-columns: repeat(2, 1fr); }
@@ -259,6 +309,7 @@ async function onDragEnd(event: any) {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  min-height: 220px;
 }
 .card-top {
   display: flex;

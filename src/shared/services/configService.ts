@@ -1,7 +1,7 @@
 import { configRepo } from '../db/repositories/configRepo';
 import { configProjectRepo } from '../db/repositories/configProjectRepo';
 import { configDefRepo } from '../db/repositories/configDefRepo';
-import type { ConfigItem, ConfigField } from '../types/entities';
+import type { ConfigItem, ConfigField, ConfigProject, ConfigDef, Environment } from '../types/entities';
 import { requireString } from '../utils/validation';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -90,14 +90,26 @@ export const configService = {
     return configDefRepo.byProject(projectId);
   },
 
-  async createConfig(projectId: string, name: string): Promise<string> {
+  // 聚合：项目 + 其下配置（供状态栏统计、导出使用）
+  async allProjectsWithConfigs(): Promise<Array<ConfigProject & { configs: ConfigDef[] }>> {
+    const projects = await configProjectRepo.all();
+    return Promise.all(
+      projects.map(async (p) => ({ ...p, configs: await configDefRepo.byProject(p.id) })),
+    );
+  },
+
+  async createConfig(projectId: string, name: string, environment?: Environment): Promise<string> {
     requireString(name, '配置名称');
-    return configDefRepo.create(projectId, name);
+    return configDefRepo.create(projectId, name, environment);
   },
 
   async renameConfig(id: string, name: string): Promise<void> {
     requireString(name, '配置名称');
     await configDefRepo.rename(id, name);
+  },
+
+  async setConfigEnvironment(id: string, environment?: Environment): Promise<void> {
+    await configDefRepo.setEnvironment(id, environment);
   },
 
   async deleteConfig(id: string): Promise<void> {

@@ -10,7 +10,7 @@ export interface FrontMatter {
 }
 
 export interface ParsedConfigField { key: string; label?: string; value?: string }
-export interface ParsedConfig { name: string; fields: ParsedConfigField[] }
+export interface ParsedConfig { name: string; environment?: string; fields: ParsedConfigField[] }
 export interface ParsedProject { name: string; configs: ParsedConfig[] }
 
 export interface ParsedGroup { entityType?: string; name?: string; color?: string }
@@ -88,18 +88,25 @@ function parseGroups(body: string): ParsedGroup[] {
   return groups;
 }
 
-/* 配置：H3 = 项目，H4 = 配置，配置体为三列表格（字段标识 / 字段名称 / 默认值） */
+/* 配置：H3 = 项目，H4 = 配置，配置体为三列表格（字段标识 / 字段名称 / 默认值），可选 "环境: xxx" 元数据行 */
 function parseProjects(body: string): ParsedProject[] {
   const projects: ParsedProject[] = [];
   for (const section of splitByHeading(body, 3)) {
     const name = section.heading.trim();
     const configs: ParsedConfig[] = [];
     for (const sub of splitByHeading(section.body, 4)) {
-      configs.push({ name: sub.heading.trim(), fields: parseFieldTable(sub.body) });
+      const environment = extractConfigEnv(sub.body);
+      configs.push({ name: sub.heading.trim(), environment, fields: parseFieldTable(sub.body) });
     }
     projects.push({ name, configs });
   }
   return projects;
+}
+
+/** 从配置 body 中提取 "环境: xxx" 行（兼容中英文冒号） */
+function extractConfigEnv(body: string): string | undefined {
+  const match = body.match(/^环境[:：]\s*(.+)/m);
+  return match ? match[1].trim() || undefined : undefined;
 }
 
 function parseFieldTable(body: string): ParsedConfigField[] {
@@ -180,6 +187,8 @@ function parseSystems(body: string): ParsedBackup['systems'] {
       url: fields['URL'],
       environment: (fields['环境'] as System['environment']) || 'development',
       icon: fields['图标'],
+      // 颜色同时写入 iconColor（表单回显优先读取）与旧版 color，保证回显正确
+      iconColor: fields['颜色'],
       color: fields['颜色'],
       remark: fields['备注'],
       groupName: fields['分组'],

@@ -1,5 +1,5 @@
 import { db } from '../schema';
-import type { ConfigDef, ConfigField } from '../../types/entities';
+import type { ConfigDef, ConfigField, Environment } from '../../types/entities';
 import { generateId } from '../../utils/id';
 import { toPlain } from '../../utils/plain';
 
@@ -12,22 +12,27 @@ export const configDefRepo = {
     return db.configDefs.get(id);
   },
 
-  async create(projectId: string, name: string): Promise<string> {
+  async create(projectId: string, name: string, environment?: Environment): Promise<string> {
     const now = Date.now();
     const id = generateId();
-    await db.configDefs.add({
+    await db.configDefs.add(toPlain({
       id,
       projectId,
       name,
+      environment,
       fields: [],
       createdAt: now,
       updatedAt: now,
-    });
+    }));
     return id;
   },
 
   async rename(id: string, name: string): Promise<void> {
     await db.configDefs.update(id, { name, updatedAt: Date.now() });
+  },
+
+  async setEnvironment(id: string, environment?: Environment): Promise<void> {
+    await db.configDefs.update(id, toPlain({ environment, updatedAt: Date.now() }));
   },
 
   async delete(id: string): Promise<void> {
