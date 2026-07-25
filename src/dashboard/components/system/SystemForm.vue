@@ -111,9 +111,10 @@
                 <span>角色</span>
                 <span>用户名</span>
                 <span>密码</span>
+                <span class="text-right">操作</span>
               </div>
               <div class="acct-rows">
-                <div v-for="row in acctRows" :key="row.uid" class="acct-row">
+                <div v-for="row in acctRows" :key="row.uid" class="acct-row" :class="{ 'is-default': row.isDefault }">
                   <input v-model="row.role" class="inp acct-inp" placeholder="角色" />
                   <input v-model="row.username" class="inp acct-inp" placeholder="用户名" />
                   <div class="pwd-cell">
@@ -125,6 +126,24 @@
                     />
                     <button class="ibtn pwd-toggle" type="button" :title="row.show ? '隐藏' : '显示'" @click="row.show = !row.show">
                       <i :class="row.show ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'"></i>
+                    </button>
+                  </div>
+                  <div class="acct-actions">
+                    <button
+                      class="ibtn acct-action-btn" :class="{ 'is-star': row.isDefault }"
+                      type="button"
+                      :title="row.isDefault ? '当前默认账号' : '设为默认账号'"
+                      @click="toggleDefault(row.uid)"
+                    >
+                      <i :class="row.isDefault ? 'fa-solid fa-star' : 'fa-regular fa-star'"></i>
+                    </button>
+                    <button
+                      class="ibtn acct-action-btn acct-del-btn"
+                      type="button"
+                      title="删除账号"
+                      @click="removeAccountRow(row.uid)"
+                    >
+                      <i class="fa-solid fa-trash"></i>
                     </button>
                   </div>
                 </div>
@@ -189,6 +208,7 @@ interface AcctRow {
   username: string;
   password: string;
   show: boolean;
+  isDefault: boolean;
 }
 
 const tab = ref<'basic' | 'accounts' | 'remark'>('basic');
@@ -263,8 +283,24 @@ async function pasteUrl() {
 function newUid() {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
-function addAccountRow(role = '', username = '', password = '', id?: string) {
-  acctRows.value.push({ uid: newUid(), id, role, username, password, show: false });
+function addAccountRow(role = '', username = '', password = '', id?: string, isDefault = false) {
+  // 如果是第一个账号行，自动设为默认
+  if (acctRows.value.length === 0) isDefault = true;
+  acctRows.value.push({ uid: newUid(), id, role, username, password, show: false, isDefault });
+}
+function removeAccountRow(uid: string) {
+  acctRows.value = acctRows.value.filter(r => r.uid !== uid);
+  // 删除后如果只剩一个账号，自动设为默认
+  if (acctRows.value.length === 1) {
+    acctRows.value[0].isDefault = true;
+  }
+  // 如果删除的是默认账号且还有剩余，第一个设为默认
+  if (acctRows.value.length > 0 && !acctRows.value.some(r => r.isDefault)) {
+    acctRows.value[0].isDefault = true;
+  }
+}
+function toggleDefault(uid: string) {
+  acctRows.value.forEach(r => { r.isDefault = r.uid === uid; });
 }
 
 // ---------- load on open ----------
@@ -312,7 +348,7 @@ watch(
             plain = '';
           }
         }
-        addAccountRow(acc.role, acc.username, plain, acc.id);
+        addAccountRow(acc.role, acc.username, plain, acc.id, acc.isDefault);
       }
     } else {
       form.value = blankForm();
@@ -350,6 +386,12 @@ async function save() {
   const rows = acctRows.value.filter(
     a => a.role.trim() && a.username.trim() && a.password.trim(),
   );
+  // 保证至少有一个默认账号：只有一个时自动默认，多个但无默认时第一个默认
+  if (rows.length === 1) {
+    rows[0].isDefault = true;
+  } else if (rows.length > 1 && !rows.some(r => r.isDefault)) {
+    rows[0].isDefault = true;
+  }
 
   try {
     if (props.system) {
@@ -368,7 +410,14 @@ async function save() {
             role: r.role.trim(),
             username: r.username.trim(),
             password: r.password,
-            isDefault: false,
+            isDefault: r.isDefault,
+          });
+        } else {
+          await accountStore.update(r.id, props.system.id, {
+            role: r.role.trim(),
+            username: r.username.trim(),
+            password: r.password,
+            isDefault: r.isDefault,
           });
         }
       }
@@ -382,7 +431,7 @@ async function save() {
           role: r.role.trim(),
           username: r.username.trim(),
           password: r.password,
-          isDefault: false,
+          isDefault: r.isDefault,
         });
       }
       toast.success(`系统已添加${rows.length > 0 ? `（含 ${rows.length} 个账号）` : ''}`);
@@ -591,7 +640,7 @@ async function save() {
 .acct-panel { display: flex; flex-direction: column; }
 .acct-head {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1.2fr;
+  grid-template-columns: 1fr 1.2fr 1.2fr 60px;
   gap: 8px;
   padding: 0 4px;
   margin-bottom: 8px;
@@ -601,17 +650,39 @@ async function save() {
   letter-spacing: 0.1em;
   color: var(--ink3);
 }
+.acct-head .text-right { text-align: right; }
 .acct-rows { display: flex; flex-direction: column; gap: 8px; }
 .acct-row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1.2fr;
+  grid-template-columns: 1fr 1.2fr 1.2fr 60px;
   align-items: center;
   gap: 8px;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel2);
+  transition: border-color 0.15s;
 }
+.acct-row.is-default {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--panel2));
+}
+.acct-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.acct-action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--ink3);
+}
+.acct-action-btn:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.acct-action-btn.is-star { color: var(--warning-text, #f59e0b); }
+.acct-del-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
 .acct-inp {
   background: transparent;
   border-color: transparent;
