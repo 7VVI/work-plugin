@@ -12,7 +12,7 @@ export const configDefRepo = {
     return db.configDefs.get(id);
   },
 
-  async create(projectId: string, name: string, environment?: Environment): Promise<string> {
+  async create(projectId: string, name: string, environment?: Environment, sortOrder?: number): Promise<string> {
     const now = Date.now();
     const id = generateId();
     await db.configDefs.add(toPlain({
@@ -21,6 +21,7 @@ export const configDefRepo = {
       name,
       environment,
       fields: [],
+      sortOrder,
       createdAt: now,
       updatedAt: now,
     }));

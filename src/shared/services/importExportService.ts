@@ -165,19 +165,29 @@ export const importExportService = {
 
     // 分组：Markdown 用名称引用，按 entityType+name 建立名称→id 映射
     const groupNameToId = new Map<string, string>();
+    const groupOrderMap = new Map<EntityType, number>();
     for (const g of parsed.groups) {
       if (g.entityType && g.name) {
         const et = g.entityType as EntityType;
         const key = `${et}:${g.name}`;
         if (!groupNameToId.has(key)) {
           const existing = (await groupRepo.allByType(et)).find(x => x.name === g.name);
-          const id = existing ? existing.id : await groupRepo.create({ entityType: et, name: g.name, color: g.color || '#2E6BF0', sortOrder: 0 });
-          groupNameToId.set(key, id);
+          if (existing) {
+            groupNameToId.set(key, existing.id);
+            const current = groupOrderMap.get(et) ?? (await groupRepo.allByType(et)).length;
+            groupOrderMap.set(et, Math.max(current, (existing.sortOrder ?? 0)) + 1);
+          } else {
+            const order = groupOrderMap.get(et) ?? (await groupRepo.allByType(et)).length;
+            const id = await groupRepo.create({ entityType: et, name: g.name, color: g.color || '#2E6BF0', sortOrder: order });
+            groupNameToId.set(key, id);
+            groupOrderMap.set(et, order + 1);
+          }
         }
       }
     }
     const resolveGroupId = (entityType: string, name?: string) => (name ? groupNameToId.get(`${entityType}:${name}`) : undefined);
 
+    let systemOrder = (await systemRepo.all()).length;
     for (const s of parsed.systems) {
       if (!s.name || !s.url) {
         summary.skipped.count++;
@@ -197,7 +207,7 @@ export const importExportService = {
           url: s.url,
           environment: s.environment || 'development',
           favorite: false,
-          sort: 0,
+          sort: systemOrder++,
           remark: s.remark,
           icon: s.icon,
           iconColor: s.iconColor,
@@ -299,6 +309,7 @@ export const importExportService = {
       const existingProject = allProjects.find(x => x.name === p.name);
       const projectId = existingProject ? existingProject.id : await configProjectRepo.create(p.name);
       const existingConfigs = await configDefRepo.byProject(projectId);
+      let cfgOrder = existingConfigs.length;
       for (const c of p.configs) {
         if (!c.name) continue;
         const fields = c.fields.map(f => ({ key: f.key ?? '', label: f.label ?? '', value: f.value ?? '' }));
@@ -309,7 +320,7 @@ export const importExportService = {
             await configDefRepo.setEnvironment(existingCfg.id, c.environment as any);
           }
         } else {
-          const cfgId = await configDefRepo.create(projectId, c.name, c.environment as any);
+          const cfgId = await configDefRepo.create(projectId, c.name, c.environment as any, cfgOrder++);
           await configDefRepo.setFields(cfgId, fields);
           summary.created.configs++;
         }
@@ -355,6 +366,7 @@ export const importExportService = {
     }
 
     const systems: Array<any> = data.systems ?? [];
+    let systemOrder = (await systemRepo.all()).length;
     for (const s of systems) {
       if (!s.name || !s.url) {
         summary.skipped.count++;
@@ -374,7 +386,7 @@ export const importExportService = {
           url: s.url,
           environment: s.environment || 'development',
           favorite: s.favorite ?? false,
-          sort: s.sort ?? 0,
+          sort: typeof s.sort === 'number' ? s.sort : systemOrder++,
           remark: s.remark,
           icon: s.icon,
           iconColor: s.iconColor,
@@ -502,6 +514,7 @@ export const importExportService = {
       // 兼容旧的两级结构（items → 默认配置）与新的三级结构（configs）
       const rawConfigs: Array<any> = Array.isArray(p.configs) ? p.configs
         : (Array.isArray(p.items) ? [{ name: '默认配置', fields: (p.items as any[]).map((it) => ({ key: it.key ?? '', label: it.label ?? '', value: it.value ?? it.defaultValue ?? '' })) }] : []);
+      let cfgOrder = existingConfigs.length;
       for (const c of rawConfigs) {
         if (!c || !c.name) continue;
         const fields = (c.fields ?? []).map((f: any) => ({ key: f.key ?? '', label: f.label ?? '', value: f.value ?? f.defaultValue ?? '' }));
@@ -512,7 +525,7 @@ export const importExportService = {
             await configDefRepo.setEnvironment(existingCfg.id, c.environment);
           }
         } else {
-          const cfgId = await configDefRepo.create(projectId, c.name, c.environment);
+          const cfgId = await configDefRepo.create(projectId, c.name, c.environment, cfgOrder++);
           await configDefRepo.setFields(cfgId, fields);
           summary.created.configs++;
         }

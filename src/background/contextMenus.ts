@@ -2,7 +2,8 @@ import { autoFillService } from '../shared/services/autoFillService';
 import { copyToClipboard } from '../shared/utils/clipboard';
 
 export function setupContextMenus() {
-  chrome.runtime.onInstalled.addListener(() => {
+  chrome.runtime.onInstalled.addListener(async () => {
+    await chrome.contextMenus.removeAll();
     chrome.contextMenus.create({ id: 'save-current-site', title: '保存当前网站为内部系统', contexts: ['page'] });
     chrome.contextMenus.create({ id: 'copy-system-info', title: '复制当前系统信息', contexts: ['page'] });
     chrome.contextMenus.create({ id: 'fill-credentials', title: '自动填充账号密码', contexts: ['editable'] });

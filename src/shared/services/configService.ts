@@ -98,9 +98,9 @@ export const configService = {
     );
   },
 
-  async createConfig(projectId: string, name: string, environment?: Environment): Promise<string> {
+  async createConfig(projectId: string, name: string, environment?: Environment, sortOrder?: number): Promise<string> {
     requireString(name, '配置名称');
-    return configDefRepo.create(projectId, name, environment);
+    return configDefRepo.create(projectId, name, environment, sortOrder);
   },
 
   async renameConfig(id: string, name: string): Promise<void> {
