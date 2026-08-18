@@ -38,9 +38,15 @@ observer.observe(document.documentElement, {
 // Stop observing after 10 seconds to avoid performance impact
 setTimeout(() => observer.disconnect(), 10000);
 
-listenForMessages(async (msg) => {
-  if (msg.type !== 'AUTO_FILL' || !msg.payload) return;
-  if (fillAttempted) return; // Prevent double-fill
+listenForMessages(async (msg, respond) => {
+  if (msg.type !== 'AUTO_FILL' || !msg.payload) {
+    respond({ filled: false });
+    return;
+  }
+  if (fillAttempted) {
+    respond({ filled: false });
+    return; // Prevent double-fill
+  }
 
   // Try to detect forms, with a short retry for SPA rendering
   let forms = detectLoginForm();
@@ -49,14 +55,22 @@ listenForMessages(async (msg) => {
     await new Promise(resolve => setTimeout(resolve, 300));
     forms = detectLoginForm();
   }
-  if (forms.length === 0) return;
+  if (forms.length === 0) {
+    respond({ filled: false });
+    return;
+  }
 
-  fillAttempted = true;
-  const payload = msg.payload;
-  if ('picker' in payload) {
-    showAccountPicker(payload.picker, forms);
-  } else {
-    await fillForm(forms[0], payload.account);
-    flashFilledIndicator();
+  try {
+    fillAttempted = true;
+    const payload = msg.payload;
+    if ('picker' in payload) {
+      showAccountPicker(payload.picker, forms);
+    } else {
+      await fillForm(forms[0], payload.account);
+      flashFilledIndicator();
+    }
+    respond({ filled: true });
+  } catch {
+    respond({ filled: false });
   }
 });

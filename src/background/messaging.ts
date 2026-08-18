@@ -3,6 +3,7 @@ import { recentRepo } from '../shared/db/repositories/recentRepo';
 import { cryptoService } from '../shared/services/cryptoService';
 import { cryptoSession } from '../shared/crypto/session';
 import type { Message, MessageResponse } from '../shared/types/messages';
+import { tryAutoFillTab } from './tabMonitor';
 
 export function setupMessaging() {
   chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
@@ -25,25 +26,10 @@ async function handleMessage(msg: Message, _sender: chrome.runtime.MessageSender
     case 'PAGE_HAS_LOGIN_FORM': {
       // Content script detected a login form - trigger auto-fill if not already done
       const tabId = _sender.tab?.id;
-      if (tabId && _sender.tab?.url) {
-        const match = await autoFillService.findDefaultAccountForUrl(_sender.tab.url);
-        if (match) {
-          // Send auto-fill after a short delay to ensure content script is fully ready
-          setTimeout(async () => {
-            try {
-              await chrome.tabs.sendMessage(tabId, {
-                type: 'AUTO_FILL',
-                payload: {
-                  systemId: match.systemId,
-                  systemName: match.systemName,
-                  account: match.account,
-                },
-              });
-            } catch {
-              // ignore
-            }
-          }, 200);
-        }
+      const tabUrl = _sender.tab?.url;
+      if (tabId && tabUrl) {
+        // 与 tabMonitor 共用统一的去重/URL 校验/重试逻辑
+        await tryAutoFillTab(tabId, tabUrl);
       }
       return { ok: true };
     }

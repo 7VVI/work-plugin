@@ -1,14 +1,25 @@
 import { systemRepo } from '../db/repositories/systemRepo';
 import { accountRepo } from '../db/repositories/accountRepo';
 import { cryptoService } from './cryptoService';
-import { urlMatchesSystem } from '../utils/url';
+import { urlMatchScore } from '../utils/url';
 import type { System } from '../types/entities';
 import type { AccountMatch } from '../types/messages';
 
 export const autoFillService = {
   async findSystemByUrl(url: string): Promise<System | undefined> {
     const systems = await systemRepo.all();
-    return systems.find(s => urlMatchesSystem(url, s.url));
+    // 存在多个可匹配系统时（如同 host 不同端口/路径），取匹配最精确的那个，
+    // 避免把 A 网站的账号密码填到 B 网站。
+    let best: System | undefined;
+    let bestScore = 0;
+    for (const system of systems) {
+      const score = urlMatchScore(url, system.url);
+      if (score > bestScore) {
+        best = system;
+        bestScore = score;
+      }
+    }
+    return best;
   },
 
   async findAccountsForUrl(url: string): Promise<AccountMatch[]> {
