@@ -2,7 +2,7 @@ import { autoFillService } from '../shared/services/autoFillService';
 import { recentRepo } from '../shared/db/repositories/recentRepo';
 import { cryptoService } from '../shared/services/cryptoService';
 import { cryptoSession } from '../shared/crypto/session';
-import type { Message, MessageResponse } from '../shared/types/messages';
+import type { Message, MessageResponse, AutoFillPayload } from '../shared/types/messages';
 import { tryAutoFillTab } from './tabMonitor';
 
 export function setupMessaging() {
@@ -53,11 +53,13 @@ async function handleMessage(msg: Message, _sender: chrome.runtime.MessageSender
 }
 
 export async function triggerAutoFillFromCommand(tab: chrome.tabs.Tab) {
-  const accounts = await autoFillService.findAccountsForUrl(tab.url!);
-  if (accounts.length === 0) return;
-  const payload = accounts.length === 1
-    ? { systemId: accounts[0].systemId, systemName: accounts[0].systemName, account: accounts[0].account }
-    : { picker: accounts };
+  const { autoFill, picker } = await autoFillService.resolveForUrl(tab.url!);
+  const payload: AutoFillPayload | null = autoFill
+    ? { systemId: autoFill.systemId, systemName: autoFill.systemName, account: autoFill.account }
+    : picker.length > 0
+      ? { picker }
+      : null;
+  if (!payload) return;
   await chrome.tabs.sendMessage(tab.id!, { type: 'AUTO_FILL', payload });
 }
 

@@ -1,60 +1,132 @@
 import { systemRepo } from '../db/repositories/systemRepo';
 import { accountRepo } from '../db/repositories/accountRepo';
 import { cryptoService } from './cryptoService';
-import { urlMatchScore } from '../utils/url';
+import { matchUrl } from '../utils/url';
 import type { System } from '../types/entities';
 import type { AccountMatch } from '../types/messages';
 
-export const autoFillService = {
-  async findSystemByUrl(url: string): Promise<System | undefined> {
-    const systems = await systemRepo.all();
-    // 存在多个可匹配系统时（如同 host 不同端口/路径），取匹配最精确的那个，
-    // 避免把 A 网站的账号密码填到 B 网站。
-    let best: System | undefined;
-    let bestScore = 0;
-    for (const system of systems) {
-      const score = urlMatchScore(url, system.url);
-      if (score > bestScore) {
-        best = system;
-        bestScore = score;
-      }
+interface SystemMatch {
+  system: System;
+  score: number;
+  protocolMatch: boolean;
+  queryMatch: boolean;
+}
+
+/**
+ * 返回与 URL 匹配度最高的系统。
+ * 同分时先按查询参数、再按协议区分；仍然并列则返回多个，表示无法确定是哪个项目。
+ */
+async function findBestSystems(url: string): Promise<System[]> {
+  const systems = await systemRepo.all();
+  const matches: SystemMatch[] = [];
+
+  for (const system of systems) {
+    const detail = matchUrl(url, system.url);
+    if (detail) matches.push({ system, ...detail });
+  }
+  if (matches.length === 0) return [];
+
+  const bestScore = Math.max(...matches.map(m => m.score));
+  let candidates = matches.filter(m => m.score === bestScore);
+
+  const queryMatched = candidates.filter(m => m.queryMatch);
+  if (queryMatched.length > 0) candidates = queryMatched;
+
+  const protocolMatched = candidates.filter(m => m.protocolMatch);
+  if (protocolMatched.length > 0) candidates = protocolMatched;
+
+  return candidates.map(m => m.system);
+}
+
+async function decryptedAccounts(system: System): Promise<AccountMatch[]> {
+  const accounts = await accountRepo.bySystemId(system.id);
+  const matches: AccountMatch[] = [];
+
+  for (const account of accounts) {
+    try {
+      const plainPassword = await cryptoService.decryptField(account.password);
+      matches.push({
+        systemId: system.id,
+        systemName: system.name,
+        account: { ...account, plainPassword },
+      });
+    } catch {
+      // skip accounts that can't be decrypted
     }
-    return best;
+  }
+
+  // 默认账号排在最前面；多重默认时按创建时间取最早的一个，保证结果稳定
+  matches.sort((a, b) => {
+    if (a.account.isDefault !== b.account.isDefault) return a.account.isDefault ? -1 : 1;
+    return a.account.createdAt - b.account.createdAt || a.account.id.localeCompare(b.account.id);
+  });
+
+  return matches;
+}
+
+export interface FillResolution {
+  /** 可以直接填充的账号（系统唯一时的默认账号） */
+  autoFill: AccountMatch | null;
+  /** 需要用户选择时的候选账号（无默认账号或多个系统并列匹配） */
+  picker: AccountMatch[];
+}
+
+async function resolveForUrl(url: string): Promise<FillResolution> {
+  const systems = await findBestSystems(url);
+  if (systems.length === 0) return { autoFill: null, picker: [] };
+
+  const accounts: AccountMatch[] = [];
+  for (const system of systems) {
+    accounts.push(...await decryptedAccounts(system));
+  }
+
+  // 多个系统同样精确：不能替用户猜项目，交给选择器
+  if (systems.length > 1) {
+    return { autoFill: null, picker: accounts };
+  }
+
+  const defaultAccount = accounts.find(m => m.account.isDefault);
+  if (defaultAccount) return { autoFill: defaultAccount, picker: [] };
+  if (accounts.length === 1) return { autoFill: accounts[0], picker: [] };
+  return { autoFill: null, picker: accounts };
+}
+
+export const autoFillService = {
+  /**
+   * 仅在唯一系统匹配时返回；多个系统同样精确时返回 undefined，
+   * 避免把其他项目的账号密码当成本系统的默认账号。
+   */
+  async findSystemByUrl(url: string): Promise<System | undefined> {
+    const systems = await findBestSystems(url);
+    return systems.length === 1 ? systems[0] : undefined;
   },
 
+  /**
+   * 返回匹配系统的所有账号。存在多个同样精确的系统时一并返回，
+   * 供手动填充选择器让用户明确选择要填哪个项目。
+   */
   async findAccountsForUrl(url: string): Promise<AccountMatch[]> {
-    const system = await this.findSystemByUrl(url);
-    if (!system) return [];
-
-    const accounts = await accountRepo.bySystemId(system.id);
+    const systems = await findBestSystems(url);
     const matches: AccountMatch[] = [];
-
-    for (const account of accounts) {
-      try {
-        const plainPassword = await cryptoService.decryptField(account.password);
-        matches.push({
-          systemId: system.id,
-          systemName: system.name,
-          account: { ...account, plainPassword },
-        });
-      } catch {
-        // skip accounts that can't be decrypted
-      }
+    for (const system of systems) {
+      matches.push(...await decryptedAccounts(system));
     }
-
-    // 默认账号排在第一位
-    matches.sort((a, b) => {
-      if (a.account.isDefault && !b.account.isDefault) return -1;
-      if (!a.account.isDefault && b.account.isDefault) return 1;
-      return 0;
-    });
-
     return matches;
   },
 
+  /**
+   * 自动填充只接受唯一匹配的系统，并优先使用默认账号；
+   * 无法确定时静默放弃，宁可不填也不填错。
+   */
   async findDefaultAccountForUrl(url: string): Promise<AccountMatch | null> {
-    const matches = await this.findAccountsForUrl(url);
-    if (matches.length === 0) return null;
-    return matches[0];
+    return (await resolveForUrl(url)).autoFill;
+  },
+
+  /**
+   * 手动填充入口：有默认账号时直接填默认账号，只有无默认账号
+   * 或多个系统并列匹配时才返回候选列表交给用户选择。
+   */
+  async resolveForUrl(url: string): Promise<FillResolution> {
+    return resolveForUrl(url);
   },
 };

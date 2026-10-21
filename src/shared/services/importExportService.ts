@@ -233,6 +233,8 @@ export const importExportService = {
             });
           }
         }
+        // 导入数据可能带多个默认账号，导入后校正为唯一默认
+        await accountRepo.normalizeDefault(systemId);
       }
     }
 
@@ -412,6 +414,8 @@ export const importExportService = {
             });
           }
         }
+        // 导入数据可能带多个默认账号，导入后校正为唯一默认
+        await accountRepo.normalizeDefault(systemId);
       }
     }
 

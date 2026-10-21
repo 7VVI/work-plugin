@@ -148,7 +148,7 @@
                   </div>
                 </div>
               </div>
-              <button class="btn-g dashed" type="button" @click="addAccountRow()">
+              <button class="btn-g dashed" type="button" @click="addNewAccountRow">
                 <i class="fa-solid fa-plus"></i>添加账号
               </button>
             </div>
@@ -284,20 +284,20 @@ function newUid() {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 function addAccountRow(role = '', username = '', password = '', id?: string, isDefault = false) {
-  // 如果是第一个账号行，自动设为默认
-  if (acctRows.value.length === 0) isDefault = true;
   acctRows.value.push({ uid: newUid(), id, role, username, password, show: false, isDefault });
+}
+function addNewAccountRow() {
+  // 只有新系统的第一个账号自动设为默认；已有账号的系统保留原有默认
+  addAccountRow('', '', '', undefined, acctRows.value.length === 0);
+}
+function ensureSingleDefault(rows: AcctRow[]) {
+  if (rows.length === 0) return;
+  const preferred = rows.find(r => r.isDefault) ?? rows[0];
+  for (const row of rows) row.isDefault = row === preferred;
 }
 function removeAccountRow(uid: string) {
   acctRows.value = acctRows.value.filter(r => r.uid !== uid);
-  // 删除后如果只剩一个账号，自动设为默认
-  if (acctRows.value.length === 1) {
-    acctRows.value[0].isDefault = true;
-  }
-  // 如果删除的是默认账号且还有剩余，第一个设为默认
-  if (acctRows.value.length > 0 && !acctRows.value.some(r => r.isDefault)) {
-    acctRows.value[0].isDefault = true;
-  }
+  ensureSingleDefault(acctRows.value);
 }
 function toggleDefault(uid: string) {
   acctRows.value.forEach(r => { r.isDefault = r.uid === uid; });
@@ -350,6 +350,8 @@ watch(
         }
         addAccountRow(acc.role, acc.username, plain, acc.id, acc.isDefault);
       }
+      // 历史数据可能有多个默认账号，表单里只保留一个，避免保存时把默认状态写乱
+      ensureSingleDefault(acctRows.value);
     } else {
       form.value = blankForm();
       form.value.groupId = props.defaultGroupId || '';
@@ -386,12 +388,8 @@ async function save() {
   const rows = acctRows.value.filter(
     a => a.role.trim() && a.username.trim() && a.password.trim(),
   );
-  // 保证至少有一个默认账号：只有一个时自动默认，多个但无默认时第一个默认
-  if (rows.length === 1) {
-    rows[0].isDefault = true;
-  } else if (rows.length > 1 && !rows.some(r => r.isDefault)) {
-    rows[0].isDefault = true;
-  }
+  // 保证只有唯一默认账号：多个默认时保留第一个，全部未选时取第一个
+  ensureSingleDefault(rows);
 
   try {
     if (props.system) {

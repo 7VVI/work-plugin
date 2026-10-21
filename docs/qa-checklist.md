@@ -48,7 +48,9 @@
 - [ ] Navigate to that URL in a tab
 - [ ] Badge "★" appears on extension icon
 - [ ] Press Ctrl+Shift+L: form fills
-- [ ] Multiple accounts: picker appears
+- [ ] Multiple accounts with a default: default account fills directly
+- [ ] Multiple accounts without a default: picker appears
+- [ ] Multiple equally matched systems: picker appears
 - [ ] Right-click > "自动填充账号密码"
 
 ## Context Menus

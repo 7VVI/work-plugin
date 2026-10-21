@@ -1,5 +1,6 @@
 import { autoFillService } from '../shared/services/autoFillService';
 import { copyToClipboard } from '../shared/utils/clipboard';
+import type { AutoFillPayload } from '../shared/types/messages';
 
 export function setupContextMenus() {
   chrome.runtime.onInstalled.addListener(async () => {
@@ -42,10 +43,12 @@ async function copyMatchedSystemInfo(tab: chrome.tabs.Tab) {
 }
 
 async function triggerAutoFill(tab: chrome.tabs.Tab) {
-  const accounts = await autoFillService.findAccountsForUrl(tab.url!);
-  if (accounts.length === 0) return;
-  const payload = accounts.length === 1
-    ? { systemId: accounts[0].systemId, systemName: accounts[0].systemName, account: accounts[0].account }
-    : { picker: accounts };
+  const { autoFill, picker } = await autoFillService.resolveForUrl(tab.url!);
+  const payload: AutoFillPayload | null = autoFill
+    ? { systemId: autoFill.systemId, systemName: autoFill.systemName, account: autoFill.account }
+    : picker.length > 0
+      ? { picker }
+      : null;
+  if (!payload) return;
   await chrome.tabs.sendMessage(tab.id!, { type: 'AUTO_FILL', payload });
 }

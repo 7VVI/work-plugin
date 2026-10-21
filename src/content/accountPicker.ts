@@ -2,11 +2,24 @@ import type { AccountMatch } from '../shared/types/messages';
 import type { LoginForm } from './detector';
 import { fillForm, flashFilledIndicator } from './filler';
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]!));
+}
+
 export function showAccountPicker(accounts: AccountMatch[], forms: LoginForm[]) {
   const host = document.createElement('div');
   host.id = 'nav-portal-picker-host';
   host.style.cssText = 'position: fixed; top: 16px; right: 16px; z-index: 2147483647;';
   const shadow = host.attachShadow({ mode: 'closed' });
+
+  // 多个系统同样匹配时，用系统名帮用户区分，避免选到其他项目
+  const showSystemName = new Set(accounts.map(a => a.systemId)).size > 1;
 
   shadow.innerHTML = `
     <style>
@@ -18,13 +31,15 @@ export function showAccountPicker(accounts: AccountMatch[], forms: LoginForm[]) 
               border-radius: 6px; cursor: pointer; font-size: 13px; color: #111827; }
       .item:hover { background: #f3f4f6; }
       .role { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #eff6ff; color: #1d4ed8; }
+      .system { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #f3f4f6; color: #374151; }
     </style>
     <div class="panel">
       <div class="title">选择要填充的账号</div>
       ${accounts.map((a, i) => `
         <div class="item" data-idx="${i}">
-          <span class="role">${a.account.role}</span>
-          <span>${a.account.username}</span>
+          ${showSystemName ? `<span class="system">${escapeHtml(a.systemName)}</span>` : ''}
+          <span class="role">${escapeHtml(a.account.role)}</span>
+          <span>${escapeHtml(a.account.username)}</span>
         </div>
       `).join('')}
     </div>
