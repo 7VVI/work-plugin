@@ -29,7 +29,7 @@
             <div class="item-tail">
               <EnvBadge :env="s.environment" />
               <div class="item-actions">
-                <button class="row-act" title="复制账号" @click.stop="onCopyAccount(s)"><i class="fa-regular fa-copy"></i></button>
+                <button class="row-act" title="复制（URL+默认账号密码）" @click.stop="onCopySystem(s)"><i class="fa-regular fa-copy"></i></button>
                 <button class="row-act" title="打开" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
               </div>
             </div>
@@ -52,6 +52,7 @@ import { systemRepo } from '@shared/db/repositories/systemRepo';
 import { accountRepo } from '@shared/db/repositories/accountRepo';
 import { groupRepo } from '@shared/db/repositories/groupRepo';
 import { recentRepo } from '@shared/db/repositories/recentRepo';
+import { accountService } from '@shared/services/accountService';
 import { useSearchStore } from '@shared/stores/searchStore';
 import { storeToRefs } from 'pinia';
 import { useToastStore } from '@shared/stores/toastStore';
@@ -105,14 +106,24 @@ async function onOpen(s: System) {
   window.close();
 }
 
-async function onCopyAccount(s: System) {
-  const accounts = await accountRepo.bySystemId(s.id);
-  const acc = accounts.find(a => a.isDefault) ?? accounts[0];
-  if (acc?.username) {
-    copyToClipboard(acc.username);
-    toast.success(`账号「${acc.username}」已复制`);
-  } else {
-    toast.info('该系统暂无账号');
+async function onCopySystem(s: System) {
+  try {
+    const account = await accountRepo.getDefault(s.id);
+    if (!account) {
+      await copyToClipboard(s.url);
+      toast.info('已复制 URL（无默认账号）');
+      return;
+    }
+    const { plainPassword } = await accountService.getDecrypted(account.id);
+    await copyToClipboard(`${s.url}\n${account.username}\n${plainPassword}`);
+    toast.success('已复制 URL + 默认账号密码');
+  } catch {
+    try {
+      await copyToClipboard(s.url);
+      toast.info('已复制 URL（账号解密失败）');
+    } catch {
+      toast.error('复制失败');
+    }
   }
 }
 
