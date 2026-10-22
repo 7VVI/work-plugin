@@ -32,12 +32,23 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
   }
 
   async function loadConfigs(projectId: string) {
-    configs.value = await configService.configsByProject(projectId);
-    configCounts.value = { ...configCounts.value, [projectId]: configs.value.length };
-    projectConfigs.value = { ...projectConfigs.value, [projectId]: configs.value };
-    if (configs.value.length > 0 && !selectedConfigId.value) {
-      selectedConfigId.value = configs.value[0].id;
+    const list = await configService.configsByProject(projectId);
+    projectConfigs.value = { ...projectConfigs.value, [projectId]: list };
+    configCounts.value = { ...configCounts.value, [projectId]: list.length };
+    // configs 始终对应当前选中的分组，避免拖拽/重命名其他分组时覆盖右侧详情
+    if (selectedProjectId.value === projectId) {
+      configs.value = list;
+      if (list.length > 0 && !selectedConfigId.value) {
+        selectedConfigId.value = list[0].id;
+      }
     }
+  }
+
+  function projectIdOfConfig(id: string): string | undefined {
+    for (const [projectId, list] of Object.entries(projectConfigs.value)) {
+      if (list.some(c => c.id === id)) return projectId;
+    }
+    return undefined;
   }
 
   function selectProject(id: string) {
@@ -88,10 +99,9 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
   }
 
   async function renameConfig(id: string, name: string) {
+    const projectId = projectIdOfConfig(id) ?? selectedProjectId.value;
     await configService.renameConfig(id, name);
-    if (selectedProjectId.value) {
-      await loadConfigs(selectedProjectId.value);
-    }
+    if (projectId) await loadConfigs(projectId);
   }
 
   async function setConfigEnvironment(id: string, environment?: Environment) {
@@ -102,12 +112,13 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
   }
 
   async function deleteConfig(id: string) {
+    const projectId = projectIdOfConfig(id) ?? selectedProjectId.value;
     await configService.deleteConfig(id);
     if (selectedConfigId.value === id) {
       selectedConfigId.value = null;
     }
-    if (selectedProjectId.value) {
-      await loadConfigs(selectedProjectId.value);
+    if (projectId) {
+      await loadConfigs(projectId);
     }
   }
 
@@ -121,6 +132,20 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
   async function reorderConfigs(projectId: string, orderedIds: string[]) {
     await configService.reorderConfigs(projectId, orderedIds);
     await loadConfigs(projectId);
+  }
+
+  async function moveConfig(id: string, targetProjectId: string, targetIndex: number) {
+    const wasSelected = selectedConfigId.value === id;
+    await configService.moveConfig(id, targetProjectId, targetIndex);
+    await loadProjects();
+    if (wasSelected) {
+      // 选中的配置被移动后跟随到目标分组，保持右侧详情不变
+      selectedProjectId.value = targetProjectId;
+      await loadConfigs(targetProjectId);
+      selectedConfigId.value = id;
+    } else if (selectedProjectId.value) {
+      await loadConfigs(selectedProjectId.value);
+    }
   }
 
   async function copyValue(value: string) {
@@ -140,7 +165,7 @@ export const useConfigStoreV3 = defineStore('configV3', () => {
     selectedProject, selectedConfig,
     loadProjects, loadConfigs, selectProject, selectConfig,
     createProject, renameProject, deleteProject, reorderProjects,
-    addConfig, renameConfig, deleteConfig, setFields, reorderConfigs, setConfigEnvironment,
+    addConfig, renameConfig, deleteConfig, setFields, reorderConfigs, moveConfig, setConfigEnvironment,
     copyValue,
   };
 });

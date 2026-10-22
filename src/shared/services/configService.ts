@@ -123,4 +123,8 @@ export const configService = {
   async reorderConfigs(projectId: string, orderedIds: string[]): Promise<void> {
     await configDefRepo.reorder(projectId, orderedIds);
   },
+
+  async moveConfig(id: string, targetProjectId: string, targetIndex: number): Promise<void> {
+    await configDefRepo.moveToProject(id, targetProjectId, targetIndex);
+  },
 };

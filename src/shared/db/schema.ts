@@ -49,6 +49,30 @@ export class NavPortalDB extends Dexie {
       middlewares: 'id, type, name, host, favorite, sortOrder, createdAt, groupId',
       groups:      'id, entityType, name, sortOrder, createdAt, updatedAt',
     });
+    this.version(5).upgrade(async (tx) => {
+      // 历史配置可能没有 sortOrder，拖拽排序前先按“已有顺序 + 创建时间”补齐
+      const rows = await tx.table('configDefs').toArray() as ConfigDef[];
+      const byProject = new Map<string, ConfigDef[]>();
+      for (const config of rows) {
+        const list = byProject.get(config.projectId) ?? [];
+        list.push(config);
+        byProject.set(config.projectId, list);
+      }
+
+      const now = Date.now();
+      for (const list of byProject.values()) {
+        list.sort((a, b) =>
+          (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER)
+          || a.createdAt - b.createdAt
+          || a.id.localeCompare(b.id),
+        );
+        for (let i = 0; i < list.length; i++) {
+          if (list[i].sortOrder !== i) {
+            await tx.table('configDefs').update(list[i].id, { sortOrder: i, updatedAt: now });
+          }
+        }
+      }
+    });
   }
 }
 

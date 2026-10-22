@@ -10,79 +10,103 @@
           </button>
         </div>
         <div class="tree-wrap">
-          <div v-for="p in filteredProjects" :key="p.id" class="tree-group">
-            <!-- 分组节点 -->
-            <div
-              class="tree-node tree-project"
-              :class="{ expanded: expandedSet.has(p.id) }"
-              @click="toggleProject(p.id)"
-            >
-              <i class="fa-solid tree-arrow" :class="expandedSet.has(p.id) ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-              <i class="fa-solid fa-cubes tree-proj-icon" :class="{ active: p.id === store.selectedProjectId }"></i>
-              <template v-if="renamingProjectId === p.id">
-                <input
-                  v-model="renamingProjectName"
-                  class="inp tree-rename-inp"
-                  @click.stop
-                  @keyup.enter="commitRenameProject(true)"
-                  @keyup.escape="commitRenameProject(false)"
-                  @blur="commitRenameProject(true)"
-                />
-              </template>
-              <template v-else>
-                <span class="tree-node-name" :class="{ active: p.id === store.selectedProjectId }">{{ p.name }}</span>
-                <span class="tree-count">{{ store.configCounts[p.id] ?? 0 }}</span>
-              </template>
-              <button class="ibtn ibtn-tiny tree-act" title="重命名" @click.stop="startRenameProject(p)">
-                <i class="fa-solid fa-pen"></i>
-              </button>
-              <button class="ibtn ibtn-tiny danger tree-act" title="删除" @click.stop="onDeleteProject(p.id)">
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-            <!-- 展开的配置子节点 -->
-            <Transition name="tree-expand">
-              <div v-if="expandedSet.has(p.id)" class="tree-children">
-                <VueDraggable
-                  :model-value="getProjectConfigs(p.id)"
-                  class="tree-config-list"
-                  :animation="200"
-                  ghost-class="dragging"
-                  :group="'configs-' + p.id"
-                  @end="(e: any) => onConfigDragEnd(p.id, e)"
-                >
-                  <div
-                    v-for="c in getProjectConfigs(p.id)"
-                    :key="c.id"
-                    class="tree-node tree-config"
-                    :class="{ active: c.id === store.selectedConfigId }"
-                    @click.stop="onSelectConfig(p.id, c.id)"
-                  >
-                    <template v-if="renamingConfigId === c.id">
-                      <input
-                        v-model="renamingConfigName"
-                        class="inp tree-rename-cfg-inp"
-                        @click.stop
-                        @keyup.enter="commitRenameConfig(true)"
-                        @keyup.escape="commitRenameConfig(false)"
-                        @blur="commitRenameConfig(true)"
-                      />
-                    </template>
-                    <template v-else>
-                      <span class="tree-config-name" @dblclick.stop="startRenameConfig(c)" title="双击重命名">{{ c.name }}</span>
-                      <span class="tree-count">{{ c.fields.length }}</span>
-                      <button class="ibtn ibtn-tiny tree-copy-act" title="复制所有字段" @click.stop="onCopyConfig(c)">
-                        <i class="fa-regular fa-copy"></i>
-                      </button>
-                      <button class="ibtn ibtn-tiny danger tree-copy-act" title="删除配置" @click.stop="onDeleteConfig(c.id)">
-                        <i class="fa-solid fa-xmark"></i>
-                      </button>
-                    </template>
-                  </div>
-                </VueDraggable>
+          <VueDraggable
+            :model-value="filteredProjects"
+            class="tree-project-list"
+            :animation="200"
+            ghost-class="dragging"
+            handle=".tree-project"
+            :filter="'.tree-act, .tree-rename-inp'"
+            :prevent-on-filter="false"
+            :disabled="!!search.trim()"
+            @end="onProjectDragEnd"
+          >
+            <div v-for="p in filteredProjects" :key="p.id" class="tree-group" :data-project-id="p.id">
+              <!-- 分组节点 -->
+              <div
+                class="tree-node tree-project"
+                :class="{ expanded: expandedSet.has(p.id) }"
+                @click="toggleProject(p.id)"
+              >
+                <i class="fa-solid tree-arrow" :class="expandedSet.has(p.id) ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+                <i class="fa-solid fa-cubes tree-proj-icon" :class="{ active: p.id === store.selectedProjectId }"></i>
+                <template v-if="renamingProjectId === p.id">
+                  <input
+                    v-model="renamingProjectName"
+                    class="inp tree-rename-inp"
+                    @click.stop
+                    @keyup.enter="commitRenameProject(true)"
+                    @keyup.escape="commitRenameProject(false)"
+                    @blur="commitRenameProject(true)"
+                  />
+                </template>
+                <template v-else>
+                  <span class="tree-node-name" :class="{ active: p.id === store.selectedProjectId }">{{ p.name }}</span>
+                  <span class="tree-count">{{ store.configCounts[p.id] ?? 0 }}</span>
+                </template>
+                <button class="ibtn ibtn-tiny tree-act" title="重命名" @click.stop="startRenameProject(p)">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="ibtn ibtn-tiny danger tree-act" title="删除" @click.stop="onDeleteProject(p.id)">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
               </div>
-            </Transition>
-          </div>
+              <!-- 展开的配置子节点 -->
+              <Transition name="tree-expand">
+                <div
+                  v-if="expandedSet.has(p.id) && localConfigs[p.id]"
+                  class="tree-children"
+                  :data-project-id="p.id"
+                >
+                  <VueDraggable
+                    v-model="localConfigs[p.id]"
+                    class="tree-config-list"
+                    :animation="200"
+                    ghost-class="dragging"
+                    group="configs"
+                    draggable=".tree-config"
+                    :disabled="selectedEnv !== 'all'"
+                    @start="onConfigDragStart"
+                    @end="onConfigDragEnd"
+                  >
+                    <div
+                      v-for="c in localConfigs[p.id]"
+                      v-show="isConfigVisible(c)"
+                      :key="c.id"
+                      class="tree-node tree-config"
+                      :class="{ active: c.id === store.selectedConfigId }"
+                      :data-config-id="c.id"
+                      @click.stop="onSelectConfig(p.id, c.id)"
+                    >
+                      <template v-if="renamingConfigId === c.id">
+                        <input
+                          v-model="renamingConfigName"
+                          class="inp tree-rename-cfg-inp"
+                          @click.stop
+                          @keyup.enter="commitRenameConfig(true)"
+                          @keyup.escape="commitRenameConfig(false)"
+                          @blur="commitRenameConfig(true)"
+                        />
+                      </template>
+                      <template v-else>
+                        <span class="tree-config-name" @dblclick.stop="startRenameConfig(c)" title="双击重命名">{{ c.name }}</span>
+                        <span class="tree-count">{{ c.fields.length }}</span>
+                        <button class="ibtn ibtn-tiny tree-copy-act" title="复制所有字段" @click.stop="onCopyConfig(c)">
+                          <i class="fa-regular fa-copy"></i>
+                        </button>
+                        <button class="ibtn ibtn-tiny danger tree-copy-act" title="删除配置" @click.stop="onDeleteConfig(c.id)">
+                          <i class="fa-solid fa-xmark"></i>
+                        </button>
+                      </template>
+                    </div>
+                    <div v-if="localConfigs[p.id].length === 0" class="tree-config-empty t3">
+                      拖入配置到该分组
+                    </div>
+                  </VueDraggable>
+                </div>
+              </Transition>
+            </div>
+          </VueDraggable>
           <div v-if="filteredProjects.length === 0" class="tree-empty t3">暂无分组</div>
         </div>
       </div>
@@ -285,7 +309,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue';
+import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useConfigStoreV3 } from '@shared/stores/configStoreV3';
 import { useToastStore } from '@shared/stores/toastStore';
@@ -301,6 +325,21 @@ const selectedEnv = ref<Environment | 'all'>('all');
 
 // 树形展开状态
 const expandedSet = ref<Set<string>>(new Set());
+
+// 配置列表的本地镜像：拖拽时先更新本地顺序，松手后再持久化
+const localConfigs = reactive<Record<string, ConfigDef[]>>({});
+watch(
+  () => store.projectConfigs,
+  (map) => {
+    for (const key of Object.keys(localConfigs)) {
+      if (!(key in map)) delete localConfigs[key];
+    }
+    for (const [key, list] of Object.entries(map)) {
+      localConfigs[key] = [...list];
+    }
+  },
+  { immediate: true },
+);
 
 // 分组：弹窗新建 / 重命名
 const projectModalOpen = ref(false);
@@ -341,6 +380,8 @@ onMounted(async () => {
   }
 });
 
+onBeforeUnmount(finishConfigDrag);
+
 // 筛选分组（搜索）
 const filteredProjects = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -348,11 +389,9 @@ const filteredProjects = computed(() => {
   return store.projects.filter(p => p.name.toLowerCase().includes(q));
 });
 
-// 获取某个分组下的配置列表（按环境筛选）
-function getProjectConfigs(projectId: string): ConfigDef[] {
-  const cfgs = store.projectConfigs[projectId] || [];
-  if (selectedEnv.value === 'all') return cfgs;
-  return cfgs.filter(c => c.environment === selectedEnv.value);
+// 环境筛选只影响显示，列表本身始终保留完整配置以保证拖拽排序正确
+function isConfigVisible(c: ConfigDef): boolean {
+  return selectedEnv.value === 'all' || c.environment === selectedEnv.value;
 }
 
 // 当前选中配置的字段（搜索过滤）
@@ -378,7 +417,11 @@ function resetNf() {
 }
 
 /* ---------- 树形操作 ---------- */
+let projectDragEndedAt = 0;
+
 function toggleProject(id: string) {
+  // 拖拽结束后浏览器仍可能触发 click，避免误折叠/展开
+  if (Date.now() - projectDragEndedAt < 250) return;
   const s = new Set(expandedSet.value);
   if (s.has(id)) {
     s.delete(id);
@@ -504,16 +547,102 @@ async function commitRenameConfig(save: boolean) {
   }
 }
 
-async function onConfigDragEnd(projectId: string, event: any) {
+async function onProjectDragEnd(event: any) {
+  projectDragEndedAt = Date.now();
   const { oldIndex, newIndex } = event;
   if (oldIndex === newIndex || oldIndex === undefined || newIndex === undefined) return;
-  const cfgs = getProjectConfigs(projectId);
-  const newList = [...cfgs];
-  const [moved] = newList.splice(oldIndex, 1);
-  newList.splice(newIndex, 0, moved);
-  const orderedIds = newList.map(c => c.id);
-  await store.reorderConfigs(projectId, orderedIds);
-  toast.success('配置排序已更新');
+  // 搜索过滤时列表不完整，不能据此重排
+  if (search.value.trim()) return;
+
+  const list = [...filteredProjects.value];
+  const [moved] = list.splice(oldIndex, 1);
+  if (!moved) return;
+  list.splice(newIndex, 0, moved);
+  await store.reorderProjects(list.map(p => p.id));
+  toast.success('分组排序已更新');
+}
+
+let draggingConfig = false;
+let expandTimer: number | undefined;
+let pendingExpandProjectId: string | null = null;
+
+function cancelPendingExpand() {
+  if (expandTimer) {
+    window.clearTimeout(expandTimer);
+    expandTimer = undefined;
+  }
+  pendingExpandProjectId = null;
+}
+
+function handleConfigDragOver(e: DragEvent | MouseEvent) {
+  if (!draggingConfig) return;
+  // mousemove 用于非原生拖拽兜底，避免鼠标已松开后仍触发展开
+  if (e.type === 'mousemove' && (e as MouseEvent).buttons === 0) return;
+
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  const group = target?.closest('.tree-group') as HTMLElement | null;
+  const projectId = group?.dataset.projectId;
+  if (!projectId || expandedSet.value.has(projectId)) {
+    cancelPendingExpand();
+    return;
+  }
+
+  if (pendingExpandProjectId === projectId) return;
+  cancelPendingExpand();
+  pendingExpandProjectId = projectId;
+  expandTimer = window.setTimeout(() => {
+    expandTimer = undefined;
+    if (!draggingConfig || pendingExpandProjectId !== projectId) return;
+    const s = new Set(expandedSet.value);
+    s.add(projectId);
+    expandedSet.value = s;
+    pendingExpandProjectId = null;
+  }, 250);
+}
+
+function finishConfigDrag() {
+  draggingConfig = false;
+  cancelPendingExpand();
+  document.removeEventListener('dragover', handleConfigDragOver, true);
+  document.removeEventListener('mousemove', handleConfigDragOver, true);
+  document.removeEventListener('mouseup', finishConfigDrag, true);
+  document.removeEventListener('dragend', finishConfigDrag, true);
+}
+
+function onConfigDragStart() {
+  if (draggingConfig) return;
+  draggingConfig = true;
+  // 只展开鼠标停留的折叠分组，避免一开始就展开全部分组造成列表跳动
+  document.addEventListener('dragover', handleConfigDragOver, true);
+  document.addEventListener('mousemove', handleConfigDragOver, true);
+  document.addEventListener('mouseup', finishConfigDrag, true);
+  document.addEventListener('dragend', finishConfigDrag, true);
+}
+
+async function onConfigDragEnd(event: any) {
+  finishConfigDrag();
+  const { oldIndex, newIndex, from, to, item } = event;
+  if (newIndex === undefined) return;
+
+  // VueDraggable 的根节点是 .tree-config-list，其父节点上记录了所属分组
+  const sourceProjectId = (from as HTMLElement | undefined)?.parentElement?.dataset.projectId;
+  const targetProjectId = (to as HTMLElement | undefined)?.parentElement?.dataset.projectId;
+  const configId = (item as HTMLElement | undefined)?.dataset.configId;
+  if (!sourceProjectId || !targetProjectId || !configId) return;
+
+  if (sourceProjectId === targetProjectId) {
+    if (oldIndex === newIndex) return;
+    const orderedIds = (localConfigs[sourceProjectId] ?? []).map(c => c.id);
+    await store.reorderConfigs(sourceProjectId, orderedIds);
+    toast.success('配置排序已更新');
+    return;
+  }
+
+  const targetList = localConfigs[targetProjectId] ?? [];
+  const targetIndex = targetList.findIndex(c => c.id === configId);
+  await store.moveConfig(configId, targetProjectId, targetIndex < 0 ? targetList.length : targetIndex);
+  const targetName = store.projects.find(p => p.id === targetProjectId)?.name ?? '分组';
+  toast.success(`配置已移动到「${targetName}」`);
 }
 
 async function onChangeConfigEnv(e: Event) {
@@ -656,6 +785,10 @@ async function onCopyConfig(c: ConfigDef) {
 }
 
 /* 树节点 */
+.tree-project-list {
+  display: flex;
+  flex-direction: column;
+}
 .tree-group {
   margin-bottom: 2px;
 }
@@ -767,6 +900,15 @@ async function onCopyConfig(c: ConfigDef) {
   transition: opacity 0.12s ease;
 }
 .tree-config:hover .tree-copy-act { opacity: 1; }
+.tree-config-empty {
+  margin: 2px 10px;
+  padding: 6px 12px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--ink3);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
 
 /* 拖拽 */
 .dragging {

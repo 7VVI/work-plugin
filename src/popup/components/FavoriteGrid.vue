@@ -2,67 +2,44 @@
   <div class="section">
     <div ref="listRef" class="sys-list">
       <template v-if="flatList.length">
-        <div v-if="starred.length" class="group-label">常用</div>
-        <div
-          v-for="s in starred"
-          :key="s.id"
-          class="popup-item"
-          :class="{ active: activeId === s.id }"
-          @click="onOpen(s)"
-          @mouseenter="activeId = s.id"
-          :title="s.url"
-        >
-          <div class="popup-icon" :style="{ background: iconBg(s), boxShadow: `0 4px 12px -3px ${iconShadow(s)}` }">
-            <i :class="s.icon || 'fa-solid fa-globe'"></i>
+        <template v-for="section in sections" :key="section.key">
+          <div class="group-label">
+            <span v-if="section.color" class="group-dot" :style="{ background: section.color }"></span>
+            {{ section.label }}
           </div>
-          <div class="sys-text">
-            <div class="sys-name">
-              <span class="sys-name-text">{{ s.name }}</span>
-              <i class="fa-solid fa-star star" title="收藏"></i>
+          <div
+            v-for="s in section.systems"
+            :key="s.id"
+            class="popup-item"
+            :class="{ active: activeId === s.id }"
+            @click="onOpen(s)"
+            @mouseenter="activeId = s.id"
+            :title="s.url"
+          >
+            <div class="popup-icon" :style="{ background: iconBg(s), boxShadow: `0 4px 12px -3px ${iconShadow(s)}` }">
+              <i :class="s.icon || 'fa-solid fa-globe'"></i>
             </div>
-            <div class="sys-url">{{ s.url }}</div>
-          </div>
-          <div class="item-tail">
-            <EnvBadge :env="s.environment" />
-            <div class="item-actions">
-              <button class="row-act" title="复制账号" @click.stop="onCopyAccount(s)"><i class="fa-regular fa-copy"></i></button>
-              <button class="row-act" title="打开" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+            <div class="sys-text">
+              <div class="sys-name">
+                <span class="sys-name-text">{{ s.name }}</span>
+                <i v-if="s.favorite" class="fa-solid fa-star star" title="收藏"></i>
+              </div>
+              <div class="sys-url">{{ s.url }}</div>
             </div>
-          </div>
-        </div>
-
-        <div v-if="rest.length" class="group-label">全部系统</div>
-        <div
-          v-for="s in rest"
-          :key="s.id"
-          class="popup-item"
-          :class="{ active: activeId === s.id }"
-          @click="onOpen(s)"
-          @mouseenter="activeId = s.id"
-          :title="s.url"
-        >
-          <div class="popup-icon" :style="{ background: iconBg(s), boxShadow: `0 4px 12px -3px ${iconShadow(s)}` }">
-            <i :class="s.icon || 'fa-solid fa-globe'"></i>
-          </div>
-          <div class="sys-text">
-            <div class="sys-name">
-              <span class="sys-name-text">{{ s.name }}</span>
-            </div>
-            <div class="sys-url">{{ s.url }}</div>
-          </div>
-          <div class="item-tail">
-            <EnvBadge :env="s.environment" />
-            <div class="item-actions">
-              <button class="row-act" title="复制账号" @click.stop="onCopyAccount(s)"><i class="fa-regular fa-copy"></i></button>
-              <button class="row-act" title="打开" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+            <div class="item-tail">
+              <EnvBadge :env="s.environment" />
+              <div class="item-actions">
+                <button class="row-act" title="复制账号" @click.stop="onCopyAccount(s)"><i class="fa-regular fa-copy"></i></button>
+                <button class="row-act" title="打开" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+              </div>
             </div>
           </div>
-        </div>
+        </template>
       </template>
 
       <div v-else class="empty">
         <i class="fa-regular fa-folder-open"></i>
-        <div class="empty-text">{{ hasQuery ? '未找到匹配的系统' : '暂无系统，点击右上角“新增”添加' }}</div>
+        <div class="empty-text">{{ hasQuery ? '未找到匹配的系统或分组' : '暂无系统，点击右上角“新增”添加' }}</div>
         <button v-if="hasQuery" class="clear-btn" @click="clearQuery">清除搜索</button>
       </div>
     </div>
@@ -73,12 +50,14 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { systemRepo } from '@shared/db/repositories/systemRepo';
 import { accountRepo } from '@shared/db/repositories/accountRepo';
+import { groupRepo } from '@shared/db/repositories/groupRepo';
 import { recentRepo } from '@shared/db/repositories/recentRepo';
 import { useSearchStore } from '@shared/stores/searchStore';
 import { storeToRefs } from 'pinia';
 import { useToastStore } from '@shared/stores/toastStore';
 import { copyToClipboard } from '@shared/utils/clipboard';
-import type { System } from '@shared/types/entities';
+import { buildSystemSearchSections } from '../utils/systemSearch';
+import type { Group, System } from '@shared/types/entities';
 import EnvBadge from '../../dashboard/components/common/EnvBadge.vue';
 
 const emit = defineEmits<{ count: [n: number] }>();
@@ -87,12 +66,17 @@ const toast = useToastStore();
 const { query } = storeToRefs(searchStore);
 
 const systems = ref<System[]>([]);
+const groups = ref<Group[]>([]);
 const activeId = ref<string | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 
 onMounted(async () => {
-  const all = await systemRepo.all();
+  const [all, systemGroups] = await Promise.all([
+    systemRepo.all(),
+    groupRepo.allByType('system'),
+  ]);
   systems.value = all.sort((a, b) => a.sort - b.sort);
+  groups.value = systemGroups;
   if (systems.value.length) activeId.value = systems.value[0].id;
   emit('count', systems.value.length);
   window.addEventListener('keydown', onKeydown);
@@ -104,14 +88,10 @@ onBeforeUnmount(() => {
 
 const hasQuery = computed(() => query.value.trim().length > 0);
 
-const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase();
-  if (!q) return systems.value;
-  return systems.value.filter(s => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
-});
-const starred = computed(() => filtered.value.filter(s => s.favorite));
-const rest = computed(() => filtered.value.filter(s => !s.favorite));
-const flatList = computed(() => [...starred.value, ...rest.value]);
+const sections = computed(() =>
+  buildSystemSearchSections(systems.value, groups.value, query.value),
+);
+const flatList = computed(() => sections.value.flatMap(section => section.systems));
 
 watch(flatList, (list) => {
   if (!list.some(s => s.id === activeId.value)) {
@@ -193,11 +173,20 @@ function iconShadow(s: System): string {
   overflow-y: auto;
 }
 .group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: var(--gap-sm) var(--gap-sm) 2px;
   font-size: 10px;
   font-weight: var(--font-semibold);
   letter-spacing: 0.18em;
   color: var(--text-tertiary);
+}
+.group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 .popup-item {
   position: relative;
