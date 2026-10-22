@@ -747,7 +747,7 @@ async function onCopyConfig(c: ConfigDef) {
 
 /* ===== 左侧树形侧栏 ===== */
 .sidebar {
-  width: 260px;
+  width: 300px;
   flex: none;
   display: flex;
   flex-direction: column;

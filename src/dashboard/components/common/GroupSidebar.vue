@@ -219,7 +219,7 @@ async function onDelete(g: Group) {
 </script>
 
 <style scoped>
-.group-sidebar { width: 240px; flex: none; min-height: 0; display: flex; }
+.group-sidebar { width: 280px; flex: none; min-height: 0; display: flex; }
 
 .group-panel {
   padding: 8px;
