@@ -284,7 +284,8 @@ function newUid() {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 function addAccountRow(role = '', username = '', password = '', id?: string, isDefault = false) {
-  acctRows.value.push({ uid: newUid(), id, role, username, password, show: false, isDefault });
+  // 新录入的行默认显示明文，便于核对；已保存的账号加载时仍保持掩码
+  acctRows.value.push({ uid: newUid(), id, role, username, password, show: !id, isDefault });
 }
 function addNewAccountRow() {
   // 只有新系统的第一个账号自动设为默认；已有账号的系统保留原有默认
