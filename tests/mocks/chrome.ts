@@ -1,4 +1,5 @@
 const memoryStore: Record<string, unknown> = {};
+const localStore: Record<string, unknown> = {};
 
 const chrome = {
   storage: {
@@ -13,6 +14,26 @@ const chrome = {
       set: async (items: Record<string, unknown>) => {
         Object.assign(memoryStore, items);
       },
+    },
+    local: {
+      get: async (keys?: string | string[]) => {
+        if (!keys) return { ...localStore };
+        const result: Record<string, unknown> = {};
+        const keyArr = Array.isArray(keys) ? keys : [keys];
+        for (const k of keyArr) if (k in localStore) result[k] = localStore[k];
+        return result;
+      },
+      set: async (items: Record<string, unknown>) => {
+        Object.assign(localStore, items);
+      },
+      remove: async (keys: string | string[]) => {
+        const keyArr = Array.isArray(keys) ? keys : [keys];
+        for (const k of keyArr) delete localStore[k];
+      },
+    },
+    onChanged: {
+      addListener: () => {},
+      removeListener: () => {},
     },
     session: {
       _store: {} as Record<string, unknown>,

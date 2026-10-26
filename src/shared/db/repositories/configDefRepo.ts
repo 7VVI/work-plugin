@@ -46,7 +46,10 @@ export const configDefRepo = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.configDefs.delete(id);
+    await db.transaction('rw', db.configDefs, db.deletions, async () => {
+      await db.configDefs.delete(id);
+      await db.deletions.put({ id: `configDef:${id}`, entityType: 'configDef', entityId: id, deletedAt: Date.now() });
+    });
   },
 
   async setFields(id: string, fields: ConfigField[]): Promise<void> {

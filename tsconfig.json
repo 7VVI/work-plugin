@@ -18,10 +18,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@protocol/*": ["shared/protocol/*"]
     },
     "types": ["chrome", "vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "shared/**/*.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -362,7 +362,8 @@ export const importExportService = {
           color: g.color || '#2E6BF0',
           sortOrder: g.sortOrder,
           createdAt: g.createdAt || Date.now(),
-          updatedAt: g.updatedAt || Date.now(),
+          // 导入视为一次新的本地变更，避免被清空时留下的分组墓碑拒绝
+          updatedAt: Date.now(),
         });
       }
     }

@@ -28,7 +28,19 @@ export const groupRepo = {
   },
 
   async clear(): Promise<void> {
-    await db.groups.clear();
+    const groups = await db.groups.toArray();
+    await db.transaction('rw', db.groups, db.deletions, async () => {
+      const now = Date.now();
+      for (const group of groups) {
+        await db.deletions.put({
+          id: `group:${group.id}`,
+          entityType: 'group',
+          entityId: group.id,
+          deletedAt: now,
+        });
+      }
+      await db.groups.clear();
+    });
   },
 
   async create(data: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
@@ -49,12 +61,19 @@ export const groupRepo = {
         : entityType === 'server' ? db.servers
           : db.middlewares
     ) as unknown as { where: (k: string) => { equals: (v: string) => { primaryKeys: () => Promise<string[]> } }; update: (k: string, p: Record<string, unknown>) => Promise<number> };
-    await db.transaction('rw', db.groups, db.systems, db.servers, db.middlewares, async () => {
-      await db.groups.delete(id);
+    await db.transaction('rw', db.groups, db.systems, db.servers, db.middlewares, db.deletions, async () => {
+      const now = Date.now();
       const keys = await table.where('groupId').equals(id).primaryKeys();
+      await db.groups.delete(id);
       for (const pk of keys) {
-        await table.update(pk, { groupId: undefined });
+        await table.update(pk, { groupId: undefined, updatedAt: now });
       }
+      await db.deletions.put({
+        id: `group:${id}`,
+        entityType: 'group',
+        entityId: id,
+        deletedAt: now,
+      });
     });
   },
 

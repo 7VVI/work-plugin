@@ -1,4 +1,5 @@
 import { exportRawKey } from './masterKey';
+import { platform } from '../platform';
 
 const VERIFIER_PLAINTEXT = 'nav-portal-verifier-v1';
 
@@ -31,6 +32,15 @@ class CryptoSession {
 
   setAutoLockMinutes(minutes: number): void {
     this.autoLockMinutes = minutes;
+    if (minutes <= 0) {
+      if (this.lockTimer) {
+        clearInterval(this.lockTimer);
+        this.lockTimer = null;
+      }
+      return;
+    }
+    this.lastActivityAt = Date.now();
+    this.startLockTimer();
   }
 
   onLock(handler: LockHandler): () => void {
@@ -50,12 +60,17 @@ class CryptoSession {
   async syncToBackground(): Promise<void> {
     if (!this.key) return;
     const raw = await exportRawKey(this.key);
-    await chrome.runtime.sendMessage({ type: 'CRYPTO_KEY_SYNC', keyBytes: raw });
+    await platform.runtime.sendMessage({ type: 'CRYPTO_KEY_SYNC', keyBytes: raw });
   }
 
   private startLockTimer(): void {
     if (this.lockTimer) clearInterval(this.lockTimer);
+    if (this.autoLockMinutes <= 0) {
+      this.lockTimer = null;
+      return;
+    }
     this.lockTimer = setInterval(() => {
+      if (this.autoLockMinutes <= 0) return;
       const idleMs = Date.now() - this.lastActivityAt;
       if (idleMs >= this.autoLockMinutes * 60 * 1000) {
         this.lock();

@@ -79,6 +79,17 @@ export interface Tag {
   name: string;
   color?: string;
   createdAt: number;
+  updatedAt: number;
+}
+
+/** 本地删除日志，用于云端同步时传播删除（避免仅凭快照推断丢失） */
+export type DeletionEntityType = EntityType | 'account' | 'tag' | 'group' | 'configProject' | 'configDef';
+
+export interface DeletionEntry {
+  id: string;
+  entityType: DeletionEntityType;
+  entityId: string;
+  deletedAt: number;
 }
 
 export interface SystemTag { systemId: string; tagId: string; }

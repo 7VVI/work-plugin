@@ -31,9 +31,11 @@ export const serverRepo = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', db.servers, db.serverTags, async () => {
+    await db.transaction('rw', db.servers, db.serverTags, db.deletions, async () => {
+      const now = Date.now();
       await db.servers.delete(id);
       await db.serverTags.where('serverId').equals(id).delete();
+      await db.deletions.put({ id: `server:${id}`, entityType: 'server', entityId: id, deletedAt: now });
     });
   },
 

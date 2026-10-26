@@ -4,10 +4,14 @@ import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   plugins: [vue()],
+  define: {
+    __APP_TARGET__: JSON.stringify('extension'),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
+      '@protocol': fileURLToPath(new URL('./shared/protocol', import.meta.url)),
     },
   },
   test: {

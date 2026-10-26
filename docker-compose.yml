@@ -1,0 +1,29 @@
+services:
+  dock-cloud:
+    build: .
+    image: dock-cloud:latest
+    restart: unless-stopped
+    init: true
+    ports:
+      - "8080:8080"
+    environment:
+      DOCK_ADMIN_SECRET: ${DOCK_ADMIN_SECRET}
+      DOCK_API_TOKEN: ${DOCK_API_TOKEN}
+      DOCK_DATA_KEY: ${DOCK_DATA_KEY}
+      DOCK_SESSION_DAYS: ${DOCK_SESSION_DAYS:-30}
+      DOCK_COOKIE_SECURE: ${DOCK_COOKIE_SECURE:-true}
+      DOCK_PUBLIC_ORIGIN: ${DOCK_PUBLIC_ORIGIN:-}
+      DOCK_TRUST_PROXY: ${DOCK_TRUST_PROXY:-true}
+      DOCK_DB: /data/dock.sqlite
+      DOCK_WEB_DIST: /app/public
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - dock-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  dock-data:

@@ -3,6 +3,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../../../src/shared/db/schema';
 import { cryptoService } from '../../../src/shared/services/cryptoService';
 import { cryptoSession } from '../../../src/shared/crypto/session';
+import { accountRepo } from '../../../src/shared/db/repositories/accountRepo';
+import { serverRepo } from '../../../src/shared/db/repositories/serverRepo';
+import { middlewareRepo } from '../../../src/shared/db/repositories/middlewareRepo';
 
 describe('cryptoService', () => {
   beforeEach(async () => {
@@ -57,5 +60,57 @@ describe('cryptoService', () => {
     }
     const decrypted = await cryptoService.decryptField(result);
     expect(decrypted).toBe('password123');
+  });
+
+  it('re-encrypts existing secrets when changing the master password', async () => {
+    await cryptoService.setPassword('mysecret');
+    const accountId = await accountRepo.create({
+      systemId: 's1', role: 'root', username: 'root',
+      password: await cryptoService.encryptField('account-secret'),
+      isDefault: true,
+    });
+    const serverId = await serverRepo.create({
+      name: 'srv', ip: '10.0.0.1', sshPort: 22, username: 'root',
+      password: await cryptoService.encryptField('server-secret'),
+      sshKey: await cryptoService.encryptField('ssh-secret'),
+      environment: 'development', favorite: false,
+    });
+    const middlewareId = await middlewareRepo.create({
+      type: 'redis', name: 'cache', host: '10.0.0.2', port: 6379,
+      username: 'default', password: await cryptoService.encryptField('redis-secret'),
+      favorite: false,
+    });
+
+    await cryptoService.changePassword('mysecret', 'newsecret');
+    cryptoSession.lock();
+
+    expect(await cryptoService.unlock('mysecret')).toBe(false);
+    expect(await cryptoService.unlock('newsecret')).toBe(true);
+
+    const account = await accountRepo.byId(accountId);
+    const server = await serverRepo.byId(serverId);
+    const middleware = await middlewareRepo.byId(middlewareId);
+    expect(await cryptoService.decryptField(account!.password)).toBe('account-secret');
+    expect(await cryptoService.decryptField(server!.password)).toBe('server-secret');
+    expect(await cryptoService.decryptField(server!.sshKey!)).toBe('ssh-secret');
+    expect(await cryptoService.decryptField(middleware!.password!)).toBe('redis-secret');
+  });
+
+  it('decrypts secrets to plaintext when disabling the master password', async () => {
+    await cryptoService.setPassword('mysecret');
+    const accountId = await accountRepo.create({
+      systemId: 's1', role: 'root', username: 'root',
+      password: await cryptoService.encryptField('account-secret'),
+      isDefault: true,
+    });
+
+    await cryptoService.disablePassword('mysecret');
+
+    expect(await cryptoService.isEnabled()).toBe(false);
+    const account = await accountRepo.byId(accountId);
+    expect(account?.password.__encrypted).toBe(false);
+    if (account && !account.password.__encrypted) {
+      expect(account.password.value).toBe('account-secret');
+    }
   });
 });

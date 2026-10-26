@@ -26,7 +26,7 @@ describe('subtitleFor', () => {
   it('returns configs subtitle with project/config/field counts', () => {
     expect(subtitleFor('/configs', stats)).toBe('4 个项目 · 7 个配置 · 12 个字段');
   });
-  it('returns a generic subtitle for unknown routes', () => {
-    expect(subtitleFor('/settings', stats)).toBe('外观 · 安全 · 快捷键 · 关于');
+  it('returns the settings subtitle', () => {
+    expect(subtitleFor('/settings', stats)).toBe('外观 · 安全 · 云端 · 快捷键 · 关于');
   });
 });

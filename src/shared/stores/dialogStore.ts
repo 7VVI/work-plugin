@@ -10,6 +10,7 @@ interface DialogState {
   message: string;
   placeholder: string;
   inputValue: string;
+  inputType: 'text' | 'password';
   resolver: ((value: boolean | string | null) => void) | null;
 }
 
@@ -20,6 +21,7 @@ const initialState: DialogState = {
   message: '',
   placeholder: '',
   inputValue: '',
+  inputType: 'text',
   resolver: null,
 };
 
@@ -35,12 +37,18 @@ export const useDialogStore = defineStore('dialog', () => {
         message,
         placeholder: '',
         inputValue: '',
+        inputType: 'text',
         resolver: resolve as (value: boolean | string | null) => void,
       };
     });
   }
 
-  function prompt(title: string, placeholder: string = '', defaultValue: string = ''): Promise<string | null> {
+  function prompt(
+    title: string,
+    placeholder: string = '',
+    defaultValue: string = '',
+    inputType: 'text' | 'password' = 'text',
+  ): Promise<string | null> {
     return new Promise((resolve) => {
       state.value = {
         visible: true,
@@ -49,6 +57,7 @@ export const useDialogStore = defineStore('dialog', () => {
         message: '',
         placeholder,
         inputValue: defaultValue,
+        inputType,
         resolver: resolve as (value: boolean | string | null) => void,
       };
     });

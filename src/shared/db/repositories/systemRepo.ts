@@ -29,10 +29,12 @@ export const systemRepo = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', db.systems, db.systemTags, db.accounts, async () => {
+    await db.transaction('rw', db.systems, db.systemTags, db.accounts, db.deletions, async () => {
+      const now = Date.now();
       await db.systems.delete(id);
       await db.systemTags.where('systemId').equals(id).delete();
       await db.accounts.where('systemId').equals(id).delete();
+      await db.deletions.put({ id: `system:${id}`, entityType: 'system', entityId: id, deletedAt: now });
     });
   },
 

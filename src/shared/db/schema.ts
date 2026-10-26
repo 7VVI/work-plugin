@@ -1,8 +1,9 @@
 import Dexie, { type Table } from 'dexie';
+import { markDirty } from '../sync/dirtyTracker';
 import type {
   System, Account, Server, Middleware, Tag,
   SystemTag, ServerTag, MiddlewareTag, Recent, MetaEntry, ConfigGroup,
-  ConfigProject, ConfigDef, Group,
+  ConfigProject, ConfigDef, Group, DeletionEntry,
 } from '../types/entities';
 
 export class NavPortalDB extends Dexie {
@@ -20,6 +21,7 @@ export class NavPortalDB extends Dexie {
   configProjects!: Table<ConfigProject, string>;
   configDefs!: Table<ConfigDef, string>;
   groups!: Table<Group, string>;
+  deletions!: Table<DeletionEntry, string>;
 
   constructor() {
     super('NavPortalDB');
@@ -73,7 +75,41 @@ export class NavPortalDB extends Dexie {
         }
       }
     });
+    this.version(6).stores({
+      tags: 'id, name, createdAt, updatedAt',
+      deletions: 'id, entityType, entityId, deletedAt',
+    }).upgrade(async (tx) => {
+      // 标签参与云端合并，需要 updatedAt；老数据用创建时间回填
+      await tx.table<Tag, string>('tags').toCollection().modify((tag) => {
+        if (typeof tag.updatedAt !== 'number') tag.updatedAt = tag.createdAt;
+      });
+    });
   }
 }
 
 export const db = new NavPortalDB();
+
+const SYNC_DIRTY_TABLES = new Set([
+  'groups', 'tags', 'systems', 'accounts', 'servers', 'middlewares',
+  'systemTags', 'serverTags', 'middlewareTags', 'configProjects', 'configDefs',
+]);
+
+// 统一捕获所有业务表写入（包括导入/弹窗），只标记 dirty，不做数据变换
+db.use({
+  stack: 'dbcore',
+  name: 'dock-sync-dirty-tracker',
+  create: (down) => ({
+    ...down,
+    table: (name: string) => {
+      const table = down.table(name);
+      if (!SYNC_DIRTY_TABLES.has(name)) return table;
+      return {
+        ...table,
+        mutate: (req) => table.mutate(req).then((result) => {
+          markDirty(name);
+          return result;
+        }),
+      };
+    },
+  }),
+});

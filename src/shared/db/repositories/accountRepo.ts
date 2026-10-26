@@ -31,9 +31,18 @@ export const accountRepo = {
 
   async delete(id: string): Promise<void> {
     const account = await db.accounts.get(id);
-    await db.accounts.delete(id);
+    if (!account) return;
+    await db.transaction('rw', db.accounts, db.deletions, async () => {
+      await db.accounts.delete(id);
+      await db.deletions.put({
+        id: `account:${id}`,
+        entityType: 'account',
+        entityId: id,
+        deletedAt: Date.now(),
+      });
+    });
     // 删除默认账号后自动补选，避免系统陷入“没有默认账号”的状态
-    if (account) await this.normalizeDefault(account.systemId);
+    await this.normalizeDefault(account.systemId);
   },
 
   /**

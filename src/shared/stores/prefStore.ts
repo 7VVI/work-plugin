@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import type { Environment } from '../types/entities';
+import { platform } from '../platform';
 
 interface Prefs {
   theme: 'light' | 'dark' | 'system';
@@ -26,7 +27,7 @@ export const usePrefStore = defineStore('pref', () => {
   const loaded = ref(false);
 
   async function load() {
-    const result = await chrome.storage.sync.get(STORAGE_KEY);
+    const result = await platform.storage.sync.get(STORAGE_KEY);
     const stored = result[STORAGE_KEY] as Partial<Prefs> | undefined;
     if (stored) {
       theme.value = stored.theme ?? DEFAULT_PREFS.theme;
@@ -39,7 +40,7 @@ export const usePrefStore = defineStore('pref', () => {
 
   async function persist() {
     const prefs: Prefs = { theme: theme.value, autoLockMinutes: autoLockMinutes.value, defaultEnvironment: defaultEnvironment.value, popupLayout: popupLayout.value };
-    await chrome.storage.sync.set({ [STORAGE_KEY]: prefs });
+    await platform.storage.sync.set({ [STORAGE_KEY]: prefs });
   }
 
   watch([theme, autoLockMinutes, defaultEnvironment, popupLayout], () => {

@@ -1,6 +1,13 @@
 node_modules/
 dist/
+dist-dev/
+dist-web/
 dist-zip/
+server/data/
+server/.tmp-e2e/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .vscode/
 .idea/
 *.swp

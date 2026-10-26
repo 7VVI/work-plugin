@@ -38,9 +38,11 @@ export const configProjectRepo = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', db.configProjects, db.configDefs, async () => {
+    await db.transaction('rw', db.configProjects, db.configDefs, db.deletions, async () => {
+      const now = Date.now();
       await db.configProjects.delete(id);
       await db.configDefs.where('projectId').equals(id).delete();
+      await db.deletions.put({ id: `configProject:${id}`, entityType: 'configProject', entityId: id, deletedAt: now });
     });
   },
 

@@ -1,3 +1,5 @@
+import { isWeb } from '@shared/platform';
+
 export interface DockStats {
   systems: number;
   servers: number;
@@ -26,8 +28,8 @@ export function subtitleFor(routePath: string, s: DockStats): string {
     case '/servers': return `共 ${s.servers} 台服务器`;
     case '/middlewares': return `共 ${s.middlewares} 个实例`;
     case '/configs': return `${s.projects} 个项目 · ${s.configs} 个配置 · ${s.fields} 个字段`;
-    case '/import-export': return 'JSON / Markdown 备份 · 本地存储';
-    case '/settings': return '外观 · 安全 · 快捷键 · 关于';
+    case '/import-export': return 'JSON / Markdown 备份 · 本地 / 云端';
+    case '/settings': return isWeb ? '外观 · 服务端访问 · 关于' : '外观 · 安全 · 云端 · 快捷键 · 关于';
     default: return '';
   }
 }

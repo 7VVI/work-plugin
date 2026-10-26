@@ -1,5 +1,6 @@
 <template>
   <div class="settings-view">
+    <div class="settings-grid">
     <!-- 外观 -->
     <section class="panel settings-section">
       <h3 class="section-title"><i class="fa-solid fa-palette section-icon"></i>外观</h3>
@@ -17,7 +18,7 @@
     </section>
 
     <!-- 安全 -->
-    <section class="panel settings-section">
+    <section v-if="!isWeb" class="panel settings-section">
       <h3 class="section-title"><i class="fa-solid fa-shield-halved section-icon"></i>安全</h3>
       <div class="setting-row">
         <div class="setting-meta">
@@ -121,7 +122,7 @@
     </section>
 
     <!-- 快捷键 -->
-    <section class="panel settings-section">
+    <section v-if="!isWeb" class="panel settings-section">
       <h3 class="section-title"><i class="fa-solid fa-keyboard section-icon"></i>快捷键</h3>
       <ul class="kbd-list">
         <li>
@@ -143,16 +144,23 @@
       </ul>
     </section>
 
+    <!-- 云端同步 -->
+    <CloudSyncSection v-if="!isWeb" />
+
+    <!-- 服务端访问（Web 面板） -->
+    <ServerAccessSection v-if="isWeb" />
+
     <!-- 关于 -->
     <section class="panel settings-section about-card">
       <div class="about-logo">D</div>
       <div class="about-info">
-        <div class="about-name">Dock for Chrome</div>
+        <div class="about-name">{{ isWeb ? 'Dock Cloud' : 'Dock for Chrome' }}</div>
         <div class="about-version mono">1.0.0</div>
       </div>
       <div class="about-spacer"></div>
-      <button class="btn btn-danger" @click="onClearAll"><i class="fa-solid fa-trash-can"></i> 清除所有数据</button>
+      <button v-if="!isWeb" class="btn btn-danger" @click="onClearAll"><i class="fa-solid fa-trash-can"></i> 清除所有数据</button>
     </section>
+    </div>
   </div>
 </template>
 
@@ -162,9 +170,10 @@ import { usePrefStore } from '@shared/stores/prefStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { importExportService } from '@shared/services/importExportService';
-import { cryptoStorage } from '@shared/crypto/storage';
-import { generateSalt, deriveKey } from '@shared/crypto/masterKey';
-import { cryptoSession, VERIFIER_PLAINTEXT } from '@shared/crypto/session';
+import { cryptoService } from '@shared/services/cryptoService';
+import { isWeb } from '@shared/platform';
+import CloudSyncSection from '../components/settings/CloudSyncSection.vue';
+import ServerAccessSection from '../../web/ServerAccessSection.vue';
 
 const prefStore = usePrefStore();
 const toast = useToastStore();
@@ -179,20 +188,22 @@ const confirmPwd = ref('');
 const changePwdLoading = ref(false);
 
 onMounted(async () => {
-  hasMasterPwd.value = await cryptoStorage.hasMasterPassword();
+  hasMasterPwd.value = await cryptoService.isEnabled();
   masterPwdOn.value = hasMasterPwd.value;
 });
 
 async function toggleMasterPwd() {
   if (masterPwdOn.value) {
-    // 关闭主密码
-    const ok = await dialog.confirm('关闭主密码', '关闭后将清除已保存的主密码，确认？');
-    if (!ok) return;
-    await cryptoStorage.clear();
-    cryptoSession.lock();
-    masterPwdOn.value = false;
-    hasMasterPwd.value = false;
-    toast.info('主密码已关闭');
+    const pwd = await dialog.prompt('关闭主密码', '输入当前主密码以解密现有数据', '', 'password');
+    if (!pwd) return;
+    try {
+      await cryptoService.disablePassword(pwd);
+      masterPwdOn.value = false;
+      hasMasterPwd.value = false;
+      toast.info('主密码已关闭');
+    } catch (e: any) {
+      toast.error(e?.message || '关闭失败');
+    }
   } else {
     masterPwdOn.value = true;
   }
@@ -203,12 +214,9 @@ async function onSetPwd() {
   if (newPwd.value !== confirmPwd.value) { toast.error('两次输入不一致'); return; }
   changePwdLoading.value = true;
   try {
-    const salt = generateSalt();
-    const key = await deriveKey(newPwd.value, salt);
-    await cryptoStorage.setSalt(salt);
-    await cryptoStorage.setVerifier(key, VERIFIER_PLAINTEXT);
-    cryptoSession.setKey(key);
+    await cryptoService.setPassword(newPwd.value);
     hasMasterPwd.value = true;
+    masterPwdOn.value = true;
     newPwd.value = '';
     confirmPwd.value = '';
     toast.success('主密码已设置');
@@ -225,18 +233,7 @@ async function onChangePwd() {
   if (newPwd.value !== confirmPwd.value) { toast.error('两次输入不一致'); return; }
   changePwdLoading.value = true;
   try {
-    // 验证当前密码
-    const oldSalt = await cryptoStorage.getSalt();
-    if (!oldSalt) { toast.error('当前无主密码记录'); return; }
-    const oldKey = await deriveKey(currentPwd.value, oldSalt);
-    const valid = await cryptoStorage.verifyKey(oldKey, VERIFIER_PLAINTEXT);
-    if (!valid) { toast.error('当前密码错误'); changePwdLoading.value = false; return; }
-    // 设置新密码
-    const salt = generateSalt();
-    const key = await deriveKey(newPwd.value, salt);
-    await cryptoStorage.setSalt(salt);
-    await cryptoStorage.setVerifier(key, VERIFIER_PLAINTEXT);
-    cryptoSession.setKey(key);
+    await cryptoService.changePassword(currentPwd.value, newPwd.value);
     currentPwd.value = '';
     newPwd.value = '';
     confirmPwd.value = '';
@@ -262,13 +259,27 @@ async function onClearAll() {
 <style scoped>
 .settings-view {
   padding: var(--gap-lg) var(--page-pad) calc(var(--statusbar-h) + var(--page-pad));
-  max-width: 760px;
   height: 100%;
   overflow-y: auto;
 }
+.settings-grid {
+  max-width: none;
+  margin: 0;
+  column-count: 2;
+  column-gap: clamp(16px, 2vw, 32px);
+}
 .settings-section {
   padding: var(--gap-xl);
-  margin-bottom: var(--gap-lg);
+  margin: 0 0 var(--gap-lg);
+  width: 100%;
+  break-inside: avoid;
+}
+@media (max-width: 980px) {
+  .settings-grid {
+    column-count: 1;
+    max-width: 760px;
+    margin: 0 auto;
+  }
 }
 .section-title {
   display: flex;

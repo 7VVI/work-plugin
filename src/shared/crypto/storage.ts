@@ -4,7 +4,7 @@ import { encrypt, decrypt } from './cipher';
 const SALT_KEY = 'crypto.salt';
 const VERIFIER_KEY = 'crypto.verifier';
 
-interface Verifier {
+export interface Verifier {
   iv: string;
   ciphertext: string;
 }
@@ -23,6 +23,17 @@ export const cryptoStorage = {
     await metaRepo.set(VERIFIER_KEY, encrypted as unknown as Verifier);
   },
 
+  /** 在调用方事务内写入密钥材料，用于密码轮换的原子更新 */
+  async writeKeyMaterial(salt: string, verifier: Verifier): Promise<void> {
+    await metaRepo.set(SALT_KEY, salt);
+    await metaRepo.set(VERIFIER_KEY, verifier);
+  },
+
+  async clearKeyMaterial(): Promise<void> {
+    await metaRepo.remove(SALT_KEY);
+    await metaRepo.remove(VERIFIER_KEY);
+  },
+
   async verifyKey(key: CryptoKey, knownPlaintext: string): Promise<boolean> {
     const stored = await metaRepo.get<Verifier>(VERIFIER_KEY);
     if (!stored) return false;
@@ -35,8 +46,7 @@ export const cryptoStorage = {
   },
 
   async clear(): Promise<void> {
-    await metaRepo.remove(SALT_KEY);
-    await metaRepo.remove(VERIFIER_KEY);
+    await this.clearKeyMaterial();
   },
 
   async hasMasterPassword(): Promise<boolean> {

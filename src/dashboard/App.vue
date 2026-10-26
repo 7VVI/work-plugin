@@ -25,10 +25,15 @@ import StatusBar from './components/layout/StatusBar.vue';
 import { usePrefStore } from '@shared/stores/prefStore';
 import { useCryptoStore } from '@shared/stores/cryptoStore';
 import { useConfigStore } from '@shared/stores/configStore';
+import { useCloudSyncStore } from '@shared/stores/cloudSyncStore';
+import { cryptoSession } from '@shared/crypto/session';
+import { startSyncScheduler } from '@shared/sync/syncScheduler';
 
 const prefStore = usePrefStore();
 const cryptoStore = useCryptoStore();
 const configStore = useConfigStore();
+const cloudStore = useCloudSyncStore();
+let stopSyncScheduler: (() => void) | null = null;
 
 function resolveTheme(theme: string): 'light' | 'dark' {
   if (theme === 'system') {
@@ -49,15 +54,24 @@ let mq: MediaQueryList | null = null;
 
 onMounted(async () => {
   await prefStore.load();
+  cryptoSession.setAutoLockMinutes(prefStore.autoLockMinutes);
   applyTheme(prefStore.theme);
   mq = window.matchMedia('(prefers-color-scheme: dark)');
   mq.addEventListener('change', onSystemThemeChange);
   await cryptoStore.checkStatus();
   await configStore.load();
+  await cloudStore.load();
+  stopSyncScheduler = startSyncScheduler();
+});
+
+watch(() => prefStore.autoLockMinutes, (minutes) => {
+  cryptoSession.setAutoLockMinutes(minutes);
 });
 
 onBeforeUnmount(() => {
   mq?.removeEventListener('change', onSystemThemeChange);
+  stopSyncScheduler?.();
+  stopSyncScheduler = null;
 });
 
 watch(() => prefStore.theme, (t) => applyTheme(t));

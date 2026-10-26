@@ -35,9 +35,11 @@ export const middlewareRepo = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', db.middlewares, db.middlewareTags, async () => {
+    await db.transaction('rw', db.middlewares, db.middlewareTags, db.deletions, async () => {
+      const now = Date.now();
       await db.middlewares.delete(id);
       await db.middlewareTags.where('middlewareId').equals(id).delete();
+      await db.deletions.put({ id: `middleware:${id}`, entityType: 'middleware', entityId: id, deletedAt: now });
     });
   },
 

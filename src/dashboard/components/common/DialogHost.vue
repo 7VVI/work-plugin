@@ -11,6 +11,7 @@
             v-else
             v-model="inputValue"
             class="dialog-input"
+            :type="store.state.inputType"
             :placeholder="store.state.placeholder"
             @keyup.enter="store.ok()"
             ref="inputRef"
