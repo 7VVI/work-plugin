@@ -198,8 +198,9 @@ export async function buildApp(config: ServerConfig): Promise<DockApp> {
     }
     const webHtmlPath = join(config.webDist, 'web.html');
     if (existsSync(webHtmlPath)) {
-      const webHtml = await readFile(webHtmlPath);
+      // 每次请求读取当前文件，避免前端资源重新构建后仍下发旧的 html 引用
       const sendWeb = async (_req: FastifyRequest, reply: FastifyReply) => {
+        const webHtml = await readFile(webHtmlPath);
         return reply.type('text/html; charset=utf-8').send(webHtml);
       };
       app.get('/', sendWeb);
