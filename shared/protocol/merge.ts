@@ -21,6 +21,7 @@ const MERGE_ORDER: SnapshotTable[] = [
   'accounts',
   'configDefs',
   'notes',
+  'noteAssets',
 ];
 
 /**

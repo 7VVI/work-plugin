@@ -11,6 +11,7 @@ import {
   normalizeTombstones,
   tableKeyForDeletionType,
   type NoteBookRec,
+  type NoteAssetRec,
   type NoteRec,
   type ServerState,
   type SyncSnapshot,
@@ -40,14 +41,29 @@ function snapshot(data: Partial<SyncSnapshot['data']> = {}): SyncSnapshot {
   };
 }
 
+function asset(id: string, updatedAt = 5): NoteAssetRec {
+  return {
+    id,
+    mime: 'image/png',
+    size: 3,
+    hash: 'a'.repeat(64),
+    data: 'AAAA',
+    createdAt: 1,
+    updatedAt,
+  };
+}
+
 describe('note protocol', () => {
   it('registers note tables and deletion mappings', () => {
     expect(SNAPSHOT_TABLES).toContain('noteBooks');
     expect(SNAPSHOT_TABLES).toContain('notes');
+    expect(SNAPSHOT_TABLES).toContain('noteAssets');
     expect(tableKeyForDeletionType('noteBook')).toBe('noteBooks');
     expect(tableKeyForDeletionType('note')).toBe('notes');
+    expect(tableKeyForDeletionType('noteAsset')).toBe('noteAssets');
     expect(deletionTypeForTable('noteBooks')).toBe('noteBook');
     expect(deletionTypeForTable('notes')).toBe('note');
+    expect(deletionTypeForTable('noteAssets')).toBe('noteAsset');
   });
 
   it('fills missing note tables when reading old snapshots', () => {
@@ -127,5 +143,28 @@ describe('note protocol', () => {
     expect(data.notes[0].sortOrder).toBe(0);
     expect(data.notes[0].title).toBe('T');
     expect(data.notes[0].content).toBe('C');
+  });
+
+  it('merges note image assets with LWW and tombstones', () => {
+    const current: ServerState = {
+      revision: 0,
+      snapshot: snapshot(),
+      tombstones: emptyTombstones(),
+    };
+    const merged = mergeServerState(current, {
+      snapshot: snapshot({ noteAssets: [asset('a1', 5)] }),
+      tombstones: emptyTombstones(),
+    }, 10);
+
+    expect(merged.state.snapshot.data.noteAssets).toHaveLength(1);
+    expect(merged.state.snapshot.data.noteAssets[0].data).toBe('AAAA');
+
+    const tombstones = emptyTombstones();
+    tombstones.noteAssets.a1 = 20;
+    const removed = mergeServerState(merged.state, {
+      snapshot: snapshot(),
+      tombstones,
+    }, 21);
+    expect(removed.state.snapshot.data.noteAssets).toHaveLength(0);
   });
 });

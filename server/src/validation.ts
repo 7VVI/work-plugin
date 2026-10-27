@@ -1,19 +1,24 @@
 import {
   SNAPSHOT_TABLES,
+  MAX_ASSET_BYTES,
   MAX_NOTE_CONTENT,
   MAX_NOTE_TITLE,
   MAX_NOTEBOOK_NAME,
+  MAX_TOTAL_ASSET_BYTES,
   MAX_TOTAL_NOTE_BYTES,
   type SyncPushRequest,
 } from '@protocol/index';
 import { badRequest } from './errors';
 
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+const HASH_RE = /^[a-f0-9]{64}$/;
 const MAX_RECORDS = 20_000;
-const MAX_STRING = MAX_NOTE_CONTENT;
+// 图片资源以 base64 随快照上传，单条上限按 2MB 原始字节换算
+const MAX_ASSET_DATA = Math.ceil((MAX_ASSET_BYTES * 4) / 3) + 4;
+const MAX_STRING = Math.max(MAX_NOTE_CONTENT, MAX_ASSET_DATA);
 const MAX_DEPTH = 12;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
-const OPTIONAL_TABLES = new Set(['noteBooks', 'notes']);
+const OPTIONAL_TABLES = new Set(['noteBooks', 'notes', 'noteAssets']);
 
 function assertPlain(value: unknown, depth = 0): void {
   if (depth > MAX_DEPTH) badRequest('INVALID_PAYLOAD', 'Payload too deep');
@@ -111,6 +116,21 @@ function validateRecord(table: string, record: Record<string, unknown>, now: num
     }
     validateSortOrder(record, table);
   }
+  if (table === 'noteAssets') {
+    if (typeof record.mime !== 'string' || !record.mime || record.mime.length > 128) {
+      badRequest('INVALID_PAYLOAD', 'Invalid asset mime');
+    }
+    if (typeof record.hash !== 'string' || !HASH_RE.test(record.hash)) {
+      badRequest('INVALID_PAYLOAD', 'Invalid asset hash');
+    }
+    if (typeof record.size !== 'number' || !Number.isFinite(record.size) || record.size < 0
+      || record.size > MAX_ASSET_BYTES) {
+      badRequest('INVALID_PAYLOAD', 'Invalid asset size');
+    }
+    if (typeof record.data !== 'string' || record.data.length > MAX_ASSET_DATA) {
+      badRequest('INVALID_PAYLOAD', 'Invalid asset data');
+    }
+  }
 }
 
 export function validatePushRequest(body: unknown): SyncPushRequest {
@@ -170,6 +190,19 @@ export function validatePushRequest(body: unknown): SyncPushRequest {
     }
     if (noteBytes > MAX_TOTAL_NOTE_BYTES) {
       badRequest('INVALID_PAYLOAD', 'Note payload too large');
+    }
+  }
+
+  const assets = data.noteAssets;
+  if (Array.isArray(assets)) {
+    let assetBytes = 0;
+    for (const item of assets) {
+      if (!item || typeof item !== 'object') continue;
+      const size = (item as Record<string, unknown>).size;
+      if (typeof size === 'number' && Number.isFinite(size)) assetBytes += size;
+    }
+    if (assetBytes > MAX_TOTAL_ASSET_BYTES) {
+      badRequest('INVALID_PAYLOAD', 'Asset payload too large');
     }
   }
 

@@ -1,5 +1,6 @@
 import { db } from '../db/schema';
 import { cryptoService } from '../services/cryptoService';
+import { base64ToBuffer } from '../db/repositories/noteAssetRepo';
 import { VaultLockedError } from './snapshotBuilder';
 import type {
   Account,
@@ -8,6 +9,7 @@ import type {
   Group,
   Middleware,
   Note,
+  NoteAsset,
   NoteBook,
   Server,
   System,
@@ -45,6 +47,7 @@ interface LocalMaps {
   configDefs: Map<string, ConfigDef>;
   noteBooks: Map<string, NoteBook>;
   notes: Map<string, Note>;
+  noteAssets: Map<string, NoteAsset>;
 }
 
 function remoteWins(local: { updatedAt: number } | undefined, remote: { updatedAt: number }): boolean {
@@ -90,6 +93,7 @@ export async function applyRemoteSnapshot(
     localDefs,
     localNoteBooks,
     localNotes,
+    localNoteAssets,
   ] = await Promise.all([
     db.groups.toArray(),
     db.tags.toArray(),
@@ -101,6 +105,7 @@ export async function applyRemoteSnapshot(
     db.configDefs.toArray(),
     db.noteBooks.toArray(),
     db.notes.toArray(),
+    db.noteAssets.toArray(),
   ]);
 
   const local: LocalMaps = {
@@ -114,6 +119,7 @@ export async function applyRemoteSnapshot(
     configDefs: new Map(localDefs.map(config => [config.id, config])),
     noteBooks: new Map(localNoteBooks.map(book => [book.id, book])),
     notes: new Map(localNotes.map(note => [note.id, note])),
+    noteAssets: new Map(localNoteAssets.map(asset => [asset.id, asset])),
   };
 
   const summary: ApplySummary = {
@@ -134,6 +140,7 @@ export async function applyRemoteSnapshot(
     configDefs: new Map(data.configDefs.map(record => [record.id, record])),
     noteBooks: new Map(data.noteBooks.map(record => [record.id, record])),
     notes: new Map(data.notes.map(record => [record.id, record])),
+    noteAssets: new Map(data.noteAssets.map(record => [record.id, record])),
   };
 
   // 云端墓碑：不删除本地，但也不再把这些记录从云端重新加回本地
@@ -172,6 +179,11 @@ export async function applyRemoteSnapshot(
     if (isCloudDeleted('notes', record.id)) return false;
     countApply(summary, local.notes, record);
     return remoteWins(local.notes.get(record.id), record);
+  });
+  const appliedNoteAssets = data.noteAssets.filter(record => {
+    if (isCloudDeleted('noteAssets', record.id)) return false;
+    countApply(summary, local.noteAssets, record);
+    return remoteWins(local.noteAssets.get(record.id), record);
   });
 
   const groupIds = new Set([...local.groups.keys(), ...appliedGroups.map(group => group.id)]);
@@ -269,6 +281,7 @@ export async function applyRemoteSnapshot(
     ...appliedDefs.map(record => ({ table: 'configDefs' as const, id: record.id, updatedAt: record.updatedAt })),
     ...appliedNoteBooks.map(record => ({ table: 'noteBooks' as const, id: record.id, updatedAt: record.updatedAt })),
     ...appliedNotes.map(record => ({ table: 'notes' as const, id: record.id, updatedAt: record.updatedAt })),
+    ...appliedNoteAssets.map(record => ({ table: 'noteAssets' as const, id: record.id, updatedAt: record.updatedAt })),
   ];
 
   await db.transaction(
@@ -276,7 +289,7 @@ export async function applyRemoteSnapshot(
     [
       db.groups, db.tags, db.systems, db.accounts, db.servers, db.middlewares,
       db.configProjects, db.configDefs, db.systemTags, db.serverTags, db.middlewareTags, db.deletions,
-      db.noteBooks, db.notes,
+      db.noteBooks, db.notes, db.noteAssets,
     ],
     async () => {
       if (appliedGroups.length) await db.groups.bulkPut(appliedGroups);
@@ -289,6 +302,17 @@ export async function applyRemoteSnapshot(
       if (appliedDefs.length) await db.configDefs.bulkPut(appliedDefs);
       if (appliedNoteBooks.length) await db.noteBooks.bulkPut(appliedNoteBooks);
       if (appliedNotes.length) await db.notes.bulkPut(appliedNotes);
+      if (appliedNoteAssets.length) {
+        await db.noteAssets.bulkPut(appliedNoteAssets.map(record => ({
+          id: record.id,
+          mime: record.mime,
+          size: record.size,
+          hash: record.hash,
+          data: base64ToBuffer(record.data),
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt,
+        })));
+      }
 
       for (const system of appliedSystems) {
         await db.systemTags.where('systemId').equals(system.id).delete();

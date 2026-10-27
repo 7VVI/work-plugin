@@ -3,8 +3,6 @@
     <div
       ref="rootEl"
       class="crepe-host"
-      @paste.capture="onPasteCapture"
-      @drop.capture="onDropCapture"
       @contextmenu.capture="onContextMenu"
     ></div>
     <div v-if="!ready && !error" class="editor-status">
@@ -47,8 +45,11 @@ import {
 } from '@milkdown/kit/preset/commonmark';
 import { insertTableCommand } from '@milkdown/kit/preset/gfm';
 import { useToastStore } from '@shared/stores/toastStore';
+import { noteAssetRepo } from '@shared/db/repositories/noteAssetRepo';
+import { assetRef } from '@shared/utils/noteAssets';
 import NoteContextMenu from './NoteContextMenu.vue';
 import { zhCrepeConfig } from './crepeLocale';
+import { imageFeatureConfig } from './crepeImages';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
@@ -90,7 +91,7 @@ async function createEditor(): Promise<void> {
       root: rootEl.value,
       defaultValue: props.initialContent || '',
       features: {
-        [Crepe.Feature.ImageBlock]: false,
+        [Crepe.Feature.ImageBlock]: true,
         [Crepe.Feature.TopBar]: false,
         [Crepe.Feature.AI]: false,
         [Crepe.Feature.BlockEdit]: true,
@@ -103,7 +104,10 @@ async function createEditor(): Promise<void> {
         [Crepe.Feature.Placeholder]: true,
         [Crepe.Feature.Cursor]: true,
       },
-      featureConfigs: zhCrepeConfig,
+      featureConfigs: {
+        ...zhCrepeConfig,
+        [Crepe.Feature.ImageBlock]: imageFeatureConfig,
+      },
     });
 
     instance.on(listener => {
@@ -146,40 +150,44 @@ function retry(): void {
   void destroyEditor().finally(() => void createEditor());
 }
 
+/** 图片块把宽高比写进了 alt，这里还原成空 alt，正文更接近通用 Markdown */
+const ASSET_ALT_RE = /!\[(\d+(?:\.\d+)?)\]\((dock-asset:[^)]+)\)/g;
+
 function getMarkdown(): string {
-  return crepe?.getMarkdown() ?? props.initialContent;
+  const raw = crepe?.getMarkdown() ?? props.initialContent;
+  return raw.replace(ASSET_ALT_RE, '![]($2)');
 }
 
 function focus(): void {
   rootEl.value?.querySelector<HTMLElement>('.ProseMirror')?.focus();
 }
 
-function onPasteCapture(event: ClipboardEvent): void {
-  const files = Array.from(event.clipboardData?.files ?? []);
-  const items = Array.from(event.clipboardData?.items ?? []);
-  const hasImage = files.some(file => file.type.startsWith('image/'))
-    || items.some(item => item.kind === 'file' && item.type.startsWith('image/'));
-  if (!hasImage) return;
-  event.preventDefault();
-  event.stopPropagation();
-  toast.error('首版暂不支持图片');
-}
-
-function onDropCapture(event: DragEvent): void {
-  const files = Array.from(event.dataTransfer?.files ?? []);
-  const items = Array.from(event.dataTransfer?.items ?? []);
-  const hasImage = files.some(file => file.type.startsWith('image/'))
-    || items.some(item => item.kind === 'file' && item.type.startsWith('image/'));
-  if (!hasImage) return;
-  event.preventDefault();
-  event.stopPropagation();
-  toast.error('首版暂不支持图片');
-}
-
 /* ---------- 右键菜单（参考 Typora） ---------- */
 
 function getView() {
   return crepe?.editor.ctx.get(editorViewCtx);
+}
+
+/** 在光标处插入一张图片：二进制存本地资源表，正文只留 dock-asset 引用 */
+async function insertImage(file: File): Promise<boolean> {
+  const view = getView();
+  if (!view) return false;
+  try {
+    const asset = await noteAssetRepo.save(file, file.type);
+    const nodeType = view.state.schema.nodes['image-block'];
+    if (!nodeType) {
+      toast.error('当前编辑器不支持图片');
+      return false;
+    }
+    const node = nodeType.createAndFill({ src: assetRef(asset.id), caption: '', ratio: 1 });
+    if (!node) return false;
+    view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+    view.focus();
+    return true;
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : '图片插入失败');
+    return false;
+  }
 }
 
 function openMenu(event: MouseEvent): void {
@@ -527,7 +535,7 @@ onBeforeUnmount(() => {
   void destroyEditor();
 });
 
-defineExpose({ getMarkdown, focus });
+defineExpose({ getMarkdown, focus, insertImage });
 </script>
 
 <style scoped>

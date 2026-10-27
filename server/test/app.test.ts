@@ -8,6 +8,7 @@ import {
   emptySnapshotData,
   emptyTombstones,
   MAX_NOTE_CONTENT,
+  type NoteAssetRec,
   type NoteBookRec,
   type NoteRec,
   type SnapshotData,
@@ -71,8 +72,20 @@ function note(id: string, notebookId: string, updatedAt = Date.now(), patch: Par
   };
 }
 
-function pushBody(data: Partial<SnapshotData>, tombstones = emptyTombstones(), baseRevision = 0): SyncPushRequest {
+function noteAsset(id: string, updatedAt = Date.now(), patch: Partial<NoteAssetRec> = {}): NoteAssetRec {
   return {
+    id,
+    mime: 'image/png',
+    size: 3,
+    hash: 'a'.repeat(64),
+    data: 'AAAA',
+    createdAt: updatedAt,
+    updatedAt,
+    ...patch,
+  };
+}
+
+function pushBody(data: Partial<SnapshotData>, tombstones = emptyTombstones(), baseRevision = 0): SyncPushRequest {  return {
     protocol: 1,
     clientId: 'client-1',
     baseRevision,
@@ -234,8 +247,21 @@ describe('dock cloud server', () => {
     expect(oldResponse.json().snapshot.data.notes).toHaveLength(1);
   });
 
-  it('rejects note content beyond the per-note or total limit', async () => {
+  it('syncs note image assets and rejects malformed ones', async () => {
     const now = Date.now();
+    const ok = await push(pushBody({ noteAssets: [noteAsset('a1', now)] }));
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().snapshot.data.noteAssets).toHaveLength(1);
+    expect(ok.json().snapshot.data.noteAssets[0].data).toBe('AAAA');
+
+    const badHash = await push(pushBody({ noteAssets: [noteAsset('a2', now, { hash: 'not-a-hash' })] }));
+    expect(badHash.statusCode).toBe(400);
+
+    const badSize = await push(pushBody({ noteAssets: [noteAsset('a3', now, { size: 64 * 1024 * 1024 })] }));
+    expect(badSize.statusCode).toBe(400);
+  });
+
+  it('rejects note content beyond the per-note or total limit', async () => {    const now = Date.now();
     const oversized = await push(pushBody({
       noteBooks: [noteBook('b1', now)],
       notes: [note('n1', 'b1', now, { content: 'x'.repeat(MAX_NOTE_CONTENT + 1) })],

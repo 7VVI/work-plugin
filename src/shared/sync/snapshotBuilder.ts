@@ -1,7 +1,13 @@
 import { db } from '../db/schema';
 import { noteRepo } from '../db/repositories/noteRepo';
+import { bufferToBase64 } from '../db/repositories/noteAssetRepo';
 import { cryptoService } from '../services/cryptoService';
-import { MAX_NOTE_CONTENT, MAX_TOTAL_NOTE_BYTES } from '@protocol/limits';
+import {
+  MAX_ASSET_BYTES,
+  MAX_NOTE_CONTENT,
+  MAX_TOTAL_ASSET_BYTES,
+  MAX_TOTAL_NOTE_BYTES,
+} from '@protocol/limits';
 import { utf8Bytes } from '../utils/noteUtils';
 import type {
   Account,
@@ -72,6 +78,7 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
     middlewareTags,
     noteBooks,
     notes,
+    noteAssets,
   ] = await Promise.all([
     db.groups.toArray(),
     db.tags.toArray(),
@@ -86,6 +93,7 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
     db.middlewareTags.toArray(),
     db.noteBooks.toArray(),
     db.notes.toArray(),
+    db.noteAssets.toArray(),
   ]);
 
   const systemTagMap = tagIdsByParent(systemTags, 'systemId');
@@ -104,6 +112,19 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
   if (noteBytes > MAX_TOTAL_NOTE_BYTES) {
     throw new NoteStorageLimitError(
       `笔记总大小超过 ${Math.floor(MAX_TOTAL_NOTE_BYTES / 1024 / 1024)}MB，无法同步`,
+    );
+  }
+
+  let assetBytes = 0;
+  for (const asset of noteAssets) {
+    if (asset.size > MAX_ASSET_BYTES) {
+      throw new NoteStorageLimitError('图片资源超过单张上限，无法同步');
+    }
+    assetBytes += asset.size;
+  }
+  if (assetBytes > MAX_TOTAL_ASSET_BYTES) {
+    throw new NoteStorageLimitError(
+      `图片资源总大小超过 ${Math.floor(MAX_TOTAL_ASSET_BYTES / 1024 / 1024)}MB，无法同步`,
     );
   }
 
@@ -193,6 +214,15 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
       sortOrder: note.sortOrder,
       createdAt: note.createdAt,
       updatedAt: stamp ?? note.updatedAt,
+    })),
+    noteAssets: noteAssets.map(asset => ({
+      id: asset.id,
+      mime: asset.mime,
+      size: asset.size,
+      hash: asset.hash,
+      data: bufferToBase64(asset.data),
+      createdAt: asset.createdAt,
+      updatedAt: stamp ?? asset.updatedAt,
     })),
   };
 

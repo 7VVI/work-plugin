@@ -10,6 +10,7 @@ import { groupRepo } from '../../../src/shared/db/repositories/groupRepo';
 import { systemTagRepo } from '../../../src/shared/db/repositories/systemTagRepo';
 import { noteBookRepo } from '../../../src/shared/db/repositories/noteBookRepo';
 import { noteRepo } from '../../../src/shared/db/repositories/noteRepo';
+import { noteAssetRepo } from '../../../src/shared/db/repositories/noteAssetRepo';
 import {
   buildLocalSnapshot,
   NoteStorageLimitError,
@@ -299,5 +300,40 @@ describe('tombstone construction', () => {
     });
     const tombstones = await buildTombstones(current, previous, 1000);
     expect(tombstones.notes['missing-note']).toBe(1000);
+  });
+
+  it('carries note image assets through build and apply', async () => {
+    const asset = await noteAssetRepo.save(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }), 'image/png');
+
+    const snapshot = await buildLocalSnapshot();
+    expect(snapshot.data.noteAssets).toHaveLength(1);
+    expect(snapshot.data.noteAssets[0]).toMatchObject({
+      id: asset.id,
+      mime: 'image/png',
+      size: 3,
+      hash: asset.hash,
+    });
+    expect(snapshot.data.noteAssets[0].data.length).toBeGreaterThan(0);
+
+    await db.noteAssets.clear();
+    await applyRemoteSnapshot(snapshot);
+    const restored = await db.noteAssets.get(asset.id);
+    expect(restored?.mime).toBe('image/png');
+    expect(restored?.data.byteLength).toBe(3);
+  });
+
+  it('drops image assets that are no longer referenced when a note is deleted', async () => {
+    const bookId = await noteBookRepo.create('工作');
+    const asset = await noteAssetRepo.save(new Blob([new Uint8Array([4, 5])], { type: 'image/png' }), 'image/png');
+    const noteId = await noteRepo.create({
+      notebookId: bookId,
+      title: '带图',
+      content: `![图](dock-asset:${asset.id})`,
+    });
+
+    await noteRepo.remove(noteId);
+
+    expect(await db.noteAssets.get(asset.id)).toBeUndefined();
+    expect(await db.deletions.get(`noteAsset:${asset.id}`)).toBeDefined();
   });
 });

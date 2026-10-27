@@ -2,6 +2,7 @@ import { db } from '../schema';
 import type { NoteBook } from '../../types/entities';
 import { generateId } from '../../utils/id';
 import { toPlain } from '../../utils/plain';
+import { releaseUnusedAssets } from './noteAssetRepo';
 
 export class LastNotebookError extends Error {
   constructor() {
@@ -66,7 +67,7 @@ export const noteBookRepo = {
   },
 
   async remove(id: string): Promise<void> {
-    await db.transaction('rw', db.noteBooks, db.notes, db.deletions, async () => {
+    await db.transaction('rw', db.noteBooks, db.notes, db.deletions, db.noteAssets, async () => {
       const book = await db.noteBooks.get(id);
       if (!book) return;
       if (await db.noteBooks.count() <= 1) throw new LastNotebookError();
@@ -82,6 +83,7 @@ export const noteBookRepo = {
         });
       }
       await db.notes.where('notebookId').equals(id).delete();
+      await releaseUnusedAssets(notes.map(note => note.content), now);
       await db.deletions.put({
         id: `noteBook:${id}`,
         entityType: 'noteBook',

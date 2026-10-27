@@ -61,6 +61,13 @@ export function normalizeData(data: SnapshotData): SnapshotData {
       content: typeof note.content === 'string' ? note.content : '',
       sortOrder: Number.isFinite(note.sortOrder) ? note.sortOrder : 0,
     })),
+    noteAssets: sortById(data.noteAssets ?? []).map(asset => ({
+      ...asset,
+      mime: typeof asset.mime === 'string' ? asset.mime : 'application/octet-stream',
+      size: Number.isFinite(asset.size) ? asset.size : 0,
+      hash: typeof asset.hash === 'string' ? asset.hash : '',
+      data: typeof asset.data === 'string' ? asset.data : '',
+    })),
   };
 }
 
@@ -97,6 +104,7 @@ export function indexFromData(data: SnapshotData): SnapshotIndex {
   index.configDefs = indexOf(data.configDefs);
   index.noteBooks = indexOf(data.noteBooks);
   index.notes = indexOf(data.notes);
+  index.noteAssets = indexOf(data.noteAssets);
   return index;
 }
 
@@ -116,6 +124,7 @@ export function tableKeyForDeletionType(entityType: string): SnapshotTable | und
     case 'configDef': return 'configDefs';
     case 'noteBook': return 'noteBooks';
     case 'note': return 'notes';
+    case 'noteAsset': return 'noteAssets';
     default: return undefined;
   }
 }
@@ -132,5 +141,6 @@ export function deletionTypeForTable(table: SnapshotTable): string {
     case 'configDefs': return 'configDef';
     case 'noteBooks': return 'noteBook';
     case 'notes': return 'note';
+    case 'noteAssets': return 'noteAsset';
   }
 }

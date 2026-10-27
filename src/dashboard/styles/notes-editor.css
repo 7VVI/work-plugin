@@ -361,6 +361,23 @@
   color: color-mix(in srgb, var(--ink3) 70%, transparent);
 }
 
+/* 图片块：居中显示、圆角，说明文字弱化，与正文节奏一致 */
+.dock-notes .milkdown .milkdown-image-block {
+  margin: 6px 0;
+}
+.dock-notes .milkdown .milkdown-image-block > .image-wrapper img {
+  border-radius: var(--radius-sm);
+  background: var(--note-code-bg);
+}
+.dock-notes .milkdown .milkdown-image-block > .caption-input {
+  color: var(--ink3);
+  font-size: 12.5px;
+}
+.dock-notes .milkdown .milkdown-image-inline img {
+  max-width: 100%;
+  border-radius: var(--radius-xs);
+}
+
 /* 统一选中色：正文与代码块选中后只有一种颜色 rgb(203,216,243)。
    代码块是嵌套编辑器，CodeMirror 默认把 .cm-line 的原生选区设为透明，
    改用自己的 .cm-selectionBackground 图层绘制；这里同时覆盖两层，

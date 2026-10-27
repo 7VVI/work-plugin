@@ -44,6 +44,7 @@ function countSnapshotData(data: SyncSnapshot['data']): SnapshotCounts {
     configDefs: data.configDefs.length,
     noteBooks: data.noteBooks.length,
     notes: data.notes.length,
+    noteAssets: data.noteAssets.length,
   };
 }
 

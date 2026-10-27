@@ -27,6 +27,9 @@
             >
               <i class="fa-solid fa-list-ul"></i>
             </button>
+            <button class="note-action-btn" title="插入图片" @click="onPickImage">
+              <i class="fa-solid fa-image"></i>
+            </button>
             <button class="note-action-btn" title="导出 Markdown" @click="onExport">
               <i class="fa-solid fa-download"></i>
             </button>
@@ -143,6 +146,7 @@ const NoteEditor = defineAsyncComponent(() => import('../components/notes/NoteEd
 interface NoteEditorExposed {
   getMarkdown: () => string;
   focus: () => void;
+  insertImage: (file: File) => Promise<boolean>;
 }
 
 const store = useNoteStore();
@@ -355,6 +359,19 @@ function onExport(): void {
   toast.success('笔记已导出');
 }
 
+/** 选择本地图片插入到当前光标处 */
+function onPickImage(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    void editorRef.value?.insertImage(file);
+  };
+  input.click();
+}
+
 const HEADING_SELECTOR = '.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6';
 
 function onScroll(): void {
@@ -393,7 +410,6 @@ function scrollToHeading(index: number): void {
 function onVisibilityChange(): void {
   if (document.visibilityState === 'hidden') void flushSave();
 }
-
 function onPageHide(): void {
   void flushSave();
 }

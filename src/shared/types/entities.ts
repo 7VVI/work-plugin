@@ -91,7 +91,8 @@ export type DeletionEntityType =
   | 'configProject'
   | 'configDef'
   | 'noteBook'
-  | 'note';
+  | 'note'
+  | 'noteAsset';
 
 export interface DeletionEntry {
   id: string;
@@ -171,6 +172,19 @@ export interface NoteBook {
   id: string;
   name: string;
   sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 笔记内嵌图片资源，正文里用 dock-asset:<id> 引用 */
+export interface NoteAsset {
+  id: string;
+  mime: string;
+  size: number;
+  /** 内容 sha-256，用于去重 */
+  hash: string;
+  /** 图片原始字节 */
+  data: ArrayBuffer;
   createdAt: number;
   updatedAt: number;
 }

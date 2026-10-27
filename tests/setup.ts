@@ -1,5 +1,15 @@
 import 'fake-indexeddb/auto';
 import './mocks/chrome';
+import { webcrypto } from 'node:crypto';
+
+// jsdom 环境没有 crypto.subtle，图片资源哈希依赖它
+if (!globalThis.crypto?.subtle) {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: webcrypto,
+    configurable: true,
+    writable: true,
+  });
+}
 
 // Stub BroadcastChannel to avoid Node.js Event type validation errors.
 // Dexie uses BroadcastChannel for cross-tab sync, which isn't needed in tests.

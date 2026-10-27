@@ -17,6 +17,7 @@ export const SNAPSHOT_TABLES = [
   'configDefs',
   'noteBooks',
   'notes',
+  'noteAssets',
 ] as const;
 
 export type SnapshotTable = typeof SNAPSHOT_TABLES[number];
@@ -150,6 +151,19 @@ export interface NoteRec {
   updatedAt: number;
 }
 
+/** 笔记内嵌图片资源：正文里用 dock-asset:<id> 引用，二进制随快照同步 */
+export interface NoteAssetRec {
+  id: string;
+  mime: string;
+  size: number;
+  /** 内容 sha-256，用于去重 */
+  hash: string;
+  /** base64 编码的图片数据 */
+  data: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SnapshotData {
   groups: GroupRec[];
   tags: TagRec[];
@@ -161,6 +175,7 @@ export interface SnapshotData {
   configDefs: ConfigDefRec[];
   noteBooks: NoteBookRec[];
   notes: NoteRec[];
+  noteAssets: NoteAssetRec[];
 }
 
 export interface SyncSnapshot {
@@ -190,6 +205,7 @@ export interface SnapshotCounts {
   configDefs: number;
   noteBooks: number;
   notes: number;
+  noteAssets: number;
 }
 
 export interface VersionChange {
@@ -245,6 +261,7 @@ export function emptySnapshotData(): SnapshotData {
     configDefs: [],
     noteBooks: [],
     notes: [],
+    noteAssets: [],
   };
 }
 
@@ -260,6 +277,7 @@ export function emptyTombstones(): TombstoneMap {
     configDefs: {},
     noteBooks: {},
     notes: {},
+    noteAssets: {},
   };
 }
 
@@ -275,6 +293,7 @@ export function emptySnapshotIndex(): SnapshotIndex {
     configDefs: {},
     noteBooks: {},
     notes: {},
+    noteAssets: {},
   };
 }
 

@@ -2,6 +2,7 @@ import { db } from '../schema';
 import type { Note } from '../../types/entities';
 import { generateId } from '../../utils/id';
 import { toPlain } from '../../utils/plain';
+import { releaseUnusedAssets } from './noteAssetRepo';
 import { noteBookRepo } from './noteBookRepo';
 
 export class NoteNotFoundError extends Error {
@@ -130,7 +131,7 @@ export const noteRepo = {
   },
 
   async remove(id: string): Promise<void> {
-    await db.transaction('rw', db.notes, db.deletions, async () => {
+    await db.transaction('rw', db.notes, db.deletions, db.noteAssets, async () => {
       const note = await db.notes.get(id);
       if (!note) return;
       const now = Date.now();
@@ -141,6 +142,7 @@ export const noteRepo = {
         deletedAt: now,
       });
       await db.notes.delete(id);
+      await releaseUnusedAssets([note.content], now);
     });
   },
 
