@@ -4,6 +4,9 @@
       <i class="fa-solid fa-list-ul"></i>
       <span>大纲</span>
       <span class="outline-count">{{ items.length }}</span>
+      <button class="outline-close" title="关闭大纲" @click="emit('close')">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
     <div class="outline-body">
       <button
@@ -30,7 +33,7 @@ defineProps<{
   activeIndex: number;
 }>();
 
-const emit = defineEmits<{ select: [index: number] }>();
+const emit = defineEmits<{ select: [index: number]; close: [] }>();
 </script>
 
 <style scoped>
@@ -58,6 +61,21 @@ const emit = defineEmits<{ select: [index: number] }>();
 }
 .outline-head i { color: var(--accent); font-size: 11px; }
 .outline-count { margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; color: var(--ink4); }
+.outline-close {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink4);
+  cursor: pointer;
+  font-size: 10px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.outline-close:hover { background: var(--panel2); color: var(--ink); }
 .outline-body { flex: 1; min-height: 0; overflow-y: auto; padding: 7px 8px 12px; }
 .outline-item {
   width: 100%;

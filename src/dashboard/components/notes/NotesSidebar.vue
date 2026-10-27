@@ -19,7 +19,7 @@
       <i class="fa-solid fa-magnifying-glass"></i>
       <input
         v-model="query"
-        class="search-input"
+        class="sidebar-search-input"
         placeholder="搜索标题或正文…"
         @input="onSearchInput"
       />
@@ -65,69 +65,89 @@
           :prevent-on-filter="false"
           @end="onBookDragEnd"
         >
-          <div v-for="book in localBooks" :key="book.id" class="book-group">
+          <div v-for="book in localBooks" :key="book.id" class="book-group" :data-notebook-id="book.id">
             <div
               class="book-row"
-              :class="{ active: book.id === activeBookId }"
+              :class="{ 'has-active': book.id === activeBookId }"
               @click="toggleBook(book.id)"
             >
               <i class="fa-solid arrow" :class="expanded[book.id] ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-              <i class="fa-solid fa-book book-icon"></i>
+              <i class="fa-regular book-icon" :class="expanded[book.id] ? 'fa-folder-open' : 'fa-folder'"></i>
               <span class="book-name" :title="book.name">{{ book.name }}</span>
-              <span class="book-count">{{ store.notesForNotebook(book.id).length }}</span>
               <button class="mini-btn row-action" title="新建笔记" @click.stop="onCreateNote(book.id)">
                 <i class="fa-solid fa-plus"></i>
               </button>
-              <button class="mini-btn row-action" title="重命名" @click.stop="onRenameNotebook(book)">
-                <i class="fa-solid fa-pen"></i>
-              </button>
-              <button
-                class="mini-btn row-action danger"
-                title="删除笔记本"
-                :disabled="!store.canDeleteNotebook"
-                @click.stop="onDeleteNotebook(book)"
-              >
-                <i class="fa-solid fa-trash"></i>
+              <button class="mini-btn row-action" title="更多" @click.stop="openBookMenu($event, book)">
+                <i class="fa-solid fa-ellipsis"></i>
               </button>
             </div>
 
             <div v-if="expanded[book.id]" class="note-list">
               <VueDraggable
-                v-if="(localNotes[book.id] ?? []).length"
                 v-model="localNotes[book.id]"
                 class="note-drag-list"
                 :animation="160"
                 ghost-class="drag-ghost"
+                group="notes"
+                draggable=".note-row"
                 handle=".note-row"
-                @start="draggingNotes = true"
-                @end="onNoteDragEnd(book.id, $event)"
+                :filter="'.mini-btn'"
+                :prevent-on-filter="false"
+                @start="onNoteDragStart"
+                @end="onNoteDragEnd"
               >
                 <div
                   v-for="note in localNotes[book.id]"
                   :key="note.id"
                   class="note-row"
                   :class="{ active: note.id === store.activeId }"
+                  :data-note-id="note.id"
                   @click="onSelectNote(note.id)"
                 >
-                  <i class="fa-regular fa-file-lines note-icon"></i>
-                  <span class="note-title">{{ note.title || '未命名笔记' }}</span>
-                  <span class="note-time">{{ relativeTime(note.updatedAt) }}</span>
-                  <button class="mini-btn note-delete" title="删除笔记" @click.stop="onDeleteNote(note)">
-                    <i class="fa-solid fa-xmark"></i>
+                  <i class="fa-regular fa-file note-icon"></i>
+                  <span class="note-title" :title="noteTip(note)">{{ note.title || '未命名笔记' }}</span>
+                  <button class="mini-btn note-more" title="更多" @click.stop="openNoteMenu($event, note)">
+                    <i class="fa-solid fa-ellipsis"></i>
                   </button>
                 </div>
               </VueDraggable>
-              <div v-else class="empty-hint note-empty">暂无笔记</div>
             </div>
           </div>
         </VueDraggable>
       </template>
     </div>
+
+    <div class="sidebar-foot">
+      <button class="foot-btn" title="新建笔记" @click="onCreateNote(activeBookId ?? localBooks[0]?.id)">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+    </div>
+
+    <Teleport to="body">
+      <div
+        v-if="menu"
+        class="tree-menu"
+        :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
+        @click.stop
+        @contextmenu.prevent
+      >
+        <button
+          v-for="item in menu.items"
+          :key="item.label"
+          class="tree-menu-item"
+          :class="{ danger: item.danger }"
+          @click="runMenuItem(item)"
+        >
+          <i v-if="item.icon" class="fa-solid" :class="item.icon"></i>
+          <span>{{ item.label }}</span>
+        </button>
+      </div>
+    </Teleport>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useNoteStore, type NoteSummary } from '@shared/stores/noteStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -150,6 +170,15 @@ const localBooks = ref<NoteBook[]>([]);
 const localNotes = ref<Record<string, NoteSummary[]>>({});
 let searchTimer: number | undefined;
 let draggingNotes = false;
+
+interface TreeMenuItem {
+  label: string;
+  icon?: string;
+  danger?: boolean;
+  run: () => void | Promise<void>;
+}
+
+const menu = ref<{ x: number; y: number; items: TreeMenuItem[] } | null>(null);
 
 const activeBookId = computed(() => store.activeNote?.notebookId ?? null);
 
@@ -186,7 +215,63 @@ watch(
 
 onBeforeUnmount(() => {
   if (searchTimer) window.clearTimeout(searchTimer);
+  document.removeEventListener('mousedown', onDocumentMouseDown, true);
+  document.removeEventListener('keydown', onDocumentKeydown, true);
 });
+
+onMounted(() => {
+  document.addEventListener('mousedown', onDocumentMouseDown, true);
+  document.addEventListener('keydown', onDocumentKeydown, true);
+});
+
+function onDocumentMouseDown(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.('.tree-menu')) return;
+  closeMenu();
+}
+
+function onDocumentKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') closeMenu();
+}
+
+function closeMenu(): void {
+  menu.value = null;
+}
+
+function openMenu(event: MouseEvent, items: TreeMenuItem[]): void {
+  event.stopPropagation();
+  const width = 132;
+  const height = items.length * 28 + 8;
+  menu.value = {
+    x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
+    y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8)),
+    items,
+  };
+}
+
+async function runMenuItem(item: TreeMenuItem): Promise<void> {
+  closeMenu();
+  await item.run();
+}
+
+function openBookMenu(event: MouseEvent, book: NoteBook): void {
+  openMenu(event, [
+    { label: '新建笔记', icon: 'fa-plus', run: () => onCreateNote(book.id) },
+    { label: '重命名', icon: 'fa-pen', run: () => onRenameNotebook(book) },
+    {
+      label: '删除笔记本',
+      icon: 'fa-trash',
+      danger: true,
+      run: () => onDeleteNotebook(book),
+    },
+  ]);
+}
+
+function openNoteMenu(event: MouseEvent, note: NoteSummary): void {
+  openMenu(event, [
+    { label: '删除笔记', icon: 'fa-trash', danger: true, run: () => onDeleteNote(note) },
+  ]);
+}
 
 function toggleBook(id: string): void {
   expanded.value = { ...expanded.value, [id]: !expanded.value[id] };
@@ -209,6 +294,12 @@ function clearSearch(): void {
 
 function relativeTime(timestamp: number): string {
   return formatRelativeTime(timestamp);
+}
+
+/** 树里不显示时间，悬停提示里补充更新时间 */
+function noteTip(note: NoteSummary): string {
+  const title = note.title || '未命名笔记';
+  return `${title} · ${relativeTime(note.updatedAt)}`;
 }
 
 async function onSelectNote(id: string): Promise<void> {
@@ -306,19 +397,32 @@ async function onBookDragEnd(event: { oldIndex?: number; newIndex?: number }): P
   }
 }
 
-async function onNoteDragEnd(
-  bookId: string,
-  event: { oldIndex?: number; newIndex?: number },
-): Promise<void> {
-  const { oldIndex, newIndex } = event;
+async function onNoteDragEnd(event: {
+  oldIndex?: number;
+  newIndex?: number;
+  from?: HTMLElement;
+  to?: HTMLElement;
+  item?: HTMLElement;
+}): Promise<void> {
+  finishNoteDrag();
   try {
-    if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
-    const ids = (localNotes.value[bookId] ?? []).map(note => note.id);
-    if (!(await props.beforeChange())) {
-      await store.load();
+    const { oldIndex, newIndex, from, to, item } = event;
+    if (newIndex === undefined) return;
+    const sourceBookId = from?.closest('[data-notebook-id]')?.getAttribute('data-notebook-id');
+    const targetBookId = to?.closest('[data-notebook-id]')?.getAttribute('data-notebook-id');
+    const noteId = item?.dataset.noteId;
+    if (!sourceBookId || !targetBookId || !noteId) return;
+
+    if (sourceBookId === targetBookId) {
+      if (oldIndex === newIndex) return;
+      const ids = (localNotes.value[sourceBookId] ?? []).map(note => note.id);
+      await store.reorderNotes(sourceBookId, ids);
+      toast.success('笔记排序已更新');
       return;
     }
-    await store.reorderNotes(bookId, ids);
+
+    await store.moveNote(noteId, targetBookId, newIndex);
+    toast.success(`笔记已移动到「${store.bookName(targetBookId)}」`);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : String(error));
     await store.load();
@@ -326,6 +430,61 @@ async function onNoteDragEnd(
     draggingNotes = false;
     syncLocalNotes();
   }
+}
+
+/* 拖动时悬停折叠的笔记本，短暂停留后展开，方便把它拖进去 */
+let draggingNote = false;
+let expandTimer: number | undefined;
+let pendingExpandBookId: string | null = null;
+
+function cancelPendingExpand(): void {
+  if (expandTimer) {
+    window.clearTimeout(expandTimer);
+    expandTimer = undefined;
+  }
+  pendingExpandBookId = null;
+}
+
+function handleNoteDragOver(e: DragEvent | MouseEvent): void {
+  if (!draggingNote) return;
+  // mousemove 兜底非原生拖拽，避免鼠标已松开仍触发展开
+  if (e.type === 'mousemove' && (e as MouseEvent).buttons === 0) return;
+
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  const group = target?.closest('.book-group') as HTMLElement | null;
+  const bookId = group?.dataset.notebookId;
+  if (!bookId || expanded.value[bookId]) {
+    cancelPendingExpand();
+    return;
+  }
+  if (pendingExpandBookId === bookId) return;
+  cancelPendingExpand();
+  pendingExpandBookId = bookId;
+  expandTimer = window.setTimeout(() => {
+    expandTimer = undefined;
+    if (!draggingNote || pendingExpandBookId !== bookId) return;
+    expanded.value = { ...expanded.value, [bookId]: true };
+    pendingExpandBookId = null;
+  }, 250);
+}
+
+function finishNoteDrag(): void {
+  draggingNote = false;
+  cancelPendingExpand();
+  document.removeEventListener('dragover', handleNoteDragOver, true);
+  document.removeEventListener('mousemove', handleNoteDragOver, true);
+  document.removeEventListener('mouseup', finishNoteDrag, true);
+  document.removeEventListener('dragend', finishNoteDrag, true);
+}
+
+function onNoteDragStart(): void {
+  draggingNotes = true;
+  if (draggingNote) return;
+  draggingNote = true;
+  document.addEventListener('dragover', handleNoteDragOver, true);
+  document.addEventListener('mousemove', handleNoteDragOver, true);
+  document.addEventListener('mouseup', finishNoteDrag, true);
+  document.addEventListener('dragend', finishNoteDrag, true);
 }
 </script>
 
@@ -392,71 +551,69 @@ async function onNoteDragEnd(
 }
 .sidebar-search:focus-within { border-color: var(--accent); box-shadow: var(--shadow-focus); }
 .sidebar-search > i { font-size: 11px; }
-.search-input {
+/* 不复用全局 .search-input（它自带边框与聚焦光晕，会和外层搜索框叠成双层框） */
+.sidebar-search-input {
   flex: 1;
   min-width: 0;
+  height: 100%;
   border: none;
   outline: none;
   background: transparent;
   color: var(--ink);
   font-size: 12px;
 }
-.search-input::placeholder { color: var(--ink4); }
+.sidebar-search-input::placeholder { color: var(--ink4); }
 .clear-btn { width: 20px; height: 20px; font-size: 10px; }
 
 .sidebar-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 8px 10px;
+  padding: 0 6px 10px;
 }
 .book-list { display: flex; flex-direction: column; gap: 1px; }
 .book-group { min-width: 0; }
+
+/* 树行样式对齐思源文档树：图标 + 名称，行高 28px，操作按钮悬停才出现 */
 .book-row {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 6px 7px 7px;
+  height: 28px;
+  padding: 0 4px 0 2px;
   border-radius: var(--radius-sm);
   color: var(--ink2);
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .book-row:hover { background: var(--panel2); }
-.book-row.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
-.arrow { width: 10px; font-size: 8px; color: var(--ink4); flex-shrink: 0; }
-.book-icon { font-size: 11px; color: var(--ink3); flex-shrink: 0; }
-.book-row.active .book-icon { color: var(--accent); }
+/* 选中的是文件夹下的笔记时，文件夹本身不再显示选中蓝，只做轻微字色区分 */
+.book-row.has-active { color: var(--ink); }
+.arrow { width: 11px; font-size: 8px; color: var(--ink4); flex-shrink: 0; }
+.book-icon { font-size: 12px; color: #d3a13c; flex-shrink: 0; }
 .book-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: var(--font-medium);
 }
-.book-count {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  background: var(--bg2);
-  color: var(--ink4);
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  text-align: center;
-  line-height: 17px;
-}
 .row-action { width: 22px; height: 22px; opacity: 0; font-size: 10px; }
-.book-row:hover .row-action { opacity: 1; }
-.note-list { padding: 1px 0 4px 12px; }
+.book-row:hover .row-action,
+.book-row:focus-within .row-action { opacity: 1; }
+.note-list { padding: 1px 0 3px 13px; }
 .note-drag-list { display: flex; flex-direction: column; gap: 1px; }
+/* 空笔记本保留一行无内容的落区，方便直接把笔记拖进去 */
+.note-drag-list:empty { min-height: 28px; }
 .note-row {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 7px;
+  height: 28px;
+  padding: 0 4px 0 3px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -467,7 +624,7 @@ async function onNoteDragEnd(
 }
 .note-row:hover { background: var(--panel2); color: var(--ink); }
 .note-row.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
-.note-icon { font-size: 10px; color: var(--ink4); flex-shrink: 0; }
+.note-icon { font-size: 11px; color: #6f96cc; flex-shrink: 0; }
 .note-row.active .note-icon { color: var(--accent); }
 .note-title {
   flex: 1;
@@ -475,13 +632,64 @@ async function onNoteDragEnd(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 12.5px;
 }
-.note-time { font-size: 9.5px; color: var(--ink4); flex-shrink: 0; }
-.note-row.active .note-time { color: color-mix(in srgb, var(--accent) 65%, var(--ink4)); }
-.note-delete { width: 20px; height: 20px; opacity: 0; font-size: 9px; flex-shrink: 0; }
-.note-row:hover .note-delete { opacity: 1; }
-.note-delete:hover { color: var(--danger); }
+.note-more { width: 22px; height: 22px; opacity: 0; font-size: 10px; flex-shrink: 0; }
+.note-row:hover .note-more,
+.note-row:focus-within .note-more { opacity: 1; }
+
+.sidebar-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+.foot-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink3);
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.foot-btn:hover { background: var(--panel2); color: var(--ink); }
+
+/* 树行「更多」菜单（对齐思源右键菜单的紧凑样式） */
+.tree-menu {
+  position: fixed;
+  z-index: 400;
+  min-width: 128px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.tree-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink2);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.tree-menu-item:hover { background: var(--panel2); color: var(--ink); }
+.tree-menu-item.danger:hover { color: var(--danger); }
+.tree-menu-item i { width: 12px; font-size: 10px; text-align: center; }
 
 .search-item {
   width: 100%;
@@ -523,6 +731,6 @@ async function onNoteDragEnd(
 }
 .empty-state i { font-size: 24px; color: var(--ink4); }
 .empty-state p { margin: 0; }
-.note-empty, .hint { padding: 10px; }
+.hint { padding: 10px; }
 .drag-ghost { opacity: 0.45; }
 </style>

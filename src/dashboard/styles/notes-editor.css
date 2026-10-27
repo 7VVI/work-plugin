@@ -362,14 +362,18 @@
   background-color: rgb(203, 216, 243) !important;
 }
 
+/* 编辑区左侧不显示块拖拽手柄（思源正文左侧无此图标），
+   块类型转换改由斜杠菜单提供 */
+.dock-notes .milkdown .milkdown-block-handle {
+  display: none !important;
+}
+
 /* Popovers are rendered by Crepe inside .milkdown; the extra global selector is a
    fallback for portal placement. They only exist while the note editor is mounted. */
 .dock-notes .milkdown-slash-menu,
 .milkdown-slash-menu,
 .dock-notes .milkdown-toolbar,
-.milkdown-toolbar,
-.dock-notes .milkdown-block-handle,
-.milkdown-block-handle {
+.milkdown-toolbar {
   font-family: var(--note-font, var(--font-sans));
 }
 .dock-notes .milkdown-slash-menu,

@@ -19,8 +19,13 @@
           </div>
           <div class="note-actions">
             <span class="save-state" :class="saveStateClass">{{ saveStateText }}</span>
-            <button class="note-action-btn" title="移动到其他笔记本" @click="openMove">
-              <i class="fa-solid fa-folder-tree"></i>
+            <button
+              class="note-action-btn outline-toggle"
+              :class="{ active: outlineOpen }"
+              title="大纲"
+              @click="toggleOutline"
+            >
+              <i class="fa-solid fa-list-ul"></i>
             </button>
             <button class="note-action-btn" title="导出 Markdown" @click="onExport">
               <i class="fa-solid fa-download"></i>
@@ -112,38 +117,12 @@
     </section>
 
     <NoteOutline
-      v-if="store.activeNote"
+      v-if="store.activeNote && outlineOpen"
       :items="outline"
       :active-index="activeHeading"
       @select="scrollToHeading"
+      @close="outlineOpen = false"
     />
-
-    <Modal :open="showMove" title="移动到笔记本" width="380px" @close="showMove = false">
-      <div class="move-list">
-        <button
-          v-for="book in store.noteBooks"
-          :key="book.id"
-          class="move-item"
-          :class="{ active: book.id === store.activeNote?.notebookId }"
-          :disabled="book.id === store.activeNote?.notebookId"
-          @click="moveTarget = book.id"
-        >
-          <i class="fa-solid fa-book"></i>
-          <span>{{ book.name }}</span>
-          <i v-if="book.id === store.activeNote?.notebookId" class="fa-solid fa-check"></i>
-        </button>
-      </div>
-      <template #footer>
-        <button class="btn-g btn-sm" @click="showMove = false">取消</button>
-        <button
-          class="btn-p btn-sm"
-          :disabled="!moveTarget || moveTarget === store.activeNote?.notebookId"
-          @click="confirmMove"
-        >
-          移动
-        </button>
-      </template>
-    </Modal>
   </div>
 </template>
 
@@ -152,7 +131,6 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import { onBeforeRouteLeave } from 'vue-router';
 import NotesSidebar from '../components/notes/NotesSidebar.vue';
 import NoteOutline from '../components/notes/NoteOutline.vue';
-import Modal from '../components/common/Modal.vue';
 import { useNoteStore } from '@shared/stores/noteStore';
 import { useCloudSyncStore } from '@shared/stores/cloudSyncStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -180,12 +158,30 @@ const draftContent = ref('');
 const editorEpoch = ref(0);
 const activeHeading = ref(0);
 const sidebarOpen = ref(false);
-const showMove = ref(false);
-const moveTarget = ref('');
+const outlineOpen = ref(readOutlineOpen());
 
 let saveTimer: number | undefined;
 let savePromise: Promise<boolean> | null = null;
 let scrollRaf = 0;
+
+const OUTLINE_OPEN_KEY = 'dock.notes.outlineOpen';
+
+function readOutlineOpen(): boolean {
+  try {
+    return localStorage.getItem(OUTLINE_OPEN_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+function toggleOutline(): void {
+  outlineOpen.value = !outlineOpen.value;
+  try {
+    localStorage.setItem(OUTLINE_OPEN_KEY, outlineOpen.value ? '1' : '0');
+  } catch {
+    // 忽略存储失败，仅本次会话生效
+  }
+}
 
 const editorKey = computed(() => `${store.activeId ?? 'none'}:${editorEpoch.value}`);
 const displayTitle = computed(() => draftTitle.value.trim() || '未命名笔记');
@@ -341,28 +337,6 @@ async function onDeleteActive(): Promise<void> {
   if (!ok) return;
   try {
     await store.deleteNote(note.id);
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-function openMove(): void {
-  moveTarget.value = store.activeNote?.notebookId ?? '';
-  showMove.value = true;
-}
-
-async function confirmMove(): Promise<void> {
-  const note = store.activeNote;
-  const target = moveTarget.value;
-  if (!note || !target || target === note.notebookId) {
-    showMove.value = false;
-    return;
-  }
-  if (!(await flushSave())) return;
-  try {
-    await store.moveNote(note.id, target, 0);
-    showMove.value = false;
-    toast.success(`已移动到「${store.bookName(target)}」`);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : String(error));
   }
@@ -553,6 +527,7 @@ onBeforeRouteLeave(async () => {
   font-size: 11px;
 }
 .note-action-btn:hover { background: var(--panel2); color: var(--ink); }
+.note-action-btn.active { background: var(--panel2); color: var(--accent); }
 .note-action-btn.danger:hover { color: var(--danger); }
 .note-banners { flex-shrink: 0; }
 .note-banner {
@@ -573,10 +548,10 @@ onBeforeRouteLeave(async () => {
 .note-banner.danger i { color: var(--danger); }
 .note-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .note-doc {
-  /* 与思源一致：内容铺满编辑区，仅保留左侧 24px / 右侧 16px 内边距 */
+  /* 与思源一致：内容铺满编辑区，左右留出 40px 呼吸位，不贴面板边界 */
   max-width: none;
   margin: 0;
-  padding: 16px 16px 90px 24px;
+  padding: 16px 40px 90px 40px;
 }
 .note-title-input {
   width: 100%;
@@ -626,28 +601,12 @@ onBeforeRouteLeave(async () => {
   font-size: 20px;
 }
 .empty-icon { font-size: 22px; color: var(--accent); }
-.move-list { display: flex; flex-direction: column; gap: 3px; max-height: 320px; overflow-y: auto; }
-.move-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink2);
-  text-align: left;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.move-item span { flex: 1; }
-.move-item:hover { background: var(--panel2); color: var(--ink); }
-.move-item.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
-.move-item:disabled { cursor: default; opacity: 0.7; }
 .mobile-backdrop { display: none; }
 
 @media (max-width: 1279px) {
-  .note-doc { padding: 16px 16px 80px 20px; }
+  .note-doc { padding: 16px 28px 80px 28px; }
+  /* 大纲面板在窄屏下不显示，折叠按钮同步隐藏 */
+  .note-action-btn.outline-toggle { display: none; }
 }
 @media (max-width: 899px) {
   .notes-view { padding-left: 12px; padding-right: 12px; gap: 0; }
