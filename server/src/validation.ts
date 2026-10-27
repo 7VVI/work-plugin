@@ -1,11 +1,19 @@
-import { SNAPSHOT_TABLES, type SyncPushRequest } from '@protocol/index';
+import {
+  SNAPSHOT_TABLES,
+  MAX_NOTE_CONTENT,
+  MAX_NOTE_TITLE,
+  MAX_NOTEBOOK_NAME,
+  MAX_TOTAL_NOTE_BYTES,
+  type SyncPushRequest,
+} from '@protocol/index';
 import { badRequest } from './errors';
 
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_RECORDS = 20_000;
-const MAX_STRING = 65_536;
+const MAX_STRING = MAX_NOTE_CONTENT;
 const MAX_DEPTH = 12;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
+const OPTIONAL_TABLES = new Set(['noteBooks', 'notes']);
 
 function assertPlain(value: unknown, depth = 0): void {
   if (depth > MAX_DEPTH) badRequest('INVALID_PAYLOAD', 'Payload too deep');
@@ -57,6 +65,16 @@ function validateTagIds(value: unknown): void {
   for (const id of value) validateId(id, 'tagId');
 }
 
+function validateSortOrder(record: Record<string, unknown>, label: string): void {
+  if (record.sortOrder === undefined) {
+    record.sortOrder = 0;
+    return;
+  }
+  if (typeof record.sortOrder !== 'number' || !Number.isFinite(record.sortOrder)) {
+    badRequest('INVALID_PAYLOAD', `Invalid ${label}.sortOrder`);
+  }
+}
+
 function validateRecord(table: string, record: Record<string, unknown>, now: number): void {
   validateId(record.id, `${table}.id`);
   validateTimestamp(record.updatedAt, now);
@@ -76,6 +94,22 @@ function validateRecord(table: string, record: Record<string, unknown>, now: num
         if (typeof item[key] !== 'string') badRequest('INVALID_PAYLOAD', 'Invalid config field value');
       }
     }
+  }
+  if (table === 'noteBooks') {
+    if (typeof record.name !== 'string' || record.name.length > MAX_NOTEBOOK_NAME) {
+      badRequest('INVALID_PAYLOAD', 'Invalid notebook name');
+    }
+    validateSortOrder(record, table);
+  }
+  if (table === 'notes') {
+    validateId(record.notebookId, 'notes.notebookId');
+    if (typeof record.title !== 'string' || record.title.length > MAX_NOTE_TITLE) {
+      badRequest('INVALID_PAYLOAD', 'Invalid note title');
+    }
+    if (typeof record.content !== 'string' || record.content.length > MAX_NOTE_CONTENT) {
+      badRequest('INVALID_PAYLOAD', 'Invalid note content');
+    }
+    validateSortOrder(record, table);
   }
 }
 
@@ -105,7 +139,11 @@ export function validatePushRequest(body: unknown): SyncPushRequest {
   const data = snapshot.data as Record<string, unknown>;
   const now = Date.now();
   for (const table of SNAPSHOT_TABLES) {
-    const list = data[table];
+    let list = data[table];
+    if (list === undefined && OPTIONAL_TABLES.has(table)) {
+      list = [];
+      data[table] = list;
+    }
     if (!Array.isArray(list) || list.length > MAX_RECORDS) {
       badRequest('INVALID_PAYLOAD', `Invalid ${table}`);
     }
@@ -122,10 +160,27 @@ export function validatePushRequest(body: unknown): SyncPushRequest {
     }
   }
 
+  const notes = data.notes;
+  if (Array.isArray(notes)) {
+    let noteBytes = 0;
+    for (const item of notes) {
+      if (!item || typeof item !== 'object') continue;
+      const content = (item as Record<string, unknown>).content;
+      if (typeof content === 'string') noteBytes += Buffer.byteLength(content, 'utf8');
+    }
+    if (noteBytes > MAX_TOTAL_NOTE_BYTES) {
+      badRequest('INVALID_PAYLOAD', 'Note payload too large');
+    }
+  }
+
   const tombstones = payload.tombstones;
   if (!tombstones || typeof tombstones !== 'object') badRequest('INVALID_PAYLOAD', 'Invalid tombstones');
   for (const table of SNAPSHOT_TABLES) {
-    const list = (tombstones as Record<string, unknown>)[table];
+    let list = (tombstones as Record<string, unknown>)[table];
+    if (list === undefined && OPTIONAL_TABLES.has(table)) {
+      list = {};
+      (tombstones as Record<string, unknown>)[table] = list;
+    }
     if (!list || typeof list !== 'object' || Array.isArray(list)) {
       badRequest('INVALID_PAYLOAD', `Invalid tombstones.${table}`);
     }

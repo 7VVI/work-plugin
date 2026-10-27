@@ -8,14 +8,23 @@ import { accountRepo } from '../../../src/shared/db/repositories/accountRepo';
 import { tagRepo } from '../../../src/shared/db/repositories/tagRepo';
 import { groupRepo } from '../../../src/shared/db/repositories/groupRepo';
 import { systemTagRepo } from '../../../src/shared/db/repositories/systemTagRepo';
-import { buildLocalSnapshot, VaultLockedError } from '../../../src/shared/sync/snapshotBuilder';
+import { noteBookRepo } from '../../../src/shared/db/repositories/noteBookRepo';
+import { noteRepo } from '../../../src/shared/db/repositories/noteRepo';
+import {
+  buildLocalSnapshot,
+  NoteStorageLimitError,
+  VaultLockedError,
+} from '../../../src/shared/sync/snapshotBuilder';
 import { applyRemoteSnapshot } from '../../../src/shared/sync/snapshotApply';
 import { buildTombstones } from '../../../src/shared/sync/tombstones';
 import { recordDeletion } from '../../../src/shared/db/deletionLog';
 import {
+  MAX_NOTE_CONTENT,
   emptySnapshotData,
   emptyTombstones,
   indexFromData,
+  type NoteBookRec,
+  type NoteRec,
   type SnapshotData,
   type SyncSnapshot,
   type SystemRec,
@@ -40,6 +49,28 @@ function remoteSystem(id: string, updatedAt: number, patch: Partial<SystemRec> =
     createdAt: 1,
     updatedAt,
     tagIds: [],
+    ...patch,
+  };
+}
+
+function remoteNoteBook(id: string, updatedAt: number): NoteBookRec {
+  return { id, name: id, sortOrder: 0, createdAt: 1, updatedAt };
+}
+
+function remoteNote(
+  id: string,
+  notebookId: string,
+  updatedAt: number,
+  patch: Partial<NoteRec> = {},
+): NoteRec {
+  return {
+    id,
+    notebookId,
+    title: id,
+    content: `# ${id}`,
+    sortOrder: 0,
+    createdAt: 1,
+    updatedAt,
     ...patch,
   };
 }
@@ -160,6 +191,79 @@ describe('snapshot build / apply', () => {
     expect(account.password.__encrypted).toBe(true);
     expect(await cryptoService.decryptField(account.password)).toBe('plain-remote-secret');
   });
+
+  it('builds notes into the snapshot and honors forceUpdatedAt', async () => {
+    const bookId = await noteBookRepo.create('工作');
+    const noteId = await noteRepo.create({ notebookId: bookId, title: '标题', content: '# 正文' });
+    const stamp = Date.now() + 10_000;
+
+    const snapshot = await buildLocalSnapshot({ forceUpdatedAt: stamp });
+    expect(snapshot.data.noteBooks).toHaveLength(1);
+    expect(snapshot.data.notes).toHaveLength(1);
+    expect(snapshot.data.notes[0]).toMatchObject({
+      id: noteId,
+      notebookId: bookId,
+      title: '标题',
+      content: '# 正文',
+      updatedAt: stamp,
+    });
+    expect(snapshot.data.noteBooks[0].updatedAt).toBe(stamp);
+  });
+
+  it('applies notes, keeps orphan notes and clears their deletion ledger', async () => {
+    await recordDeletion('note', 'n1', 5);
+    const remote = remoteSnapshot({
+      noteBooks: [remoteNoteBook('b1', 10)],
+      notes: [
+        remoteNote('n1', 'b1', 20),
+        remoteNote('orphan', 'missing-book', 20),
+      ],
+    });
+
+    const summary = await applyRemoteSnapshot(remote);
+
+    expect(await db.noteBooks.get('b1')).toMatchObject({ name: 'b1' });
+    expect(await db.notes.get('n1')).toMatchObject({ title: 'n1' });
+    expect(await db.notes.get('orphan')).toMatchObject({ notebookId: 'missing-book' });
+    expect(await db.deletions.get('note:n1')).toBeUndefined();
+    expect(summary.added).toBeGreaterThanOrEqual(3);
+  });
+
+  it('does not let an older remote note overwrite a newer local note', async () => {
+    const bookId = await noteBookRepo.create('工作');
+    const noteId = await noteRepo.create({ notebookId: bookId, title: '本地' });
+    const local = (await noteRepo.byId(noteId))!;
+
+    const summary = await applyRemoteSnapshot(remoteSnapshot({
+      notes: [remoteNote(noteId, bookId, local.updatedAt - 1000, { title: '远端旧版' })],
+    }));
+
+    expect((await noteRepo.byId(noteId))?.title).toBe('本地');
+    expect(summary.skippedLocalNewer).toBe(1);
+  });
+
+  it('accepts old-server snapshots without note arrays', async () => {
+    const old = remoteSnapshot({
+      systems: [remoteSystem('s1', 300)],
+    }) as unknown as { data: Record<string, unknown> };
+    delete old.data.noteBooks;
+    delete old.data.notes;
+
+    const summary = await applyRemoteSnapshot(old as unknown as SyncSnapshot);
+    expect(await db.systems.get('s1')).toBeTruthy();
+    expect(await db.notes.count()).toBe(0);
+    expect(summary.added).toBe(1);
+  });
+
+  it('rejects oversized notes before building a snapshot for sync', async () => {
+    const bookId = await noteBookRepo.create('工作');
+    await noteRepo.create({
+      notebookId: bookId,
+      content: 'x'.repeat(MAX_NOTE_CONTENT + 1),
+    });
+
+    await expect(buildLocalSnapshot()).rejects.toBeInstanceOf(NoteStorageLimitError);
+  });
 });
 
 describe('tombstone construction', () => {
@@ -185,5 +289,15 @@ describe('tombstone construction', () => {
     const current = indexFromData(emptySnapshotData());
     const tombstones = await buildTombstones(current, null, 1000);
     expect(tombstones.systems).toEqual({});
+  });
+
+  it('infers note deletions from the previous snapshot index', async () => {
+    const current = indexFromData(emptySnapshotData());
+    const previous = indexFromData({
+      ...emptySnapshotData(),
+      notes: [remoteNote('missing-note', 'b1', 100)],
+    });
+    const tombstones = await buildTombstones(current, previous, 1000);
+    expect(tombstones.notes['missing-note']).toBe(1000);
   });
 });

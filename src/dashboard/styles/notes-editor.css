@@ -1,0 +1,422 @@
+/* SiYuan-like Markdown typography for the Milkdown Crepe editor.
+   Values mirror the day-light theme used by SiYuan 3.1.x:
+   body 16px/1.625, headings 1.75/1.55/1.38/1.25/1.13/1em at 600,
+   list marker column 34px, quote bar 4px, code block rgba(27,31,35,.05). */
+.dock-notes .milkdown {
+  --crepe-color-background: transparent;
+  --crepe-color-on-background: var(--ink);
+  --crepe-color-surface: var(--panel);
+  --crepe-color-surface-low: var(--panel2);
+  --crepe-color-on-surface: var(--ink);
+  --crepe-color-on-surface-variant: var(--ink2);
+  --crepe-color-outline: var(--border2);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--border);
+  --crepe-color-on-secondary: var(--ink);
+  --crepe-color-inverse: var(--ink);
+  --crepe-color-on-inverse: var(--panel);
+  --crepe-color-inline-code: var(--ink);
+  --crepe-color-error: var(--danger);
+  --crepe-color-hover: var(--panel2);
+  --crepe-color-selected: color-mix(in srgb, var(--accent) 22%, transparent);
+  --crepe-color-inline-area: var(--bg2);
+  --crepe-font-default: var(--note-font, var(--font-sans));
+  --crepe-font-title: var(--note-font, var(--font-sans));
+  --crepe-font-code: var(--font-mono);
+  --crepe-base-font-size: 16px;
+  --note-code-bg: rgba(27, 31, 35, 0.05);
+  --note-link: #4285f4;
+  background: transparent;
+  color: var(--ink);
+}
+
+.dock-notes .milkdown .ProseMirror {
+  padding: 0;
+  min-height: 360px;
+  outline: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--note-font, var(--font-sans));
+  font-size: 16px;
+  line-height: 1.625;
+}
+
+/* SiYuan blocks share the same 2px margin / 4px padding rhythm. */
+.dock-notes .milkdown .ProseMirror p,
+.dock-notes .milkdown .ProseMirror h1,
+.dock-notes .milkdown .ProseMirror h2,
+.dock-notes .milkdown .ProseMirror h3,
+.dock-notes .milkdown .ProseMirror h4,
+.dock-notes .milkdown .ProseMirror h5,
+.dock-notes .milkdown .ProseMirror h6 {
+  margin: 2px 0;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+}
+.dock-notes .milkdown .ProseMirror p {
+  line-height: 1.625;
+}
+
+.dock-notes .milkdown .ProseMirror h1,
+.dock-notes .milkdown .ProseMirror h2,
+.dock-notes .milkdown .ProseMirror h3,
+.dock-notes .milkdown .ProseMirror h4,
+.dock-notes .milkdown .ProseMirror h5,
+.dock-notes .milkdown .ProseMirror h6 {
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: normal;
+}
+.dock-notes .milkdown .ProseMirror h1 { font-size: 1.75em; }
+.dock-notes .milkdown .ProseMirror h2 { font-size: 1.55em; }
+.dock-notes .milkdown .ProseMirror h3 { font-size: 1.38em; }
+.dock-notes .milkdown .ProseMirror h4 { font-size: 1.25em; }
+.dock-notes .milkdown .ProseMirror h5 { font-size: 1.13em; }
+.dock-notes .milkdown .ProseMirror h6 { font-size: 1em; }
+
+.dock-notes .milkdown .ProseMirror strong { font-weight: 700; color: inherit; }
+.dock-notes .milkdown .ProseMirror em { font-style: italic; color: inherit; }
+.dock-notes .milkdown .ProseMirror a {
+  color: var(--note-link);
+  text-decoration: none;
+}
+.dock-notes .milkdown .ProseMirror a:hover { text-decoration: underline; }
+
+/* Lists: SiYuan uses a 34px marker column and 34px minimum row height. */
+.dock-notes .milkdown .ProseMirror ul,
+.dock-notes .milkdown .ProseMirror ol {
+  list-style: none;
+  margin: 2px 0;
+  padding-left: 0;
+}
+.dock-notes .milkdown .ProseMirror li { margin: 0; }
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block > .list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-height: 34px;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .label-wrapper {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink2);
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .label-wrapper svg {
+  fill: currentColor;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .label {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  line-height: 34px;
+  text-align: center;
+  font-size: 1em;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .label.bullet svg {
+  width: 16px;
+  height: 16px;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .label.checked svg,
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .label.unchecked svg {
+  width: 16px;
+  height: 16px;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .children {
+  min-width: 0;
+  flex: 1;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .children .content-dom > p {
+  margin: 2px 0;
+  padding: 4px;
+  line-height: 1.625;
+}
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .children .content-dom > :first-child { margin-top: 0; }
+.dock-notes .milkdown .ProseMirror .milkdown-list-item-block .children .content-dom > :last-child { margin-bottom: 0; }
+
+/* Quote: 4px gray bar, 6px inset, muted text. */
+.dock-notes .milkdown .ProseMirror blockquote {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0;
+  padding: 0 4px 0 calc(0.25em + 6px);
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink2);
+}
+.dock-notes .milkdown .ProseMirror blockquote::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: var(--radius-xs);
+  background: var(--border);
+}
+
+/* Inline code: 85% mono, 0.2em/0.4em padding, 5% gray background. */
+.dock-notes .milkdown .ProseMirror code:not(.hljs),
+.dock-notes .milkdown .ProseMirror span[data-type='code'] {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  border-radius: var(--radius-xs);
+  background: var(--note-code-bg);
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 85%;
+  font-variant-ligatures: none;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+/* 代码块内部的 code 继承代码块字号，不套用行内代码的 85% 规则 */
+.dock-notes .milkdown .ProseMirror pre code,
+.dock-notes .milkdown .ProseMirror .milkdown-code-block code {
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: inherit;
+}
+
+/* Fenced code block: SiYuan overlays the language/copy actions on a 4px padded
+   shell, and the editable code is inset by 27.2/13.6/21.76px. It has no gutter
+   line numbers and no active-line highlight in the default light theme. */
+.dock-notes .milkdown .milkdown-code-block {
+  position: relative;
+  margin: 2px 0;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  background: var(--note-code-bg);
+}
+.dock-notes .milkdown .milkdown-code-block .cm-editor,
+.dock-notes .milkdown .milkdown-code-block .cm-editor.cm-focused {
+  background: transparent;
+  outline: none !important;
+}
+.dock-notes .milkdown .milkdown-code-block .cm-gutters {
+  display: none !important;
+}
+.dock-notes .milkdown .milkdown-code-block .cm-scroller {
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  line-height: 1.625;
+}
+.dock-notes .milkdown .milkdown-code-block .cm-content {
+  padding: 27.2px 13.6px 21.76px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: calc(var(--crepe-base-font-size) * 0.85);
+  line-height: 1.625;
+}
+.dock-notes .milkdown .milkdown-code-block .cm-line { padding: 0; }
+.dock-notes .milkdown .milkdown-code-block .cm-activeLine,
+.dock-notes .milkdown .milkdown-code-block .cm-activeLineGutter {
+  background: transparent !important;
+}
+.dock-notes .milkdown .milkdown-code-block .cm-cursor {
+  border-left-color: var(--ink);
+}
+.dock-notes .milkdown .milkdown-code-block .milkdown-code-block-placeholder {
+  margin: 0;
+  padding: 27.2px 13.6px 21.76px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: calc(var(--crepe-base-font-size) * 0.85);
+  line-height: 1.625;
+  /* 与思源一致：代码不换行，超出部分横向滚动 */
+  white-space: pre;
+  word-break: initial;
+  overflow-x: auto;
+}
+/* Toolbar overlays the top padding, exactly like SiYuan's hidden-until-hover actions. */
+.dock-notes .milkdown .milkdown-code-block .tools {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  z-index: 1;
+}
+.dock-notes .milkdown .milkdown-code-block .tools .language-button {
+  margin: -4px 0 0 13.6px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink2);
+  font-family: var(--note-font, var(--font-sans));
+  font-size: calc(var(--crepe-base-font-size) * 0.85);
+  font-weight: 400;
+  line-height: 1.625;
+  opacity: 0;
+}
+.dock-notes .milkdown .milkdown-code-block .tools .language-button .expand-icon {
+  display: none;
+}
+.dock-notes .milkdown .milkdown-code-block:hover .tools .language-button,
+.dock-notes .milkdown .milkdown-code-block:focus-within .tools .language-button {
+  opacity: 1;
+}
+.dock-notes .milkdown .milkdown-code-block .tools .tools-button-group {
+  opacity: 0;
+}
+.dock-notes .milkdown .milkdown-code-block:hover .tools .tools-button-group,
+.dock-notes .milkdown .milkdown-code-block:focus-within .tools .tools-button-group {
+  opacity: 1;
+}
+.dock-notes .milkdown .milkdown-code-block .tools .tools-button-group button {
+  padding: 2px;
+  gap: 0;
+  background: transparent;
+  color: var(--ink3);
+  font-size: 0;
+  font-weight: 400;
+}
+.dock-notes .milkdown .milkdown-code-block .tools .tools-button-group button:hover {
+  background: var(--panel2);
+  color: var(--ink);
+}
+.dock-notes .milkdown .milkdown-code-block .tools .tools-button-group button svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* 代码高亮配色来自 crepeHighlight.ts（思源同款 GitHub 浅色主题）。 */
+
+/* Tables: SiYuan uses compact 4px/8px cells, 1px light borders and even-row tint. */
+.dock-notes .milkdown .milkdown-table-block {
+  margin: 2px 0;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+}
+.dock-notes .milkdown .ProseMirror table {
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 1em;
+}
+.dock-notes .milkdown .ProseMirror th,
+.dock-notes .milkdown .ProseMirror td {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  line-height: 1.625;
+  font-weight: 400;
+  text-align: left;
+}
+.dock-notes .milkdown .ProseMirror th { font-weight: 600; }
+.dock-notes .milkdown .ProseMirror th p,
+.dock-notes .milkdown .ProseMirror td p {
+  margin: 0;
+  padding: 0;
+  line-height: 1.625;
+}
+/* Crepe puts the header row inside tbody; SiYuan's first body row is not tinted. */
+.dock-notes .milkdown .ProseMirror tbody tr:nth-child(odd) td {
+  background: color-mix(in srgb, var(--ink) 2%, transparent);
+}
+
+.dock-notes .milkdown .ProseMirror hr {
+  height: 1px;
+  margin: 12px 4px;
+  padding: 0;
+  border: none;
+  background: var(--border);
+}
+.dock-notes .milkdown .ProseMirror img { max-width: 100%; border-radius: var(--radius-sm); }
+.dock-notes .milkdown .ProseMirror .katex { font-size: 1.21em; }
+
+.dock-notes .crepe-placeholder::before {
+  color: color-mix(in srgb, var(--ink3) 70%, transparent);
+}
+
+/* 统一选中色：正文与代码块选中后只有一种颜色 rgb(203,216,243)。
+   代码块是嵌套编辑器，CodeMirror 默认把 .cm-line 的原生选区设为透明，
+   改用自己的 .cm-selectionBackground 图层绘制；这里同时覆盖两层，
+   避免正文与代码块出现色差。 */
+.dock-notes .milkdown .ProseMirror::selection,
+.dock-notes .milkdown .ProseMirror ::selection,
+.dock-notes .milkdown .cm-content ::selection,
+.dock-notes .milkdown .cm-content .cm-line::selection,
+.dock-notes .milkdown .milkdown-code-block .cm-content ::selection,
+.dock-notes .milkdown .cm-selectionBackground,
+.dock-notes .milkdown .milkdown-code-block .cm-selectionBackground,
+.dock-notes .milkdown .cm-focused .cm-selectionBackground,
+.dock-notes .milkdown .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background-color: rgb(203, 216, 243) !important;
+}
+
+/* Popovers are rendered by Crepe inside .milkdown; the extra global selector is a
+   fallback for portal placement. They only exist while the note editor is mounted. */
+.dock-notes .milkdown-slash-menu,
+.milkdown-slash-menu,
+.dock-notes .milkdown-toolbar,
+.milkdown-toolbar,
+.dock-notes .milkdown-block-handle,
+.milkdown-block-handle {
+  font-family: var(--note-font, var(--font-sans));
+}
+.dock-notes .milkdown-slash-menu,
+.milkdown-slash-menu,
+.dock-notes .milkdown-toolbar,
+.milkdown-toolbar {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.dock-notes .milkdown-slash-menu .menu-group h6,
+.milkdown-slash-menu .menu-group h6 { color: var(--ink4); font-size: 10px; letter-spacing: 0.04em; }
+.dock-notes .milkdown-slash-menu .menu-group li,
+.milkdown-slash-menu .menu-group li { border-radius: var(--radius-sm); color: var(--ink2); }
+.dock-notes .milkdown-slash-menu .menu-group li.hover,
+.milkdown-slash-menu .menu-group li.hover,
+.dock-notes .milkdown-slash-menu .menu-group li.active,
+.milkdown-slash-menu .menu-group li.active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+.dock-notes .milkdown-toolbar .toolbar-item,
+.milkdown-toolbar .toolbar-item { color: var(--ink2); border-radius: var(--radius-sm); }
+.dock-notes .milkdown-toolbar .toolbar-item:hover,
+.milkdown-toolbar .toolbar-item:hover { background: var(--panel2); color: var(--ink); }
+.dock-notes .milkdown-toolbar .toolbar-item.active svg,
+.milkdown-toolbar .toolbar-item.active svg { color: var(--accent); }
+
+[data-theme='dark'] .dock-notes .milkdown {
+  --note-code-bg: rgba(255, 255, 255, 0.07);
+  --note-link: #6ea8ff;
+  --crepe-color-background: transparent;
+  --crepe-color-on-background: var(--ink);
+  --crepe-color-surface: var(--panel);
+  --crepe-color-surface-low: var(--panel2);
+  --crepe-color-on-surface: var(--ink);
+  --crepe-color-on-surface-variant: var(--ink2);
+  --crepe-color-outline: var(--border2);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--border);
+  --crepe-color-on-secondary: var(--ink);
+  --crepe-color-inverse: var(--ink);
+  --crepe-color-on-inverse: var(--panel);
+  --crepe-color-inline-code: var(--ink);
+  --crepe-color-error: #ff8a8a;
+  --crepe-color-hover: var(--panel2);
+  --crepe-color-selected: color-mix(in srgb, var(--accent) 22%, transparent);
+  --crepe-color-inline-area: var(--bg2);
+}

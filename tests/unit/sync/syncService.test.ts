@@ -3,6 +3,8 @@ import { db } from '../../../src/shared/db/schema';
 import { cryptoSession } from '../../../src/shared/crypto/session';
 import { cryptoService } from '../../../src/shared/services/cryptoService';
 import { systemRepo } from '../../../src/shared/db/repositories/systemRepo';
+import { noteBookRepo } from '../../../src/shared/db/repositories/noteBookRepo';
+import { noteRepo } from '../../../src/shared/db/repositories/noteRepo';
 import { VaultLockedError } from '../../../src/shared/sync/snapshotBuilder';
 import { pushToCloud, overwriteCloud, restoreFromCloud, restoreVersionFromCloud } from '../../../src/shared/sync/syncService';
 import {
@@ -21,6 +23,8 @@ import {
   type ServerState,
   type SyncPushRequest,
   type SystemRec,
+  type NoteBookRec,
+  type NoteRec,
 } from '../../../shared/protocol/index';
 
 const BASE = 'http://localhost:9999';
@@ -36,6 +40,22 @@ function remoteSystem(id: string, updatedAt = Date.now()): SystemRec {
     createdAt: updatedAt,
     updatedAt,
     tagIds: [],
+  };
+}
+
+function remoteNoteBook(id: string, updatedAt = Date.now()): NoteBookRec {
+  return { id, name: id, sortOrder: 0, createdAt: updatedAt, updatedAt };
+}
+
+function remoteNote(id: string, notebookId: string, updatedAt = Date.now()): NoteRec {
+  return {
+    id,
+    notebookId,
+    title: id,
+    content: `# ${id}`,
+    sortOrder: 0,
+    createdAt: updatedAt,
+    updatedAt,
   };
 }
 
@@ -306,6 +326,8 @@ describe('syncService', () => {
       name: 'BadLocal', url: 'https://bad.example.com', environment: 'development',
       favorite: false, sort: 0,
     });
+    const badBook = await noteBookRepo.create('坏笔记本');
+    await noteRepo.create({ notebookId: badBook, title: 'BadNote', content: '# bad' });
     await db.deletions.put({
       id: 'group:gone',
       entityType: 'group',
@@ -316,7 +338,12 @@ describe('syncService', () => {
     const versionSnapshot = {
       schemaVersion: 1 as const,
       generatedAt: Date.now(),
-      data: { ...emptySnapshotData(), systems: [remoteSystem('good-version')] },
+      data: {
+        ...emptySnapshotData(),
+        systems: [remoteSystem('good-version')],
+        noteBooks: [remoteNoteBook('good-book')],
+        notes: [remoteNote('good-note', 'good-book')],
+      },
     };
     const pushed: SyncPushRequest[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -327,7 +354,10 @@ describe('syncService', () => {
           createdAt: Date.now(),
           note: '初始同步',
           changes: { added: 1, updated: 0, deleted: 0 },
-          counts: { groups: 0, tags: 0, systems: 1, accounts: 0, servers: 0, middlewares: 0, configProjects: 0, configDefs: 0 },
+          counts: {
+            groups: 0, tags: 0, systems: 1, accounts: 0, servers: 0, middlewares: 0,
+            configProjects: 0, configDefs: 0, noteBooks: 1, notes: 1,
+          },
           snapshot: versionSnapshot,
           tombstones: emptyTombstones(),
         });
@@ -362,9 +392,12 @@ describe('syncService', () => {
     expect(pushed).toHaveLength(1);
     expect(pushed[0].note).toBe('恢复到版本 #3');
     expect(pushed[0].snapshot.data.systems.map(system => system.id)).toEqual(['good-version']);
+    expect(pushed[0].snapshot.data.notes.map(note => note.id)).toEqual(['good-note']);
 
     const systems = await systemRepo.all();
     expect(systems.map(system => system.id)).toEqual(['good-version']);
+    expect((await db.notes.toArray()).map(note => note.id)).toEqual(['good-note']);
+    expect((await db.noteBooks.toArray()).map(book => book.id)).toEqual(['good-book']);
     expect(await db.deletions.count()).toBe(0);
   });
 

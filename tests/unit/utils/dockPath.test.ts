@@ -7,6 +7,7 @@ describe('dockPathFor', () => {
     expect(dockPathFor('/servers')).toBe('dock://servers');
     expect(dockPathFor('/middlewares')).toBe('dock://middleware');
     expect(dockPathFor('/configs')).toBe('dock://configs');
+    expect(dockPathFor('/notes')).toBe('dock://notes');
     expect(dockPathFor('/settings')).toBe('dock://settings');
   });
   it('falls back to dock://app for unknown routes', () => {
@@ -16,7 +17,10 @@ describe('dockPathFor', () => {
 });
 
 describe('subtitleFor', () => {
-  const stats = { systems: 3, servers: 2, middlewares: 1, projects: 4, configs: 7, fields: 12 };
+  const stats = {
+    systems: 3, servers: 2, middlewares: 1, projects: 4, configs: 7, fields: 12,
+    noteBooks: 2, notes: 5,
+  };
   it('returns systems subtitle with counts', () => {
     expect(subtitleFor('/systems', stats)).toBe('共 3 个系统');
   });
@@ -25,6 +29,9 @@ describe('subtitleFor', () => {
   });
   it('returns configs subtitle with project/config/field counts', () => {
     expect(subtitleFor('/configs', stats)).toBe('4 个项目 · 7 个配置 · 12 个字段');
+  });
+  it('returns notes subtitle with notebook/note counts', () => {
+    expect(subtitleFor('/notes', stats)).toBe('2 个笔记本 · 5 篇笔记');
   });
   it('returns the settings subtitle', () => {
     expect(subtitleFor('/settings', stats)).toBe('外观 · 安全 · 云端 · 快捷键 · 关于');

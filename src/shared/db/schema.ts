@@ -3,7 +3,7 @@ import { markDirty } from '../sync/dirtyTracker';
 import type {
   System, Account, Server, Middleware, Tag,
   SystemTag, ServerTag, MiddlewareTag, Recent, MetaEntry, ConfigGroup,
-  ConfigProject, ConfigDef, Group, DeletionEntry,
+  ConfigProject, ConfigDef, Group, DeletionEntry, NoteBook, Note,
 } from '../types/entities';
 
 export class NavPortalDB extends Dexie {
@@ -22,6 +22,8 @@ export class NavPortalDB extends Dexie {
   configDefs!: Table<ConfigDef, string>;
   groups!: Table<Group, string>;
   deletions!: Table<DeletionEntry, string>;
+  noteBooks!: Table<NoteBook, string>;
+  notes!: Table<Note, string>;
 
   constructor() {
     super('NavPortalDB');
@@ -84,6 +86,10 @@ export class NavPortalDB extends Dexie {
         if (typeof tag.updatedAt !== 'number') tag.updatedAt = tag.createdAt;
       });
     });
+    this.version(7).stores({
+      noteBooks: 'id, name, sortOrder, createdAt, updatedAt',
+      notes: 'id, notebookId, [notebookId+sortOrder], sortOrder, updatedAt, createdAt',
+    });
   }
 }
 
@@ -92,6 +98,7 @@ export const db = new NavPortalDB();
 const SYNC_DIRTY_TABLES = new Set([
   'groups', 'tags', 'systems', 'accounts', 'servers', 'middlewares',
   'systemTags', 'serverTags', 'middlewareTags', 'configProjects', 'configDefs',
+  'noteBooks', 'notes',
 ]);
 
 // 统一捕获所有业务表写入（包括导入/弹窗），只标记 dirty，不做数据变换

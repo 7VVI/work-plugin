@@ -5,14 +5,19 @@
       <section class="panel ie-card">
         <div class="io-icon export"><i class="fa-solid fa-cloud-arrow-down"></i></div>
         <h3 class="io-title">导出数据</h3>
-        <p class="io-desc">将资产数据导出为备份文件，可用于迁移或存档。支持 JSON 与 Markdown（每种记录为表格）。</p>
+        <p class="io-desc">将资产数据导出为备份文件，可用于迁移或存档。JSON 可包含笔记正文；Markdown 以表格保存结构化资产。</p>
         <div class="scope-list">
           <label class="scope-item"><input type="checkbox" v-model="scope.systems" class="form-check" /><span>系统（含账号密码）</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.servers" class="form-check" /><span>服务器</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.middlewares" class="form-check" /><span>中间件</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.configs" class="form-check" /><span>配置（分组 / 字段）</span></label>
           <label class="scope-item"><input type="checkbox" v-model="scope.groups" class="form-check" /><span>分组（系统 / 服务器 / 中间件）</span></label>
+          <label class="scope-item" :class="{ disabled: format === 'md' }">
+            <input v-model="scope.notes" type="checkbox" class="form-check" :disabled="format === 'md'" />
+            <span>笔记（笔记本 / 正文）</span>
+          </label>
         </div>
+        <p v-if="format === 'md'" class="io-hint">Markdown 备份不含笔记正文；请使用 JSON 备份，或在笔记页单篇导出 Markdown。</p>
 
         <div class="io-row">
           <span class="io-label">格式</span>
@@ -56,7 +61,7 @@
     <!-- 琥珀警示 -->
     <div class="warn-bar">
       <i class="fa-solid fa-triangle-exclamation"></i>
-      <span>数据仅保存在浏览器本地（IndexedDB）。导出的备份文件可能包含<strong>明文账号密码</strong>，请妥善保管，不要上传到公共网盘或群聊。</span>
+      <span>数据仅保存在浏览器本地（IndexedDB）。导出的备份文件可能包含<strong>明文账号密码和笔记正文</strong>，请妥善保管，不要上传到公共网盘或群聊。</span>
     </div>
   </div>
 </template>
@@ -68,7 +73,7 @@ import { useToastStore } from '@shared/stores/toastStore';
 
 const toast = useToastStore();
 
-const scope = ref({ systems: true, servers: true, middlewares: true, configs: true, groups: true });
+const scope = ref({ systems: true, servers: true, middlewares: true, configs: true, groups: true, notes: true });
 const format = ref<'json' | 'md'>('json');
 const includePasswords = ref(false);
 const dragOver = ref(false);
@@ -92,6 +97,10 @@ async function onExport() {
       if (scope.value.middlewares) out.middlewares = full.middlewares ?? [];
       if (scope.value.configs) out.projects = full.projects ?? [];
       if (scope.value.groups) out.groups = full.groups ?? [];
+      if (scope.value.notes) {
+        out.noteBooks = full.noteBooks ?? [];
+        out.notes = full.notes ?? [];
+      }
       downloadFile(JSON.stringify(out, null, 2), `dock-backup-${stamp}.json`, 'application/json');
       toast.success('JSON 备份已导出');
     }
@@ -190,6 +199,13 @@ function downloadFile(content: string, filename: string, mime: string) {
 .scope-item {
   display: flex; align-items: center; gap: var(--gap-sm);
   cursor: pointer; user-select: none;
+}
+.scope-item.disabled { opacity: 0.45; cursor: not-allowed; }
+.io-hint {
+  margin: -4px 0 var(--gap-md);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-tertiary, var(--ink4));
 }
 .io-row {
   display: flex;

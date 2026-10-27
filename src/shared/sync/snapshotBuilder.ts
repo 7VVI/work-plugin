@@ -1,11 +1,16 @@
 import { db } from '../db/schema';
+import { noteRepo } from '../db/repositories/noteRepo';
 import { cryptoService } from '../services/cryptoService';
+import { MAX_NOTE_CONTENT, MAX_TOTAL_NOTE_BYTES } from '@protocol/limits';
+import { utf8Bytes } from '../utils/noteUtils';
 import type {
   Account,
   ConfigDef,
   ConfigProject,
   Group,
   Middleware,
+  Note,
+  NoteBook,
   Server,
   System,
   Tag,
@@ -17,6 +22,13 @@ export class VaultLockedError extends Error {
   constructor() {
     super('保险库已锁定，请先解锁主密码');
     this.name = 'VaultLockedError';
+  }
+}
+
+export class NoteStorageLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoteStorageLimitError';
   }
 }
 
@@ -43,6 +55,7 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
   if (await cryptoService.isEnabled() && !cryptoService.isUnlocked()) {
     throw new VaultLockedError();
   }
+  await noteRepo.repairOrphanNotes();
   const stamp = options.forceUpdatedAt;
 
   const [
@@ -57,6 +70,8 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
     systemTags,
     serverTags,
     middlewareTags,
+    noteBooks,
+    notes,
   ] = await Promise.all([
     db.groups.toArray(),
     db.tags.toArray(),
@@ -69,11 +84,28 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
     db.systemTags.toArray(),
     db.serverTags.toArray(),
     db.middlewareTags.toArray(),
+    db.noteBooks.toArray(),
+    db.notes.toArray(),
   ]);
 
   const systemTagMap = tagIdsByParent(systemTags, 'systemId');
   const serverTagMap = tagIdsByParent(serverTags, 'serverId');
   const middlewareTagMap = tagIdsByParent(middlewareTags, 'middlewareId');
+
+  let noteBytes = 0;
+  for (const note of notes as Note[]) {
+    if (note.content.length > MAX_NOTE_CONTENT) {
+      throw new NoteStorageLimitError(
+        `笔记「${note.title || '未命名笔记'}」超过单篇 ${MAX_NOTE_CONTENT} 字符限制，无法同步`,
+      );
+    }
+    noteBytes += utf8Bytes(note.content);
+  }
+  if (noteBytes > MAX_TOTAL_NOTE_BYTES) {
+    throw new NoteStorageLimitError(
+      `笔记总大小超过 ${Math.floor(MAX_TOTAL_NOTE_BYTES / 1024 / 1024)}MB，无法同步`,
+    );
+  }
 
   const data: SnapshotData = {
     groups: groups.map((group: Group) => ({ ...group, updatedAt: stamp ?? group.updatedAt })),
@@ -146,6 +178,22 @@ export async function buildLocalSnapshot(options: SnapshotBuildOptions = {}): Pr
     })),
     configProjects: configProjects.map((project: ConfigProject) => ({ ...project, updatedAt: stamp ?? project.updatedAt })),
     configDefs: configDefs.map((config: ConfigDef) => ({ ...config, updatedAt: stamp ?? config.updatedAt, fields: config.fields.map(field => ({ ...field })) })),
+    noteBooks: noteBooks.map((book: NoteBook) => ({
+      id: book.id,
+      name: book.name,
+      sortOrder: book.sortOrder,
+      createdAt: book.createdAt,
+      updatedAt: stamp ?? book.updatedAt,
+    })),
+    notes: notes.map((note: Note) => ({
+      id: note.id,
+      notebookId: note.notebookId,
+      title: note.title,
+      content: note.content,
+      sortOrder: note.sortOrder,
+      createdAt: note.createdAt,
+      updatedAt: stamp ?? note.updatedAt,
+    })),
   };
 
   return {

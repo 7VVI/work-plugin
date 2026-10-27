@@ -21,6 +21,7 @@ import { useServerStore } from '@shared/stores/serverStore';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useConfigStore } from '@shared/stores/configStore';
 import { useCloudSyncStore } from '@shared/stores/cloudSyncStore';
+import { useNoteCounts } from '../../utils/useNoteCounts';
 
 const router = useRouter();
 const systemStore = useSystemStore();
@@ -28,6 +29,7 @@ const serverStore = useServerStore();
 const middlewareStore = useMiddlewareStore();
 const configStore = useConfigStore();
 const cloudStore = useCloudSyncStore();
+const noteCounts = useNoteCounts();
 
 const clock = ref('--:--:--');
 const storageLabel = isWeb ? '云端数据' : 'chrome.storage.local';
@@ -42,7 +44,7 @@ const statsText = computed(() => {
   const sv = serverStore.list?.length ?? 0;
   const mw = middlewareStore.list?.length ?? 0;
   const pj = configStore.list?.length ?? 0;
-  return `系统 ${s} · 服务器 ${sv} · 中间件 ${mw} · 项目 ${pj}`;
+  return `系统 ${s} · 服务器 ${sv} · 中间件 ${mw} · 项目 ${pj} · 笔记 ${noteCounts.notes.value}`;
 });
 
 const cloudStatusText = computed(() => {

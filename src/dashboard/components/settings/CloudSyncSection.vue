@@ -88,7 +88,7 @@
               新增 {{ version.changes.added }} · 更新 {{ version.changes.updated }} · 删除 {{ version.changes.deleted }}
             </div>
             <div class="history-counts">
-              系统 {{ version.counts.systems }} · 服务器 {{ version.counts.servers }} · 中间件 {{ version.counts.middlewares }} · 配置 {{ version.counts.configProjects }}
+              系统 {{ version.counts.systems }} · 服务器 {{ version.counts.servers }} · 中间件 {{ version.counts.middlewares }} · 配置 {{ version.counts.configProjects }} · 笔记 {{ version.counts.notes ?? 0 }}
             </div>
           </div>
           <button
@@ -127,6 +127,8 @@ import { useSystemStore } from '@shared/stores/systemStore';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useConfigStore } from '@shared/stores/configStore';
+import { useNoteStore } from '@shared/stores/noteStore';
+import { noteRepo } from '@shared/db/repositories/noteRepo';
 import { cryptoService } from '@shared/services/cryptoService';
 import { normalizeEndpoint } from '@shared/sync/syncStorage';
 import type { SyncVersionMeta } from '@protocol/types';
@@ -138,6 +140,7 @@ const systemStore = useSystemStore();
 const serverStore = useServerStore();
 const middlewareStore = useMiddlewareStore();
 const configStore = useConfigStore();
+const noteStore = useNoteStore();
 
 const enabled = ref(false);
 const endpoint = ref('');
@@ -396,17 +399,20 @@ async function refreshLocalStores(): Promise<void> {
     serverStore.load(),
     middlewareStore.load(),
     configStore.load(),
+    noteStore.load(),
   ]).catch(() => {});
 }
 
 async function onRestoreVersion(version: SyncVersionMeta) {
   const enabledNow = !!store.config?.enabled;
-  const ok = await dialog.confirm(
-    `恢复到版本 #${version.revision}`,
-    enabledNow
-      ? '将用该版本替换本地数据，并立即覆盖云端；当前本地改动会丢失。继续？'
-      : '将用该版本替换本地数据；持久化未开启，云端暂不修改。继续？',
-  );
+  const localNotes = await noteRepo.counts();
+  const noteWarning = localNotes.notes > 0 && !((version.counts.notes ?? 0) > 0)
+    ? ' 该版本不包含笔记，恢复会删除本地笔记。'
+    : '';
+  const message = enabledNow
+    ? `将用该版本替换本地数据，并立即覆盖云端；当前本地改动会丢失。${noteWarning} 继续？`
+    : `将用该版本替换本地数据；持久化未开启，云端暂不修改。${noteWarning} 继续？`;
+  const ok = await dialog.confirm(`恢复到版本 #${version.revision}`, message);
   if (!ok) return;
   if (!(await ensureUnlocked())) return;
   try {

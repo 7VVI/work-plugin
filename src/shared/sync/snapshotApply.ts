@@ -7,6 +7,8 @@ import type {
   ConfigProject,
   Group,
   Middleware,
+  Note,
+  NoteBook,
   Server,
   System,
   Tag,
@@ -22,6 +24,7 @@ import {
   deletionTypeForTable,
   emptyTombstones,
   normalizeSnapshot,
+  normalizeTombstones,
 } from '@protocol/index';
 
 export interface ApplySummary {
@@ -40,6 +43,8 @@ interface LocalMaps {
   middlewares: Map<string, Middleware>;
   configProjects: Map<string, ConfigProject>;
   configDefs: Map<string, ConfigDef>;
+  noteBooks: Map<string, NoteBook>;
+  notes: Map<string, Note>;
 }
 
 function remoteWins(local: { updatedAt: number } | undefined, remote: { updatedAt: number }): boolean {
@@ -72,6 +77,7 @@ export async function applyRemoteSnapshot(
   }
 
   const data: SnapshotData = normalizeSnapshot(remote).data;
+  const safeTombstones = normalizeTombstones(tombstones);
 
   const [
     localGroups,
@@ -82,6 +88,8 @@ export async function applyRemoteSnapshot(
     localMiddlewares,
     localProjects,
     localDefs,
+    localNoteBooks,
+    localNotes,
   ] = await Promise.all([
     db.groups.toArray(),
     db.tags.toArray(),
@@ -91,6 +99,8 @@ export async function applyRemoteSnapshot(
     db.middlewares.toArray(),
     db.configProjects.toArray(),
     db.configDefs.toArray(),
+    db.noteBooks.toArray(),
+    db.notes.toArray(),
   ]);
 
   const local: LocalMaps = {
@@ -102,6 +112,8 @@ export async function applyRemoteSnapshot(
     middlewares: new Map(localMiddlewares.map(middleware => [middleware.id, middleware])),
     configProjects: new Map(localProjects.map(project => [project.id, project])),
     configDefs: new Map(localDefs.map(config => [config.id, config])),
+    noteBooks: new Map(localNoteBooks.map(book => [book.id, book])),
+    notes: new Map(localNotes.map(note => [note.id, note])),
   };
 
   const summary: ApplySummary = {
@@ -120,12 +132,14 @@ export async function applyRemoteSnapshot(
     middlewares: new Map(data.middlewares.map(record => [record.id, record])),
     configProjects: new Map(data.configProjects.map(record => [record.id, record])),
     configDefs: new Map(data.configDefs.map(record => [record.id, record])),
+    noteBooks: new Map(data.noteBooks.map(record => [record.id, record])),
+    notes: new Map(data.notes.map(record => [record.id, record])),
   };
 
   // 云端墓碑：不删除本地，但也不再把这些记录从云端重新加回本地
   const cloudDeleted = new Set<string>();
   for (const table of SNAPSHOT_TABLES) {
-    for (const [id, deletedAt] of Object.entries(tombstones[table])) {
+    for (const [id, deletedAt] of Object.entries(safeTombstones[table])) {
       const remote = remoteMaps[table].get(id);
       if (!remote || remote.updatedAt <= deletedAt) cloudDeleted.add(`${table}:${id}`);
     }
@@ -148,6 +162,16 @@ export async function applyRemoteSnapshot(
     if (isCloudDeleted('configProjects', record.id)) return false;
     countApply(summary, local.configProjects, record);
     return remoteWins(local.configProjects.get(record.id), record);
+  });
+  const appliedNoteBooks = data.noteBooks.filter(record => {
+    if (isCloudDeleted('noteBooks', record.id)) return false;
+    countApply(summary, local.noteBooks, record);
+    return remoteWins(local.noteBooks.get(record.id), record);
+  });
+  const appliedNotes = data.notes.filter(record => {
+    if (isCloudDeleted('notes', record.id)) return false;
+    countApply(summary, local.notes, record);
+    return remoteWins(local.notes.get(record.id), record);
   });
 
   const groupIds = new Set([...local.groups.keys(), ...appliedGroups.map(group => group.id)]);
@@ -243,6 +267,8 @@ export async function applyRemoteSnapshot(
     ...appliedMiddlewares.map(record => ({ table: 'middlewares' as const, id: record.id, updatedAt: record.updatedAt })),
     ...appliedProjects.map(record => ({ table: 'configProjects' as const, id: record.id, updatedAt: record.updatedAt })),
     ...appliedDefs.map(record => ({ table: 'configDefs' as const, id: record.id, updatedAt: record.updatedAt })),
+    ...appliedNoteBooks.map(record => ({ table: 'noteBooks' as const, id: record.id, updatedAt: record.updatedAt })),
+    ...appliedNotes.map(record => ({ table: 'notes' as const, id: record.id, updatedAt: record.updatedAt })),
   ];
 
   await db.transaction(
@@ -250,6 +276,7 @@ export async function applyRemoteSnapshot(
     [
       db.groups, db.tags, db.systems, db.accounts, db.servers, db.middlewares,
       db.configProjects, db.configDefs, db.systemTags, db.serverTags, db.middlewareTags, db.deletions,
+      db.noteBooks, db.notes,
     ],
     async () => {
       if (appliedGroups.length) await db.groups.bulkPut(appliedGroups);
@@ -260,6 +287,8 @@ export async function applyRemoteSnapshot(
       if (appliedServers.length) await db.servers.bulkPut(appliedServers);
       if (appliedMiddlewares.length) await db.middlewares.bulkPut(appliedMiddlewares);
       if (appliedDefs.length) await db.configDefs.bulkPut(appliedDefs);
+      if (appliedNoteBooks.length) await db.noteBooks.bulkPut(appliedNoteBooks);
+      if (appliedNotes.length) await db.notes.bulkPut(appliedNotes);
 
       for (const system of appliedSystems) {
         await db.systemTags.where('systemId').equals(system.id).delete();

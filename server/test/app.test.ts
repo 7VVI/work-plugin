@@ -7,6 +7,9 @@ import type { ServerConfig } from '../src/config';
 import {
   emptySnapshotData,
   emptyTombstones,
+  MAX_NOTE_CONTENT,
+  type NoteBookRec,
+  type NoteRec,
   type SnapshotData,
   type SyncPushRequest,
   type SystemRec,
@@ -40,6 +43,30 @@ function system(id: string, updatedAt = Date.now(), patch: Partial<SystemRec> = 
     createdAt: updatedAt,
     updatedAt,
     tagIds: [],
+    ...patch,
+  };
+}
+
+function noteBook(id: string, updatedAt = Date.now(), patch: Partial<NoteBookRec> = {}): NoteBookRec {
+  return {
+    id,
+    name: id,
+    sortOrder: 0,
+    createdAt: updatedAt,
+    updatedAt,
+    ...patch,
+  };
+}
+
+function note(id: string, notebookId: string, updatedAt = Date.now(), patch: Partial<NoteRec> = {}): NoteRec {
+  return {
+    id,
+    notebookId,
+    title: id,
+    content: `# ${id}`,
+    sortOrder: 0,
+    createdAt: updatedAt,
+    updatedAt,
     ...patch,
   };
 }
@@ -171,6 +198,59 @@ describe('dock cloud server', () => {
     expect(deleted.json().snapshot.data.systems).toHaveLength(0);
     expect(deleted.json().tombstones.systems.s1).toBe(updatedAt + 10);
   });
+
+  it('syncs notes and remains compatible with old clients that omit note tables', async () => {
+    const now = Date.now();
+    const first = await push(pushBody({
+      noteBooks: [noteBook('b1', now)],
+      notes: [note('n1', 'b1', now, { title: '标题', content: '# 正文' })],
+    }));
+    expect(first.statusCode).toBe(200);
+    expect(first.json().snapshot.data.noteBooks).toHaveLength(1);
+    expect(first.json().snapshot.data.notes).toHaveLength(1);
+    expect(first.json().snapshot.data.notes[0].content).toBe('# 正文');
+
+    const history = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(history.json().versions[0].counts).toMatchObject({ noteBooks: 1, notes: 1 });
+    const detail = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history/1',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(detail.json().snapshot.data.notes[0].content).toBe('# 正文');
+
+    const oldPayload = pushBody({ systems: [system('s1', now)] }, emptyTombstones(), 1) as any;
+    delete oldPayload.snapshot.data.noteBooks;
+    delete oldPayload.snapshot.data.notes;
+    delete oldPayload.tombstones.noteBooks;
+    delete oldPayload.tombstones.notes;
+    const oldResponse = await push(oldPayload);
+    expect(oldResponse.statusCode).toBe(200);
+    expect(oldResponse.json().snapshot.data.noteBooks).toHaveLength(1);
+    expect(oldResponse.json().snapshot.data.notes).toHaveLength(1);
+  });
+
+  it('rejects note content beyond the per-note or total limit', async () => {
+    const now = Date.now();
+    const oversized = await push(pushBody({
+      noteBooks: [noteBook('b1', now)],
+      notes: [note('n1', 'b1', now, { content: 'x'.repeat(MAX_NOTE_CONTENT + 1) })],
+    }));
+    expect(oversized.statusCode).toBe(400);
+
+    const notes = Array.from({ length: 25 }, (_, i) => note(`n${i}`, 'b1', now, {
+      content: 'x'.repeat(MAX_NOTE_CONTENT),
+    }));
+    const tooLarge = await push(pushBody({
+      noteBooks: [noteBook('b1', now)],
+      notes,
+    }));
+    expect(tooLarge.statusCode).toBe(400);
+  }, 20_000);
 
   it('records a version for every change and serves history details', async () => {
     const now = Date.now();
@@ -355,7 +435,11 @@ describe('dock cloud server', () => {
 
   it('supports data key rotation and revokes sessions when the admin secret changes', async () => {
     const now = Date.now();
-    await push(pushBody({ systems: [system('s1', now)] }));
+    await push(pushBody({
+      systems: [system('s1', now)],
+      noteBooks: [noteBook('b1', now)],
+      notes: [note('n1', 'b1', now, { content: '# 保留' })],
+    }));
     const cookie = await login();
     await dock.app.close();
 
@@ -371,6 +455,7 @@ describe('dock cloud server', () => {
     });
     expect(state.statusCode).toBe(200);
     expect(state.json().snapshot.data.systems).toHaveLength(1);
+    expect(state.json().snapshot.data.notes[0].content).toBe('# 保留');
     const history = await dock.app.inject({
       method: 'GET',
       url: '/api/sync/history/1',
@@ -378,6 +463,7 @@ describe('dock cloud server', () => {
     });
     expect(history.statusCode).toBe(200);
     expect(history.json().snapshot.data.systems).toHaveLength(1);
+    expect(history.json().snapshot.data.notes[0].content).toBe('# 保留');
     await dock.app.close();
 
     const changedSecret = testConfig(dir, {

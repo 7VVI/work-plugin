@@ -49,6 +49,18 @@ export function normalizeData(data: SnapshotData): SnapshotData {
       ...config,
       fields: config.fields ?? [],
     })),
+    noteBooks: sortById(data.noteBooks ?? []).map(book => ({
+      ...book,
+      name: typeof book.name === 'string' ? book.name : '',
+      sortOrder: Number.isFinite(book.sortOrder) ? book.sortOrder : 0,
+    })),
+    notes: sortById(data.notes ?? []).map(note => ({
+      ...note,
+      notebookId: typeof note.notebookId === 'string' ? note.notebookId : '',
+      title: typeof note.title === 'string' ? note.title : '',
+      content: typeof note.content === 'string' ? note.content : '',
+      sortOrder: Number.isFinite(note.sortOrder) ? note.sortOrder : 0,
+    })),
   };
 }
 
@@ -83,6 +95,8 @@ export function indexFromData(data: SnapshotData): SnapshotIndex {
   index.middlewares = indexOf(data.middlewares);
   index.configProjects = indexOf(data.configProjects);
   index.configDefs = indexOf(data.configDefs);
+  index.noteBooks = indexOf(data.noteBooks);
+  index.notes = indexOf(data.notes);
   return index;
 }
 
@@ -100,6 +114,8 @@ export function tableKeyForDeletionType(entityType: string): SnapshotTable | und
     case 'group': return 'groups';
     case 'configProject': return 'configProjects';
     case 'configDef': return 'configDefs';
+    case 'noteBook': return 'noteBooks';
+    case 'note': return 'notes';
     default: return undefined;
   }
 }
@@ -114,5 +130,7 @@ export function deletionTypeForTable(table: SnapshotTable): string {
     case 'groups': return 'group';
     case 'configProjects': return 'configProject';
     case 'configDefs': return 'configDef';
+    case 'noteBooks': return 'noteBook';
+    case 'notes': return 'note';
   }
 }

@@ -249,7 +249,7 @@ async function onChangePwd() {
 async function onClearAll() {
   const ok1 = await dialog.confirm('确认清空', '确认清空所有数据？此操作不可恢复！');
   if (!ok1) return;
-  const ok2 = await dialog.confirm('再次确认', '所有系统、账号、服务器、中间件将被永久删除。');
+  const ok2 = await dialog.confirm('再次确认', '所有系统、账号、服务器、中间件、配置和笔记将被永久删除。');
   if (!ok2) return;
   await importExportService.clearAll();
   toast.success('所有数据已清空');

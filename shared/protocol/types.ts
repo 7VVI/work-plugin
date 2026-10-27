@@ -15,6 +15,8 @@ export const SNAPSHOT_TABLES = [
   'middlewares',
   'configProjects',
   'configDefs',
+  'noteBooks',
+  'notes',
 ] as const;
 
 export type SnapshotTable = typeof SNAPSHOT_TABLES[number];
@@ -130,6 +132,24 @@ export interface ConfigDefRec {
   updatedAt: number;
 }
 
+export interface NoteBookRec {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface NoteRec {
+  id: string;
+  notebookId: string;
+  title: string;
+  content: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SnapshotData {
   groups: GroupRec[];
   tags: TagRec[];
@@ -139,6 +159,8 @@ export interface SnapshotData {
   middlewares: MiddlewareRec[];
   configProjects: ConfigProjectRec[];
   configDefs: ConfigDefRec[];
+  noteBooks: NoteBookRec[];
+  notes: NoteRec[];
 }
 
 export interface SyncSnapshot {
@@ -166,6 +188,8 @@ export interface SnapshotCounts {
   middlewares: number;
   configProjects: number;
   configDefs: number;
+  noteBooks: number;
+  notes: number;
 }
 
 export interface VersionChange {
@@ -219,6 +243,8 @@ export function emptySnapshotData(): SnapshotData {
     middlewares: [],
     configProjects: [],
     configDefs: [],
+    noteBooks: [],
+    notes: [],
   };
 }
 
@@ -232,6 +258,8 @@ export function emptyTombstones(): TombstoneMap {
     middlewares: {},
     configProjects: {},
     configDefs: {},
+    noteBooks: {},
+    notes: {},
   };
 }
 
@@ -245,6 +273,8 @@ export function emptySnapshotIndex(): SnapshotIndex {
     middlewares: {},
     configProjects: {},
     configDefs: {},
+    noteBooks: {},
+    notes: {},
   };
 }
 

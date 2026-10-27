@@ -1,6 +1,6 @@
 import { cryptoService } from '../services/cryptoService';
 import { db } from '../db/schema';
-import { buildLocalSnapshot, VaultLockedError } from './snapshotBuilder';
+import { buildLocalSnapshot, VaultLockedError, NoteStorageLimitError } from './snapshotBuilder';
 import { applyRemoteSnapshot, type ApplySummary } from './snapshotApply';
 import { buildTombstones, pruneSyncedDeletions } from './tombstones';
 import { CloudAuthError, CloudClient, CloudHttpError } from './cloudClient';
@@ -72,6 +72,10 @@ function errorMessage(error: unknown): string {
 async function markFailure(error: unknown): Promise<void> {
   if (error instanceof VaultLockedError) {
     await writeStatus({ state: 'waiting-unlock', checkedAt: Date.now(), error: error.message });
+    return;
+  }
+  if (error instanceof NoteStorageLimitError) {
+    await writeStatus({ state: 'error', checkedAt: Date.now(), error: error.message });
     return;
   }
   if (error instanceof CloudTokenError || error instanceof CloudAuthError) {
@@ -178,6 +182,9 @@ async function doPushToCloud(): Promise<{ response: SyncPushResponse; summary: A
     };
 
     const response = await client.push(request);
+    const noteSyncSupported = Array.isArray(
+      (response.snapshot as unknown as { data?: { notes?: unknown } }).data?.notes,
+    );
     const summary = await withDirtyTrackingSuspended(
       () => applyRemoteSnapshot(response.snapshot, response.tombstones),
     );
@@ -198,7 +205,7 @@ async function doPushToCloud(): Promise<{ response: SyncPushResponse; summary: A
       checkedAt: Date.now(),
       lastSyncAt: Date.now(),
       revision: response.revision,
-      error: undefined,
+      error: noteSyncSupported ? undefined : '服务端版本过旧，笔记暂未同步',
     });
     return { response, summary };
   } catch (error) {
@@ -267,6 +274,9 @@ async function doOverwriteCloud(note?: string): Promise<{ response: SyncPushResp
     };
 
     const response = await client.push(request);
+    const noteSyncSupported = Array.isArray(
+      (response.snapshot as unknown as { data?: { notes?: unknown } }).data?.notes,
+    );
     const summary = await withDirtyTrackingSuspended(
       () => applyRemoteSnapshot(response.snapshot, response.tombstones),
     );
@@ -284,7 +294,7 @@ async function doOverwriteCloud(note?: string): Promise<{ response: SyncPushResp
       checkedAt: Date.now(),
       lastSyncAt: Date.now(),
       revision: response.revision,
-      error: undefined,
+      error: noteSyncSupported ? undefined : '服务端版本过旧，笔记暂未同步',
     });
     return { response, summary };
   } catch (error) {
@@ -320,7 +330,7 @@ async function replaceLocalWithVersion(version: { snapshot: SyncSnapshot; tombst
   const tables = [
     db.groups, db.tags, db.systems, db.accounts, db.servers, db.middlewares,
     db.systemTags, db.serverTags, db.middlewareTags, db.recents,
-    db.configProjects, db.configDefs, db.deletions,
+    db.configProjects, db.configDefs, db.deletions, db.noteBooks, db.notes,
   ];
   return withDirtyTrackingSuspended(async () => {
     await db.transaction('rw', tables, async () => {

@@ -10,6 +10,7 @@ export default defineConfig(({ command }) => ({
     __APP_TARGET__: JSON.stringify('extension'),
   },
   resolve: {
+    dedupe: ['vue'],
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),

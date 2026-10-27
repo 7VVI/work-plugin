@@ -42,6 +42,8 @@ function countSnapshotData(data: SyncSnapshot['data']): SnapshotCounts {
     middlewares: data.middlewares.length,
     configProjects: data.configProjects.length,
     configDefs: data.configDefs.length,
+    noteBooks: data.noteBooks.length,
+    notes: data.notes.length,
   };
 }
 
@@ -333,7 +335,10 @@ export class StateStore {
       createdAt: row.created_at,
       note: row.note ?? undefined,
       changes: summary.changes,
-      counts: summary.counts,
+      counts: {
+        ...countSnapshotData(emptySnapshotData()),
+        ...(summary.counts ?? {}),
+      },
     };
   }
 

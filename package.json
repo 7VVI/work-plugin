@@ -16,8 +16,14 @@
     "zip": "cd dist && zip -r ../nav-portal-v$npm_package_version.zip ."
   },
   "dependencies": {
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
+    "@milkdown/crepe": "^7.22.3",
+    "@milkdown/kit": "^7.22.3",
     "dexie": "^4.0.4",
     "front-matter": "^4.0.2",
+    "katex": "^0.19.1",
     "markdown-it": "^14.1.0",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",

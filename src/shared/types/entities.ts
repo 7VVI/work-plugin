@@ -83,7 +83,15 @@ export interface Tag {
 }
 
 /** 本地删除日志，用于云端同步时传播删除（避免仅凭快照推断丢失） */
-export type DeletionEntityType = EntityType | 'account' | 'tag' | 'group' | 'configProject' | 'configDef';
+export type DeletionEntityType =
+  | EntityType
+  | 'account'
+  | 'tag'
+  | 'group'
+  | 'configProject'
+  | 'configDef'
+  | 'noteBook'
+  | 'note';
 
 export interface DeletionEntry {
   id: string;
@@ -158,6 +166,27 @@ export interface ConfigField {
   label: string;
   value: string;
 }
+
+export interface NoteBook {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Note {
+  id: string;
+  notebookId: string;
+  title: string;
+  content: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type NoteBookInput = Omit<NoteBook, 'id' | 'createdAt' | 'updatedAt'>;
+export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt'>;
 
 export type ConfigProjectInput = Omit<ConfigProject, 'id' | 'createdAt' | 'updatedAt'>;
 export type ConfigDefInput = Omit<ConfigDef, 'id' | 'createdAt' | 'updatedAt' | 'fields'>;

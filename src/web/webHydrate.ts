@@ -24,6 +24,8 @@ async function clearAllLocalTables(): Promise<void> {
       db.configProjects,
       db.configDefs,
       db.deletions,
+      db.noteBooks,
+      db.notes,
     ],
     async () => {
       await db.groups.clear();
@@ -41,6 +43,8 @@ async function clearAllLocalTables(): Promise<void> {
       await db.configProjects.clear();
       await db.configDefs.clear();
       await db.deletions.clear();
+      await db.notes.clear();
+      await db.noteBooks.clear();
     },
   );
 }

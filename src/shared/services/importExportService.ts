@@ -7,6 +7,12 @@ import { configProjectRepo } from '../db/repositories/configProjectRepo';
 import { configDefRepo } from '../db/repositories/configDefRepo';
 import { configService } from './configService';
 import { groupRepo } from '../db/repositories/groupRepo';
+import { noteBookRepo } from '../db/repositories/noteBookRepo';
+import { noteRepo } from '../db/repositories/noteRepo';
+import { db } from '../db/schema';
+import { deletionId } from '../db/deletionLog';
+import { generateId } from '../utils/id';
+import { MAX_NOTE_CONTENT } from '@protocol/limits';
 import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
@@ -26,8 +32,23 @@ async function normalizeEncryptedField(pwd: unknown): Promise<EncryptedField> {
 }
 
 export interface ImportSummary {
-  created: { systems: number; servers: number; middlewares: number; configs: number; tags: number };
-  updated: { systems: number; servers: number; middlewares: number; configs: number };
+  created: {
+    systems: number;
+    servers: number;
+    middlewares: number;
+    configs: number;
+    tags: number;
+    noteBooks: number;
+    notes: number;
+  };
+  updated: {
+    systems: number;
+    servers: number;
+    middlewares: number;
+    configs: number;
+    noteBooks: number;
+    notes: number;
+  };
   skipped: { count: number; reasons: string[] };
   errors: string[];
 }
@@ -85,13 +106,15 @@ export const importExportService = {
   },
 
   async exportJSON(): Promise<string> {
-    const [systems, servers, middlewares, tags, projects, groups] = await Promise.all([
+    const [systems, servers, middlewares, tags, projects, groups, noteBooks, notes] = await Promise.all([
       systemRepo.all(),
       serverRepo.all(),
       middlewareRepo.all(),
       tagRepo.all(),
       configService.allProjectsWithConfigs(),
       groupRepo.all(),
+      noteBookRepo.all(),
+      noteRepo.all(),
     ]);
 
     // 解密密码为明文（与 v3 一致，导出文件即明文备份）
@@ -126,6 +149,8 @@ export const importExportService = {
       projects,
       groups,
       tags,
+      noteBooks,
+      notes,
     }, null, 2);
   },
 
@@ -147,8 +172,14 @@ export const importExportService = {
 
   async upsertParsed(parsed: ParsedBackup): Promise<ImportSummary> {
     const summary: ImportSummary = {
-      created: { systems: 0, servers: 0, middlewares: 0, configs: 0, tags: 0 },
-      updated: { systems: 0, servers: 0, middlewares: 0, configs: 0 },
+      created: {
+        systems: 0, servers: 0, middlewares: 0, configs: 0, tags: 0,
+        noteBooks: 0, notes: 0,
+      },
+      updated: {
+        systems: 0, servers: 0, middlewares: 0, configs: 0,
+        noteBooks: 0, notes: 0,
+      },
       skipped: { count: 0, reasons: [] },
       errors: [],
     };
@@ -334,8 +365,14 @@ export const importExportService = {
 
   async upsertJson(data: any): Promise<ImportSummary> {
     const summary: ImportSummary = {
-      created: { systems: 0, servers: 0, middlewares: 0, configs: 0, tags: 0 },
-      updated: { systems: 0, servers: 0, middlewares: 0, configs: 0 },
+      created: {
+        systems: 0, servers: 0, middlewares: 0, configs: 0, tags: 0,
+        noteBooks: 0, notes: 0,
+      },
+      updated: {
+        systems: 0, servers: 0, middlewares: 0, configs: 0,
+        noteBooks: 0, notes: 0,
+      },
       skipped: { count: 0, reasons: [] },
       errors: [],
     };
@@ -537,6 +574,77 @@ export const importExportService = {
       }
     }
 
+    const importedBooks: Array<any> = Array.isArray(data.noteBooks) ? data.noteBooks : [];
+    const bookIdMap = new Map<string, string>();
+    let bookOrder = (await noteBookRepo.all()).length;
+    for (const b of importedBooks) {
+      if (!b || typeof b !== 'object') {
+        summary.skipped.count++;
+        summary.skipped.reasons.push('Notebook record is invalid');
+        continue;
+      }
+      const oldId = typeof b.id === 'string' && b.id ? b.id : '';
+      const id = oldId || generateId();
+      const existing = oldId ? await noteBookRepo.byId(oldId) : undefined;
+      const now = Date.now();
+      await noteBookRepo.put({
+        id,
+        name: typeof b.name === 'string' && b.name.trim() ? b.name : '导入笔记本',
+        sortOrder: Number.isFinite(b.sortOrder) ? b.sortOrder : bookOrder++,
+        createdAt: Number.isFinite(b.createdAt) ? b.createdAt : now,
+        updatedAt: now,
+      });
+      await db.deletions.delete(deletionId('noteBook', id));
+      if (oldId) bookIdMap.set(oldId, id);
+      if (existing) summary.updated.noteBooks++;
+      else summary.created.noteBooks++;
+    }
+
+    const importedNotes: Array<any> = Array.isArray(data.notes) ? data.notes : [];
+    let fallbackBookId = '';
+    let noteOrder = (await noteRepo.all()).length;
+    for (const n of importedNotes) {
+      if (!n || typeof n !== 'object') {
+        summary.skipped.count++;
+        summary.skipped.reasons.push('Note record is invalid');
+        continue;
+      }
+      const content = typeof n.content === 'string' ? n.content : '';
+      if (content.length > MAX_NOTE_CONTENT) {
+        summary.skipped.count++;
+        summary.skipped.reasons.push(`Note content exceeds ${MAX_NOTE_CONTENT} characters`);
+        continue;
+      }
+
+      let bookId = typeof n.notebookId === 'string' && n.notebookId
+        ? (bookIdMap.get(n.notebookId) ?? n.notebookId)
+        : '';
+      if (!bookId || !(await noteBookRepo.byId(bookId))) {
+        if (!fallbackBookId) {
+          const fallback = (await noteBookRepo.all()).find(book => book.name === '导入笔记');
+          fallbackBookId = fallback?.id ?? await noteBookRepo.create('导入笔记');
+        }
+        bookId = fallbackBookId;
+      }
+
+      const oldId = typeof n.id === 'string' && n.id ? n.id : '';
+      const id = oldId || generateId();
+      const existing = oldId ? await noteRepo.byId(oldId) : undefined;
+      const now = Date.now();
+      await noteRepo.put({
+        id,
+        notebookId: bookId,
+        title: typeof n.title === 'string' ? n.title : '',
+        content,
+        sortOrder: Number.isFinite(n.sortOrder) ? n.sortOrder : noteOrder++,
+        createdAt: Number.isFinite(n.createdAt) ? n.createdAt : now,
+        updatedAt: now,
+      });
+      await db.deletions.delete(deletionId('note', id));
+      if (existing) summary.updated.notes++;
+      else summary.created.notes++;
+    }
+
     return summary;
   },
 
@@ -549,5 +657,7 @@ export const importExportService = {
       configProjectRepo.all().then(all => Promise.all(all.map(p => configProjectRepo.delete(p.id)))),
       groupRepo.clear(),
     ]);
+    await noteRepo.clearAll();
+    await noteBookRepo.clearAll();
   },
 };

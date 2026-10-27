@@ -29,6 +29,7 @@ import { useSystemStore } from '@shared/stores/systemStore';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useConfigStore } from '@shared/stores/configStore';
+import { useNoteCounts } from '../../utils/useNoteCounts';
 
 const route = useRoute();
 const tabs = [
@@ -36,6 +37,7 @@ const tabs = [
   { path: '/servers', label: '服务器', icon: 'fa-solid fa-server' },
   { path: '/middlewares', label: '中间件', icon: 'fa-solid fa-cubes' },
   { path: '/configs', label: '配置', icon: 'fa-solid fa-sliders' },
+  { path: '/notes', label: '笔记', icon: 'fa-solid fa-book-open' },
   { path: '/import-export', label: '导入 / 导出', icon: 'fa-solid fa-arrow-right-arrow-left' },
   { path: '/settings', label: '设置', icon: 'fa-solid fa-gear' },
 ];
@@ -49,6 +51,7 @@ const systemStore = useSystemStore();
 const serverStore = useServerStore();
 const middlewareStore = useMiddlewareStore();
 const configStore = useConfigStore();
+const noteCounts = useNoteCounts();
 
 const stats = computed<DockStats>(() => {
   const projects = configStore.list ?? [];
@@ -61,6 +64,8 @@ const stats = computed<DockStats>(() => {
     projects: projects.length,
     configs,
     fields,
+    noteBooks: noteCounts.noteBooks.value,
+    notes: noteCounts.notes.value,
   };
 });
 

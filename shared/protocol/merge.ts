@@ -14,11 +14,13 @@ const MERGE_ORDER: SnapshotTable[] = [
   'groups',
   'tags',
   'configProjects',
+  'noteBooks',
   'systems',
   'servers',
   'middlewares',
   'accounts',
   'configDefs',
+  'notes',
 ];
 
 /**
