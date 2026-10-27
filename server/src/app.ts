@@ -8,7 +8,14 @@ import type { ServerConfig } from './config';
 import { openDatabase, pruneExpiredSessions, setSetting, type Db } from './db';
 import { StateStore } from './stateStore';
 import { AuthService, getBearer } from './auth';
-import { HttpError, unauthorized } from './errors';import { validateLoginBody, validatePushRequest, validateSessionDays } from './validation';
+import { HttpError, notFound, unauthorized } from './errors';
+import {
+  validateHistoryQuery,
+  validateLoginBody,
+  validatePushRequest,
+  validateRevisionParam,
+  validateSessionDays,
+} from './validation';
 
 export interface DockApp {
   app: FastifyInstance;
@@ -152,6 +159,18 @@ export async function buildApp(config: ServerConfig): Promise<DockApp> {
       snapshot: state.snapshot,
       tombstones: state.tombstones,
     };
+  });
+
+  app.get('/api/sync/history', { preHandler: requireSyncAuth }, async req => {
+    const { limit, before } = validateHistoryQuery(req.query);
+    return { versions: store.listVersions(limit, before) };
+  });
+
+  app.get('/api/sync/history/:revision', { preHandler: requireSyncAuth }, async req => {
+    const revision = validateRevisionParam(req.params);
+    const version = store.getVersion(revision);
+    if (!version) notFound('Version not found');
+    return version;
   });
 
   app.post('/api/sync/push', { preHandler: requireSyncAuth }, async req => {

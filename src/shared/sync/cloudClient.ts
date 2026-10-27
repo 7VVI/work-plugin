@@ -2,6 +2,8 @@ import type {
   SyncPushRequest,
   SyncPushResponse,
   SyncSnapshot,
+  SyncVersionDetail,
+  SyncVersionMeta,
   TombstoneMap,
 } from '@protocol/types';
 
@@ -65,6 +67,16 @@ export class CloudClient {
 
   async getState(): Promise<CloudStateResponse> {
     return this.request('/api/sync/state', { method: 'GET' });
+  }
+
+  async listVersions(limit = 30, before?: number): Promise<{ versions: SyncVersionMeta[] }> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (before !== undefined) query.set('before', String(before));
+    return this.request(`/api/sync/history?${query.toString()}`, { method: 'GET' });
+  }
+
+  async getVersion(revision: number): Promise<SyncVersionDetail> {
+    return this.request(`/api/sync/history/${revision}`, { method: 'GET' });
   }
 
   async push(payload: SyncPushRequest): Promise<SyncPushResponse> {

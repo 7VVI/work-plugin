@@ -10,6 +10,7 @@ export interface ServerConfig {
   dataKey: string;
   dataKeyOld?: string;
   sessionDays: number;
+  historyLimit: number;
   publicOrigin?: string;
   cookieSecure: boolean;
   trustProxy: boolean;
@@ -26,6 +27,12 @@ function parseDays(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(3650, Math.max(1, Math.floor(parsed)));
+}
+
+function parseHistoryLimit(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(1000, Math.max(1, Math.floor(parsed)));
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -56,6 +63,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     dataKey,
     dataKeyOld: env.DOCK_DATA_KEY_OLD?.trim() || undefined,
     sessionDays: parseDays(env.DOCK_SESSION_DAYS, 30),
+    historyLimit: parseHistoryLimit(env.DOCK_HISTORY_LIMIT, 100),
     publicOrigin,
     cookieSecure: env.DOCK_COOKIE_SECURE !== 'false',
     trustProxy: env.DOCK_TRUST_PROXY === 'true',

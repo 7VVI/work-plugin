@@ -21,6 +21,7 @@ function testConfig(dir: string, overrides: Partial<ServerConfig> = {}): ServerC
     apiToken: 'api-token-12345678901234567890',
     dataKey: 'data-key-12345678901234567890123456789012',
     sessionDays: 30,
+    historyLimit: 100,
     cookieSecure: false,
     trustProxy: false,
     webDist: join(dir, 'web'),
@@ -171,6 +172,125 @@ describe('dock cloud server', () => {
     expect(deleted.json().tombstones.systems.s1).toBe(updatedAt + 10);
   });
 
+  it('records a version for every change and serves history details', async () => {
+    const now = Date.now();
+    const first = pushBody({ systems: [system('s1', now)] });
+    first.note = '初始同步';
+    await push(first);
+
+    await push(pushBody({ systems: [system('s1', now)] }, emptyTombstones(), 1));
+
+    const update = pushBody({
+      systems: [system('s1', now + 1000, { name: 'updated' })],
+    }, emptyTombstones(), 1);
+    update.note = '调整系统';
+    await push(update);
+
+    const tombstones = emptyTombstones();
+    tombstones.systems.s1 = now + 1010;
+    const remove = pushBody({}, tombstones, 2);
+    remove.note = '删除系统';
+    await push(remove);
+
+    const history = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(history.statusCode).toBe(200);
+    const versions = history.json().versions as Array<{
+      revision: number;
+      note?: string;
+      changes: { added: number; updated: number; deleted: number };
+      counts: { systems: number };
+    }>;
+    expect(versions.map(version => version.revision)).toEqual([3, 2, 1]);
+    expect(versions[0]).toMatchObject({ note: '删除系统', changes: { deleted: 1 }, counts: { systems: 0 } });
+    expect(versions[1]).toMatchObject({ note: '调整系统', changes: { updated: 1 }, counts: { systems: 1 } });
+    expect(versions[2]).toMatchObject({ note: '初始同步', changes: { added: 1 }, counts: { systems: 1 } });
+
+    const firstPage = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history?limit=2',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(firstPage.json().versions.map((version: { revision: number }) => version.revision)).toEqual([3, 2]);
+
+    const olderPage = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history?limit=2&before=2',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(olderPage.json().versions.map((version: { revision: number }) => version.revision)).toEqual([1]);
+
+    const detail = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history/2',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json().note).toBe('调整系统');
+    expect(detail.json().snapshot.data.systems[0].name).toBe('updated');
+    expect(detail.json().tombstones.systems.s1).toBeUndefined();
+
+    const missing = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history/99',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const unauthorizedHistory = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history',
+    });
+    expect(unauthorizedHistory.statusCode).toBe(401);
+  });
+
+  it('prunes old versions to the configured history limit', async () => {
+    await dock.app.close();
+    dock = await buildApp(testConfig(dir, { historyLimit: 2 }));
+
+    const now = Date.now();
+    await push(pushBody({ systems: [system('s1', now)] }));
+    await push(pushBody({ systems: [system('s1', now + 1000, { name: 'v2' })] }, emptyTombstones(), 1));
+    await push(pushBody({ systems: [system('s1', now + 2000, { name: 'v3' })] }, emptyTombstones(), 2));
+
+    const history = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json().versions.map((version: { revision: number }) => version.revision)).toEqual([3, 2]);
+  });
+
+  it('backfills a baseline version when upgrading a database without history', async () => {
+    const now = Date.now();
+    await push(pushBody({ systems: [system('s1', now)] }));
+    dock.db.prepare('DELETE FROM versions').run();
+    await dock.app.close();
+
+    dock = await buildApp(config);
+    const history = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(history.statusCode).toBe(200);
+    const versions = history.json().versions as Array<{ revision: number; note?: string; counts: { systems: number } }>;
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toMatchObject({ revision: 1, note: '历史起点', counts: { systems: 1 } });
+
+    const detail = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history/1',
+      headers: { authorization: `Bearer ${config.apiToken}` },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json().snapshot.data.systems).toHaveLength(1);
+  });
+
   it('validates bearer auth and rejects encrypted payloads', async () => {
     const unauthorizedResponse = await dock.app.inject({
       method: 'GET',
@@ -251,6 +371,13 @@ describe('dock cloud server', () => {
     });
     expect(state.statusCode).toBe(200);
     expect(state.json().snapshot.data.systems).toHaveLength(1);
+    const history = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history/1',
+      headers: { authorization: `Bearer ${rotated.apiToken}` },
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json().snapshot.data.systems).toHaveLength(1);
     await dock.app.close();
 
     const changedSecret = testConfig(dir, {
@@ -264,5 +391,12 @@ describe('dock cloud server', () => {
       headers: { cookie },
     });
     expect(session.statusCode).toBe(401);
+    const historyAfterRotation = await dock.app.inject({
+      method: 'GET',
+      url: '/api/sync/history/1',
+      headers: { authorization: `Bearer ${changedSecret.apiToken}` },
+    });
+    expect(historyAfterRotation.statusCode).toBe(200);
+    expect(historyAfterRotation.json().snapshot.data.systems).toHaveLength(1);
   });
 });

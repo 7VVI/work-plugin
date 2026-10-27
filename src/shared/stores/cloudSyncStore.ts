@@ -6,11 +6,14 @@ import { cryptoService } from '../services/cryptoService';
 import { VaultLockedError } from '../sync/snapshotBuilder';
 import {
   checkCloudHealth,
+  listCloudVersions,
   overwriteCloud,
   pushToCloud,
   restoreFromCloud,
+  restoreVersionFromCloud,
   testCloudConnection,
 } from '../sync/syncService';
+import type { SyncVersionMeta } from '@protocol/types';
 import {
   normalizeEndpoint,
   readCloudConfig,
@@ -24,7 +27,10 @@ import {
 export const useCloudSyncStore = defineStore('cloudSync', () => {
   const config = ref<CloudConfig | null>(null);
   const status = ref<CloudStatus>({ state: 'disabled' });
+  const versions = ref<SyncVersionMeta[]>([]);
   const loading = ref(false);
+  const historyLoading = ref(false);
+  const hasMoreHistory = ref(false);
   const hasToken = computed(() => !!config.value?.token);
 
   let stopWatching: (() => void) | null = null;
@@ -123,6 +129,42 @@ export const useCloudSyncStore = defineStore('cloudSync', () => {
     }
   }
 
+  async function loadHistory(limit = 30) {
+    historyLoading.value = true;
+    try {
+      versions.value = await listCloudVersions(limit);
+      hasMoreHistory.value = versions.value.length >= limit;
+      return versions.value;
+    } finally {
+      historyLoading.value = false;
+    }
+  }
+
+  async function loadMoreHistory(limit = 30) {
+    const last = versions.value[versions.value.length - 1];
+    if (!last) return [];
+    historyLoading.value = true;
+    try {
+      const older = await listCloudVersions(limit, last.revision);
+      versions.value = [...versions.value, ...older];
+      hasMoreHistory.value = older.length >= limit;
+      return older;
+    } finally {
+      historyLoading.value = false;
+    }
+  }
+
+  async function restoreVersion(revision: number) {
+    loading.value = true;
+    try {
+      const result = await restoreVersionFromCloud(revision);
+      status.value = await readStatus();
+      return result;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function refreshHealth() {
     status.value = await checkCloudHealth(config.value);
   }
@@ -130,7 +172,10 @@ export const useCloudSyncStore = defineStore('cloudSync', () => {
   return {
     config,
     status,
+    versions,
     loading,
+    historyLoading,
+    hasMoreHistory,
     hasToken,
     load,
     refresh,
@@ -139,6 +184,9 @@ export const useCloudSyncStore = defineStore('cloudSync', () => {
     syncNow,
     restore,
     overwrite,
+    loadHistory,
+    loadMoreHistory,
+    restoreVersion,
     refreshHealth,
   };
 });

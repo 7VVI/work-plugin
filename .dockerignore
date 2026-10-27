@@ -5,7 +5,11 @@ dist-web
 dist-zip
 server/node_modules
 server/dist
+server/data
 server/.tmp-e2e
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .git
 .github
 .idea

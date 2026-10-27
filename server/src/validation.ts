@@ -91,6 +91,11 @@ export function validatePushRequest(body: unknown): SyncPushRequest {
   if (typeof payload.baseRevision !== 'number' || !Number.isInteger(payload.baseRevision) || payload.baseRevision < 0) {
     badRequest('INVALID_PAYLOAD', 'Invalid baseRevision');
   }
+  if (payload.note !== undefined) {
+    if (typeof payload.note !== 'string' || payload.note.length > 200) {
+      badRequest('INVALID_PAYLOAD', 'Invalid note');
+    }
+  }
 
   const snapshot = payload.snapshot as Record<string, unknown> | undefined;
   if (!snapshot || snapshot.schemaVersion !== 1 || !snapshot.data || typeof snapshot.data !== 'object') {
@@ -157,4 +162,33 @@ export function validateSessionDays(body: unknown): number {
     badRequest('INVALID_PAYLOAD', 'Invalid sessionDays');
   }
   return Math.min(3650, Math.max(1, Math.floor(value)));
+}
+
+export interface HistoryQuery {
+  limit: number;
+  before?: number;
+}
+
+export function validateHistoryQuery(query: unknown): HistoryQuery {
+  const raw = (query && typeof query === 'object' ? query : {}) as Record<string, unknown>;
+  let limit = 50;
+  if (raw.limit !== undefined) {
+    const value = Number(raw.limit);
+    if (!Number.isFinite(value)) badRequest('INVALID_PAYLOAD', 'Invalid limit');
+    limit = Math.min(100, Math.max(1, Math.floor(value)));
+  }
+  let before: number | undefined;
+  if (raw.before !== undefined) {
+    const value = Number(raw.before);
+    if (!Number.isInteger(value) || value < 0) badRequest('INVALID_PAYLOAD', 'Invalid before');
+    before = value;
+  }
+  return { limit, before };
+}
+
+export function validateRevisionParam(params: unknown): number {
+  const raw = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
+  const value = Number(raw.revision);
+  if (!Number.isInteger(value) || value <= 0) badRequest('INVALID_PAYLOAD', 'Invalid revision');
+  return value;
 }

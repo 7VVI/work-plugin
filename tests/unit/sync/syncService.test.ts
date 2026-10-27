@@ -4,7 +4,7 @@ import { cryptoSession } from '../../../src/shared/crypto/session';
 import { cryptoService } from '../../../src/shared/services/cryptoService';
 import { systemRepo } from '../../../src/shared/db/repositories/systemRepo';
 import { VaultLockedError } from '../../../src/shared/sync/snapshotBuilder';
-import { pushToCloud, overwriteCloud, restoreFromCloud } from '../../../src/shared/sync/syncService';
+import { pushToCloud, overwriteCloud, restoreFromCloud, restoreVersionFromCloud } from '../../../src/shared/sync/syncService';
 import {
   clearCloudConfig,
   normalizeEndpoint,
@@ -299,6 +299,112 @@ describe('syncService', () => {
     }
     expect(await db.deletions.count()).toBe(0);
     expect((await readCloudConfig())?.suppressDeletions).toBe(false);
+  });
+
+  it('restores a selected version locally and mirrors it to the cloud when enabled', async () => {
+    await systemRepo.create({
+      name: 'BadLocal', url: 'https://bad.example.com', environment: 'development',
+      favorite: false, sort: 0,
+    });
+    await db.deletions.put({
+      id: 'group:gone',
+      entityType: 'group',
+      entityId: 'gone',
+      deletedAt: Date.now(),
+    });
+
+    const versionSnapshot = {
+      schemaVersion: 1 as const,
+      generatedAt: Date.now(),
+      data: { ...emptySnapshotData(), systems: [remoteSystem('good-version')] },
+    };
+    const pushed: SyncPushRequest[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/sync/history/3')) {
+        return jsonResponse({
+          revision: 3,
+          createdAt: Date.now(),
+          note: '初始同步',
+          changes: { added: 1, updated: 0, deleted: 0 },
+          counts: { groups: 0, tags: 0, systems: 1, accounts: 0, servers: 0, middlewares: 0, configProjects: 0, configDefs: 0 },
+          snapshot: versionSnapshot,
+          tombstones: emptyTombstones(),
+        });
+      }
+      if (url.endsWith('/api/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/sync/state')) {
+        return jsonResponse({
+          revision: 5,
+          serverTime: Date.now(),
+          snapshot: { schemaVersion: 1, generatedAt: 0, data: emptySnapshotData() },
+          tombstones: emptyTombstones(),
+        });
+      }
+      if (url.endsWith('/api/sync/push')) {
+        const body = JSON.parse(String(init?.body)) as SyncPushRequest;
+        pushed.push(body);
+        return jsonResponse({
+          revision: 6,
+          serverTime: Date.now(),
+          reset: false,
+          snapshot: body.snapshot,
+          tombstones: body.tombstones,
+          stats: { applied: 1, ignoredOlder: 0, rejectedByTombstone: 0, droppedOrphans: 0 },
+        });
+      }
+      return jsonResponse({ error: 'NOT_FOUND' }, 404);
+    });
+
+    const result = await restoreVersionFromCloud(3);
+    expect(result.mirrored).toBe(true);
+    expect(result.mirrorRevision).toBe(6);
+    expect(pushed).toHaveLength(1);
+    expect(pushed[0].note).toBe('恢复到版本 #3');
+    expect(pushed[0].snapshot.data.systems.map(system => system.id)).toEqual(['good-version']);
+
+    const systems = await systemRepo.all();
+    expect(systems.map(system => system.id)).toEqual(['good-version']);
+    expect(await db.deletions.count()).toBe(0);
+  });
+
+  it('restores a selected version locally without cloud changes when persistence is off', async () => {
+    await writeCloudConfig({
+      enabled: false,
+      endpoint: BASE,
+      token: { __encrypted: false, value: 'api-token' },
+      clientId: 'client-test',
+    });
+    await systemRepo.create({
+      name: 'BadLocal', url: 'https://bad.example.com', environment: 'development',
+      favorite: false, sort: 0,
+    });
+
+    let otherRequests = 0;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/sync/history/4')) {
+        return jsonResponse({
+          revision: 4,
+          createdAt: Date.now(),
+          changes: { added: 1, updated: 0, deleted: 0 },
+          counts: { groups: 0, tags: 0, systems: 1, accounts: 0, servers: 0, middlewares: 0, configProjects: 0, configDefs: 0 },
+          snapshot: {
+            schemaVersion: 1,
+            generatedAt: Date.now(),
+            data: { ...emptySnapshotData(), systems: [remoteSystem('good-version')] },
+          },
+          tombstones: emptyTombstones(),
+        });
+      }
+      otherRequests++;
+      return jsonResponse({ error: 'UNEXPECTED' }, 500);
+    });
+
+    const result = await restoreVersionFromCloud(4);
+    expect(result.mirrored).toBe(false);
+    expect(otherRequests).toBe(0);
+    expect((await systemRepo.all()).map(system => system.id)).toEqual(['good-version']);
   });
 
   it('refuses to push while a master password is enabled and the vault is locked', async () => {

@@ -152,6 +152,37 @@ export interface SyncPushRequest {
   clientId: string;
   baseRevision: number;
   clientTime: number;
+  note?: string;
+  snapshot: SyncSnapshot;
+  tombstones: TombstoneMap;
+}
+
+export interface SnapshotCounts {
+  groups: number;
+  tags: number;
+  systems: number;
+  accounts: number;
+  servers: number;
+  middlewares: number;
+  configProjects: number;
+  configDefs: number;
+}
+
+export interface VersionChange {
+  added: number;
+  updated: number;
+  deleted: number;
+}
+
+export interface SyncVersionMeta {
+  revision: number;
+  createdAt: number;
+  note?: string;
+  changes: VersionChange;
+  counts: SnapshotCounts;
+}
+
+export interface SyncVersionDetail extends SyncVersionMeta {
   snapshot: SyncSnapshot;
   tombstones: TombstoneMap;
 }

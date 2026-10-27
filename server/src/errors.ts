@@ -20,3 +20,7 @@ export function unauthorized(message = 'Unauthorized'): never {
 export function forbidden(code = 'FORBIDDEN', message?: string): never {
   throw new HttpError(403, code, message);
 }
+
+export function notFound(message = 'Not Found'): never {
+  throw new HttpError(404, 'NOT_FOUND', message);
+}

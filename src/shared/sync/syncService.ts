@@ -1,4 +1,5 @@
 import { cryptoService } from '../services/cryptoService';
+import { db } from '../db/schema';
 import { buildLocalSnapshot, VaultLockedError } from './snapshotBuilder';
 import { applyRemoteSnapshot, type ApplySummary } from './snapshotApply';
 import { buildTombstones, pruneSyncedDeletions } from './tombstones';
@@ -22,6 +23,9 @@ import {
   indexFromSnapshot,
   type SyncPushRequest,
   type SyncPushResponse,
+  type SyncSnapshot,
+  type SyncVersionMeta,
+  type TombstoneMap,
 } from '@protocol/index';
 
 export class CloudNotConfiguredError extends Error {
@@ -217,7 +221,7 @@ export function pushToCloud(): Promise<{ response: SyncPushResponse; summary: Ap
 }
 
 /** 用本地快照镜像云端：本地记录刷新时间戳，云端独有记录写入墓碑 */
-async function doOverwriteCloud(): Promise<{ response: SyncPushResponse; summary: ApplySummary }> {
+async function doOverwriteCloud(note?: string): Promise<{ response: SyncPushResponse; summary: ApplySummary }> {
   const config = await readCloudConfig();
   if (!config?.enabled || !config.endpoint) throw new CloudNotConfiguredError();
   await ensureSecretsUnlocked();
@@ -257,6 +261,7 @@ async function doOverwriteCloud(): Promise<{ response: SyncPushResponse; summary
       clientId: config.clientId,
       baseRevision: baseline?.revision ?? remote.revision,
       clientTime: now,
+      note,
       snapshot,
       tombstones,
     };
@@ -288,8 +293,71 @@ async function doOverwriteCloud(): Promise<{ response: SyncPushResponse; summary
   }
 }
 
-export function overwriteCloud(): Promise<{ response: SyncPushResponse; summary: ApplySummary }> {
-  return enqueuePush(doOverwriteCloud);
+export function overwriteCloud(note?: string): Promise<{ response: SyncPushResponse; summary: ApplySummary }> {
+  return enqueuePush(() => doOverwriteCloud(note));
+}
+
+export async function listCloudVersions(limit = 30, before?: number): Promise<SyncVersionMeta[]> {
+  const config = await readCloudConfig();
+  if (!config?.endpoint) throw new CloudNotConfiguredError();
+  await ensureSecretsUnlocked();
+  const token = await resolveToken(config);
+  const endpoint = normalizeEndpoint(config.endpoint);
+  const client = new CloudClient(endpoint, token);
+  const response = await client.listVersions(limit, before);
+  return response.versions;
+}
+
+export interface RestoreVersionResult {
+  revision: number;
+  summary: ApplySummary;
+  mirrored: boolean;
+  mirrorRevision?: number;
+  mirrorError?: string;
+}
+
+async function replaceLocalWithVersion(version: { snapshot: SyncSnapshot; tombstones: TombstoneMap }): Promise<ApplySummary> {
+  const tables = [
+    db.groups, db.tags, db.systems, db.accounts, db.servers, db.middlewares,
+    db.systemTags, db.serverTags, db.middlewareTags, db.recents,
+    db.configProjects, db.configDefs, db.deletions,
+  ];
+  return withDirtyTrackingSuspended(async () => {
+    await db.transaction('rw', tables, async () => {
+      for (const table of tables) await table.clear();
+    });
+    const summary = await applyRemoteSnapshot(version.snapshot, version.tombstones);
+    await clearDeletions();
+    return summary;
+  });
+}
+
+async function doRestoreVersion(revision: number): Promise<RestoreVersionResult> {
+  const config = await readCloudConfig();
+  if (!config?.endpoint) throw new CloudNotConfiguredError();
+  await ensureSecretsUnlocked();
+  const token = await resolveToken(config);
+  const endpoint = normalizeEndpoint(config.endpoint);
+  const client = new CloudClient(endpoint, token);
+  const version = await client.getVersion(revision);
+
+  const summary = await replaceLocalWithVersion(version);
+  const result: RestoreVersionResult = { revision, summary, mirrored: false };
+  if (config.enabled) {
+    try {
+      const mirrored = await doOverwriteCloud(`恢复到版本 #${revision}`);
+      result.mirrored = true;
+      result.mirrorRevision = mirrored.response.revision;
+    } catch (error) {
+      result.mirrorError = errorMessage(error);
+    }
+  }
+  return result;
+}
+
+/** 版本恢复会替换本地数据；持久化开启时再把该版本镜像到云端 */
+export function restoreVersionFromCloud(revision: number): Promise<RestoreVersionResult> {
+  return enqueuePush(() => doRestoreVersion(revision));
 }
 
 export async function restoreFromCloud(): Promise<{ revision: number; summary: ApplySummary }> {

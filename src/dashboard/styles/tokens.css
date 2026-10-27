@@ -461,6 +461,27 @@ select.inp {
 .btn-d:active { transform: scale(0.97); }
 .btn-d:disabled { opacity: 0.35; cursor: not-allowed; }
 
+.btn-p:disabled,
+.btn-g:disabled {
+  background: var(--bg2);
+  border-color: var(--border);
+  color: var(--text-quaternary);
+  box-shadow: none;
+  filter: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+.btn-p:disabled:hover,
+.btn-g:disabled:hover {
+  background: var(--bg2);
+  border-color: var(--border);
+  color: var(--text-quaternary);
+  box-shadow: none;
+  filter: none;
+}
+.btn-p:disabled:active,
+.btn-g:disabled:active { transform: none; }
+
 /* ============================================================
    图标 tile（第一列 / 卡片图标，支持彩色辉光）
    ============================================================ */

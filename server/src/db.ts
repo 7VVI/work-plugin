@@ -22,6 +22,18 @@ export interface StateRow {
   payload: Buffer;
 }
 
+export interface VersionRow {
+  revision: number;
+  created_at: number;
+  note: string | null;
+  summary: string;
+  state_hash: string;
+  key_id: string;
+  iv: Buffer;
+  tag: Buffer;
+  payload: Buffer;
+}
+
 export function openDatabase(path: string): Db {
   const db = new Database(path);
   db.pragma('journal_mode = WAL');
@@ -53,6 +65,18 @@ function migrate(db: Db): void {
       auth_epoch TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+    CREATE TABLE IF NOT EXISTS versions (
+      revision INTEGER PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      note TEXT,
+      summary TEXT NOT NULL,
+      state_hash TEXT NOT NULL,
+      key_id TEXT NOT NULL,
+      iv BLOB NOT NULL,
+      tag BLOB NOT NULL,
+      payload BLOB NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_versions_created ON versions(created_at DESC);
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

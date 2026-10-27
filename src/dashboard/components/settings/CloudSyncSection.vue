@@ -62,6 +62,54 @@
       </button>
     </div>
 
+    <div class="history-block">
+      <div class="history-head">
+        <div class="setting-meta">
+          <div class="setting-name">版本历史</div>
+          <div class="setting-desc">每次同步有变更自动记录，可选择旧版本恢复</div>
+        </div>
+        <button class="btn-g btn-sm" :disabled="!canRemote || store.historyLoading" @click="onLoadHistory">
+          <i class="fa-solid fa-rotate"></i>{{ store.historyLoading ? '加载中…' : '刷新' }}
+        </button>
+      </div>
+
+      <div v-if="!canRemote" class="history-empty">配置云端地址和 API Token 后可查看</div>
+      <div v-else-if="store.historyLoading && store.versions.length === 0" class="history-empty">正在加载版本…</div>
+      <div v-else-if="store.versions.length === 0" class="history-empty">暂无版本记录</div>
+      <ul v-else class="history-list">
+        <li v-for="version in store.versions" :key="version.revision" class="history-item">
+          <div class="history-main">
+            <div class="history-line">
+              <span class="history-rev mono">#{{ version.revision }}</span>
+              <span class="history-time">{{ formatHistoryTime(version.createdAt) }}</span>
+              <span v-if="version.note" class="history-note">{{ version.note }}</span>
+            </div>
+            <div class="history-diff">
+              新增 {{ version.changes.added }} · 更新 {{ version.changes.updated }} · 删除 {{ version.changes.deleted }}
+            </div>
+            <div class="history-counts">
+              系统 {{ version.counts.systems }} · 服务器 {{ version.counts.servers }} · 中间件 {{ version.counts.middlewares }} · 配置 {{ version.counts.configProjects }}
+            </div>
+          </div>
+          <button
+            class="btn-g btn-sm"
+            :disabled="store.loading || store.historyLoading"
+            @click="onRestoreVersion(version)"
+          >
+            恢复
+          </button>
+        </li>
+      </ul>
+      <button
+        v-if="store.hasMoreHistory"
+        class="btn-g btn-sm history-more"
+        :disabled="store.historyLoading"
+        @click="onLoadMoreHistory"
+      >
+        {{ store.historyLoading ? '加载中…' : '加载更多' }}
+      </button>
+    </div>
+
     <p class="cloud-note">
       云端使用服务端密钥加密存储。主密码启用时，上传/恢复需要先解锁；恢复按更新时间安全合并，不删除本地记录。
       关闭持久化后本地改动不会上传，重新开启后的首次同步也不会把关闭期间的删除传播到云端。
@@ -75,12 +123,21 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useCloudSyncStore } from '@shared/stores/cloudSyncStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
+import { useSystemStore } from '@shared/stores/systemStore';
+import { useServerStore } from '@shared/stores/serverStore';
+import { useMiddlewareStore } from '@shared/stores/middlewareStore';
+import { useConfigStore } from '@shared/stores/configStore';
 import { cryptoService } from '@shared/services/cryptoService';
 import { normalizeEndpoint } from '@shared/sync/syncStorage';
+import type { SyncVersionMeta } from '@protocol/types';
 
 const store = useCloudSyncStore();
 const toast = useToastStore();
 const dialog = useDialogStore();
+const systemStore = useSystemStore();
+const serverStore = useServerStore();
+const middlewareStore = useMiddlewareStore();
+const configStore = useConfigStore();
 
 const enabled = ref(false);
 const endpoint = ref('');
@@ -99,13 +156,22 @@ watch(
   { immediate: true },
 );
 
-onMounted(() => store.load());
-
 const canSync = computed(() =>
   !!store.config?.enabled && !!store.config?.endpoint && store.hasToken,
 );
 
 const canRemote = computed(() => !!store.config?.endpoint && store.hasToken);
+
+onMounted(async () => {
+  await store.load();
+  if (canRemote.value && (!(await cryptoService.isEnabled()) || cryptoService.isUnlocked())) {
+    try {
+      await store.loadHistory();
+    } catch {
+      // 自动加载失败时保留手动刷新入口
+    }
+  }
+});
 
 const insecureHttp = computed(() => {
   if (!endpoint.value.trim()) return false;
@@ -215,6 +281,7 @@ async function onToggleEnabled() {
         } else {
           toast.success('云端持久化已开启');
         }
+        await store.loadHistory().catch(() => {});
       } catch (error) {
         toast.error(`已开启，但首次同步失败：${errorMessage(error)}`);
       }
@@ -256,6 +323,7 @@ async function onSync() {
     const rejected = result.response.stats.rejectedByTombstone;
     const hint = rejected > 0 ? `；${rejected} 条被云端删除标记拦截，可点击“覆盖云端”` : '';
     toast.success(`同步完成：新增 ${summary.added}，更新 ${summary.updated}，版本 #${result.response.revision}${hint}`);
+    await store.loadHistory().catch(() => {});
   } catch (error) {
     toast.error(errorMessage(error));
   }
@@ -293,6 +361,65 @@ async function onOverwrite() {
     toast.success(
       `云端已覆盖：新增 ${summary.added}，更新 ${summary.updated}，版本 #${result.response.revision}`,
     );
+    await store.loadHistory().catch(() => {});
+  } catch (error) {
+    toast.error(errorMessage(error));
+  }
+}
+
+function formatHistoryTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleString();
+}
+
+async function onLoadHistory() {
+  if (!canRemote.value) return;
+  if (!(await ensureUnlocked())) return;
+  try {
+    await store.loadHistory();
+  } catch (error) {
+    toast.error(errorMessage(error));
+  }
+}
+
+async function onLoadMoreHistory() {
+  if (!(await ensureUnlocked())) return;
+  try {
+    await store.loadMoreHistory();
+  } catch (error) {
+    toast.error(errorMessage(error));
+  }
+}
+
+async function refreshLocalStores(): Promise<void> {
+  await Promise.all([
+    systemStore.load(),
+    serverStore.load(),
+    middlewareStore.load(),
+    configStore.load(),
+  ]).catch(() => {});
+}
+
+async function onRestoreVersion(version: SyncVersionMeta) {
+  const enabledNow = !!store.config?.enabled;
+  const ok = await dialog.confirm(
+    `恢复到版本 #${version.revision}`,
+    enabledNow
+      ? '将用该版本替换本地数据，并立即覆盖云端；当前本地改动会丢失。继续？'
+      : '将用该版本替换本地数据；持久化未开启，云端暂不修改。继续？',
+  );
+  if (!ok) return;
+  if (!(await ensureUnlocked())) return;
+  try {
+    const result = await store.restoreVersion(version.revision);
+    if (result.mirrorError) {
+      toast.error(`已恢复到本地，但覆盖云端失败：${result.mirrorError}`);
+    } else if (result.mirrored) {
+      toast.success(`已恢复到版本 #${version.revision}，云端已同步为版本 #${result.mirrorRevision}`);
+    } else {
+      toast.success(`已恢复到版本 #${version.revision}；开启持久化后请点击“覆盖云端”同步`);
+    }
+    await refreshLocalStores();
+    await store.loadHistory().catch(() => {});
   } catch (error) {
     toast.error(errorMessage(error));
   }
@@ -378,6 +505,75 @@ async function onOverwrite() {
   gap: 8px;
   margin-top: var(--gap-md);
 }
+.history-block {
+  margin-top: var(--gap-lg);
+  padding-top: var(--gap-lg);
+  border-top: 1px solid var(--border);
+}
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-lg);
+}
+.history-empty {
+  margin-top: var(--gap-sm);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.history-list {
+  list-style: none;
+  margin: var(--gap-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-md);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel2);
+}
+.history-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.history-rev {
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+}
+.history-time {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.history-note {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+.history-diff,
+.history-counts {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: var(--leading-normal);
+}
+.history-item .btn-sm { flex-shrink: 0; }
+.history-more { margin-top: 8px; }
 .btn-sm {
   padding: 4px 12px;
   font-size: var(--text-xs);
