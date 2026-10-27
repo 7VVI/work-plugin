@@ -26,6 +26,21 @@
   --crepe-base-font-size: 16px;
   --note-code-bg: rgba(27, 31, 35, 0.05);
   --note-link: #4285f4;
+  /* 代码高亮：GitHub 浅色主题（思源默认） */
+  --note-tok-comment: #6a737d;
+  --note-tok-keyword: #d73a49;
+  --note-tok-string: #032f62;
+  --note-tok-number: #005cc5;
+  --note-tok-type: #6f42c1;
+  --note-tok-property: #005cc5;
+  --note-tok-function: #6f42c1;
+  --note-tok-variable: #24292e;
+  --note-tok-punctuation: #24292e;
+  --note-tok-link: #032f62;
+  --note-tok-invalid: #d73a49;
+  /* 引用块竖条与文字 */
+  --note-quote-bar: var(--border);
+  --note-quote-text: var(--ink2);
   background: transparent;
   color: var(--ink);
 }
@@ -154,7 +169,7 @@
   border: none;
   border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--ink2);
+  color: var(--note-quote-text);
 }
 .dock-notes .milkdown .ProseMirror blockquote::before {
   content: '';
@@ -164,7 +179,7 @@
   bottom: 6px;
   width: 4px;
   border-radius: var(--radius-xs);
-  background: var(--border);
+  background: var(--note-quote-bar);
 }
 
 /* Inline code: 85% mono, 0.2em/0.4em padding, 5% gray background. */
@@ -406,6 +421,21 @@
 [data-theme='dark'] .dock-notes .milkdown {
   --note-code-bg: rgba(255, 255, 255, 0.07);
   --note-link: #6ea8ff;
+  /* 代码高亮：GitHub 暗色主题，避免浅色主题的深色文字看不清 */
+  --note-tok-comment: #8b949e;
+  --note-tok-keyword: #ff7b72;
+  --note-tok-string: #a5d6ff;
+  --note-tok-number: #79c0ff;
+  --note-tok-type: #ffa657;
+  --note-tok-property: #79c0ff;
+  --note-tok-function: #d2a8ff;
+  --note-tok-variable: #c9d1d9;
+  --note-tok-punctuation: #c9d1d9;
+  --note-tok-link: #a5d6ff;
+  --note-tok-invalid: #ff7b72;
+  /* 暗色下引用竖条要够亮才看得见 */
+  --note-quote-bar: rgba(255, 255, 255, 0.24);
+  --note-quote-text: #b6bec9;
   --crepe-color-background: transparent;
   --crepe-color-on-background: var(--ink);
   --crepe-color-surface: var(--panel);
