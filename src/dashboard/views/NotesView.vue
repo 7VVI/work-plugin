@@ -27,7 +27,15 @@
             >
               <i class="fa-solid fa-list-ul"></i>
             </button>
-            <button class="note-action-btn" title="插入图片" @click="onPickImage">
+            <button
+              class="note-action-btn"
+              :class="{ active: sourceMode }"
+              :title="sourceMode ? '富文本模式' : '源码模式'"
+              @click="toggleSourceMode"
+            >
+              <i class="fa-solid fa-code"></i>
+            </button>
+            <button v-if="!sourceMode" class="note-action-btn" title="插入图片" @click="onPickImage">
               <i class="fa-solid fa-image"></i>
             </button>
             <button class="note-action-btn" title="导出 Markdown" @click="onExport">
@@ -84,7 +92,15 @@
               <span v-if="store.activeNote.updatedAt">更新于 {{ formatRelativeTime(store.activeNote.updatedAt) }}</span>
             </div>
 
-            <div class="dock-notes">
+            <textarea
+              v-if="sourceMode"
+              class="note-source"
+              :value="draftContent"
+              spellcheck="false"
+              placeholder="Markdown 源码"
+              @input="onSourceInput"
+            ></textarea>
+            <div v-else class="dock-notes">
               <NoteEditor
                 ref="editorRef"
                 :key="editorKey"
@@ -163,18 +179,28 @@ const editorEpoch = ref(0);
 const activeHeading = ref(0);
 const sidebarOpen = ref(false);
 const outlineOpen = ref(readOutlineOpen());
+const sourceMode = ref(readSourceMode());
 
 let saveTimer: number | undefined;
 let savePromise: Promise<boolean> | null = null;
 let scrollRaf = 0;
 
 const OUTLINE_OPEN_KEY = 'dock.notes.outlineOpen';
+const SOURCE_MODE_KEY = 'dock.notes.sourceMode';
 
 function readOutlineOpen(): boolean {
   try {
     return localStorage.getItem(OUTLINE_OPEN_KEY) !== '0';
   } catch {
     return true;
+  }
+}
+
+function readSourceMode(): boolean {
+  try {
+    return localStorage.getItem(SOURCE_MODE_KEY) === '1';
+  } catch {
+    return false;
   }
 }
 
@@ -185,6 +211,30 @@ function toggleOutline(): void {
   } catch {
     // 忽略存储失败，仅本次会话生效
   }
+}
+
+/** 源码 / 富文本切换：源码内容即 draftContent，切回富文本时用最新源码重建编辑器 */
+function toggleSourceMode(): void {
+  if (sourceMode.value) {
+    sourceMode.value = false;
+    editorEpoch.value += 1;
+    void flushSave();
+  } else {
+    const latest = editorRef.value?.getMarkdown?.();
+    if (typeof latest === 'string' && latest !== draftContent.value) draftContent.value = latest;
+    sourceMode.value = true;
+  }
+  try {
+    localStorage.setItem(SOURCE_MODE_KEY, sourceMode.value ? '1' : '0');
+  } catch {
+    // 忽略存储失败，仅本次会话生效
+  }
+}
+
+function onSourceInput(event: Event): void {
+  const target = event.target as HTMLTextAreaElement | null;
+  if (!target) return;
+  onEditorChange(target.value);
 }
 
 const editorKey = computed(() => `${store.activeId ?? 'none'}:${editorEpoch.value}`);
@@ -584,6 +634,24 @@ onBeforeRouteLeave(async () => {
   letter-spacing: normal;
 }
 .note-title-input::placeholder { color: var(--ink4); }
+/* 源码模式：纯文本编辑，等宽字体，与富文本共用同一块编辑区 */
+.note-source {
+  display: block;
+  width: 100%;
+  min-height: 60vh;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  tab-size: 2;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+.note-source::placeholder { color: var(--ink4); }
 .note-meta {
   display: flex;
   align-items: center;
