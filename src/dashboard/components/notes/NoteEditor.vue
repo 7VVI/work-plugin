@@ -29,7 +29,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Crepe } from '@milkdown/crepe';
 import { EditorView } from '@codemirror/view';
 import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
-import { TextSelection } from '@milkdown/kit/prose/state';
+import { TextSelection, AllSelection } from '@milkdown/kit/prose/state';
 import { codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { toggleLinkCommand } from '@milkdown/kit/component/link-tooltip';
 import {
@@ -506,10 +506,12 @@ function selectWholeDocument(cmView: EditorView | null, content: HTMLElement): v
   const view = getView();
   if (view) {
     try {
+      // 用 AllSelection：TextSelection 落在文档边界会触发
+      // "TextSelection endpoint not pointing into a node with inline content"
       const { state } = view;
-      view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 0, state.doc.content.size)));
+      view.dispatch(state.tr.setSelection(new AllSelection(state.doc)));
     } catch {
-      // 选区跨非文本节点时可能失败
+      // 极端文档结构下选区创建可能失败，下面仍会用原生选区铺满
     }
   }
 
