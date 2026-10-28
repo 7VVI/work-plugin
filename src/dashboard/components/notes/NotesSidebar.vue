@@ -582,12 +582,12 @@ function onNoteDragStart(): void {
   height: 28px;
   padding: 0 4px 0 2px;
   border-radius: var(--radius-sm);
-  color: var(--ink2);
+  color: var(--ink);
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .book-row:hover { background: var(--panel2); }
-/* 选中的是文件夹下的笔记时，文件夹本身不再显示选中蓝，只做轻微字色区分 */
+/* 选中的是文件夹下的笔记时，文件夹本身不再显示选中蓝，保持父节点字色 */
 .book-row.has-active { color: var(--ink); }
 .arrow { width: 11px; font-size: 8px; color: var(--ink4); flex-shrink: 0; }
 .book-icon { font-size: 12px; color: #d3a13c; flex-shrink: 0; }
@@ -603,7 +603,21 @@ function onNoteDragStart(): void {
 .row-action { width: 22px; height: 22px; opacity: 0; font-size: 10px; }
 .book-row:hover .row-action,
 .book-row:focus-within .row-action { opacity: 1; }
-.note-list { padding: 1px 0 3px 13px; }
+/* 子级缩进到笔记本名字那一列（箭头 11 + 间隔 5 + 图标 12 + 间隔 5 + 行内边距 2） */
+.note-list {
+  position: relative;
+  padding: 1px 0 3px 32px;
+}
+/* 子级引导线，强化层级（思源的文档树同样有缩进层次） */
+.note-list::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 3px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--border);
+}
 .note-drag-list { display: flex; flex-direction: column; gap: 1px; }
 /* 空笔记本保留一行无内容的落区，方便直接把笔记拖进去 */
 .note-drag-list:empty { min-height: 28px; }
@@ -632,7 +646,7 @@ function onNoteDragStart(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .note-more { width: 22px; height: 22px; opacity: 0; font-size: 10px; flex-shrink: 0; }
 .note-row:hover .note-more,
