@@ -48,7 +48,7 @@ import { useToastStore } from '@shared/stores/toastStore';
 import { noteAssetRepo } from '@shared/db/repositories/noteAssetRepo';
 import { assetRef } from '@shared/utils/noteAssets';
 import NoteContextMenu from './NoteContextMenu.vue';
-import { zhCrepeConfig } from './crepeLocale';
+import { zhCrepeConfig, sortedCodeLanguages } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
 import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
 import { htmlInlineSchema, htmlRemark } from './crepeHtml';
@@ -109,6 +109,10 @@ async function createEditor(): Promise<void> {
       },
       featureConfigs: {
         ...zhCrepeConfig,
+        [Crepe.Feature.CodeMirror]: {
+          ...zhCrepeConfig[Crepe.Feature.CodeMirror],
+          languages: sortedCodeLanguages,
+        },
         [Crepe.Feature.ImageBlock]: imageFeatureConfig,
       },
     });

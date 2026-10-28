@@ -378,6 +378,94 @@
   border-radius: var(--radius-xs);
 }
 
+/* 代码块语言选择：紧凑滚动列表 + 顶部搜索，风格对齐思源 */
+.dock-notes .milkdown .milkdown-code-block .language-picker {
+  width: 264px;
+  padding-top: 8px;
+}
+.dock-notes .milkdown .milkdown-code-block .language-picker .list-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  padding: 8px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.dock-notes .milkdown .milkdown-code-block .search-box {
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg2);
+  outline: 1px solid transparent;
+  transition: outline-color 0.12s ease;
+}
+.dock-notes .milkdown .milkdown-code-block .search-box:has(input:focus) {
+  outline-color: var(--accent);
+}
+.dock-notes .milkdown .milkdown-code-block .search-box .search-input {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font-family: var(--note-font, var(--font-sans));
+  font-size: 12.5px;
+  line-height: 20px;
+}
+.dock-notes .milkdown .milkdown-code-block .search-box .search-input::placeholder {
+  color: var(--ink4);
+}
+.dock-notes .milkdown .milkdown-code-block .search-box .clear-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--ink4);
+  border-radius: var(--radius-xs);
+}
+.dock-notes .milkdown .milkdown-code-block .search-box .clear-icon:hover {
+  background: var(--panel2);
+  color: var(--ink);
+}
+.dock-notes .milkdown .milkdown-code-block .search-box .clear-icon svg {
+  width: 12px;
+  height: 12px;
+  color: currentColor;
+  fill: currentColor;
+}
+.dock-notes .milkdown .milkdown-code-block .language-list {
+  height: auto;
+  max-height: 300px;
+  padding: 0 6px;
+}
+.dock-notes .milkdown .milkdown-code-block .language-list-item {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ink2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 28px;
+}
+.dock-notes .milkdown .milkdown-code-block .language-list-item:hover,
+.dock-notes .milkdown .milkdown-code-block .language-list-item:focus-visible {
+  background: var(--panel2);
+  color: var(--ink);
+}
+.dock-notes .milkdown .milkdown-code-block .language-list-item[aria-selected='true'] {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
 /* 统一选中色：正文与代码块选中后只有一种颜色 rgb(203,216,243)。
    代码块是嵌套编辑器，CodeMirror 默认把 .cm-line 的原生选区设为透明，
    改用自己的 .cm-selectionBackground 图层绘制；这里同时覆盖两层，

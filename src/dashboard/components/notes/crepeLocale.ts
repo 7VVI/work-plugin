@@ -1,4 +1,10 @@
 import { CrepeFeature } from '@milkdown/crepe';
+import { languages as codeLanguages } from '@codemirror/language-data';
+
+/** 代码块语言按字母序排列（思源的语言列表也是 A-Z），便于快速定位 */
+export const sortedCodeLanguages = [...codeLanguages].sort((a, b) =>
+  a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }),
+);
 
 /** Crepe 没有全局 locale，按功能覆盖内置英文标签 */
 export const zhCrepeConfig = {
@@ -42,7 +48,7 @@ export const zhCrepeConfig = {
   },
   [CrepeFeature.CodeMirror]: {
     previewOnlyByDefault: false,
-    searchPlaceholder: '搜索语言',
+    searchPlaceholder: '搜索',
     noResultText: '无结果',
     copyText: '复制',
   },
