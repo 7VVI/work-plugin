@@ -50,6 +50,7 @@ import { assetRef } from '@shared/utils/noteAssets';
 import NoteContextMenu from './NoteContextMenu.vue';
 import { zhCrepeConfig } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
+import { trimPastedCodeBlock } from './crepePaste';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
@@ -123,6 +124,9 @@ async function createEditor(): Promise<void> {
         extensions: [crepeHighlightExtension],
       }));
     });
+
+    // 粘贴代码块时去掉末尾多余空行
+    instance.editor.use(trimPastedCodeBlock);
 
     await instance.create();
     if (destroyed) {
