@@ -51,7 +51,7 @@ import NoteContextMenu from './NoteContextMenu.vue';
 import { zhCrepeConfig, sortedCodeLanguages } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
 import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
-import { htmlInlineSchema, htmlRemark } from './crepeHtml';
+import { htmlRenderSchema, htmlRemark } from './crepeHtml';
 import { noteKeyBehavior } from './crepeKeys';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
@@ -136,7 +136,7 @@ async function createEditor(): Promise<void> {
     // 粘贴 / 新建代码块时去掉末尾多余空行
     instance.editor.use(trimPastedCodeBlock);
     // Markdown 里的行内 HTML（如思源导出的 <span style>）按 HTML 渲染
-    instance.editor.use(htmlRemark).use(htmlInlineSchema);
+    instance.editor.use(htmlRemark).use(htmlRenderSchema);
 
     await instance.create();
     if (destroyed) {

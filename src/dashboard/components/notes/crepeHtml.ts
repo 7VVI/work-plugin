@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
-import { $nodeSchema, $remark } from '@milkdown/kit/utils';
+import { htmlSchema } from '@milkdown/kit/preset/commonmark';
+import { $remark } from '@milkdown/kit/utils';
 import remarkParse from 'remark-parse';
 
 interface MdastLike {
@@ -100,36 +101,27 @@ export const htmlRemark = $remark('dock-raw-html', () => {
   return plugin as never;
 });
 
-/** 行内 HTML：DOMPurify 清洗后原样渲染，序列化时还原成原始 HTML */
-export const htmlInlineSchema = $nodeSchema('html_inline', () => ({
-  inline: true,
-  group: 'inline',
-  atom: true,
-  selectable: false,
-  attrs: { value: { default: '' } },
-  parseDOM: [
-    {
-      tag: 'span[data-dock-html]',
-      getAttrs: (dom) => ({ value: (dom as HTMLElement).dataset.dockHtml ?? '' }),
+/**
+ * 预设自带的 html 节点会把原始 HTML 当纯文本渲染（span[data-value]），
+ * 这里覆盖它的 toDOM：清洗后按真实 HTML 渲染，同时保留原始值以便序列化与复制。
+ */
+export const htmlRenderSchema = htmlSchema.extendSchema(prev => (ctx) => {
+  const spec = prev(ctx);
+  return {
+    ...spec,
+    toDOM: (node) => {
+      const span = document.createElement('span');
+      const raw = String(node.attrs.value ?? '');
+      span.dataset.dockHtml = raw;
+      span.innerHTML = DOMPurify.sanitize(raw);
+      return span;
     },
-  ],
-  toDOM: (node) => {
-    const span = document.createElement('span');
-    const raw = String(node.attrs.value ?? '');
-    span.dataset.dockHtml = raw;
-    span.innerHTML = DOMPurify.sanitize(raw);
-    return span;
-  },
-  parseMarkdown: {
-    match: ({ type }) => type === 'html',
-    runner: (state, node, type) => {
-      state.addNode(type, { value: String((node as { value?: string }).value ?? '') });
-    },
-  },
-  toMarkdown: {
-    match: (node) => node.type.name === 'html_inline',
-    runner: (state, node) => {
-      state.addNode('html', undefined, String(node.attrs.value ?? ''));
-    },
-  },
-}));
+    parseDOM: [
+      ...(spec.parseDOM ?? []),
+      {
+        tag: 'span[data-dock-html]',
+        getAttrs: (dom) => ({ value: (dom as HTMLElement).dataset.dockHtml ?? '' }),
+      },
+    ],
+  };
+});
