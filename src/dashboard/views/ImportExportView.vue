@@ -95,6 +95,7 @@
 import { onMounted, ref } from 'vue';
 import { importExportService } from '@shared/services/importExportService';
 import { noteBookRepo } from '@shared/db/repositories/noteBookRepo';
+import { downloadBlob, downloadText } from '@shared/utils/download';
 import { useToastStore } from '@shared/stores/toastStore';
 import type { NoteBook } from '@shared/types/entities';
 
@@ -125,7 +126,7 @@ async function onExport() {
         includePasswords: includePasswords.value,
         scope: { ...scope.value },
       });
-      downloadFile(md, `dock-backup-${stamp}.md`, 'text/markdown');
+      downloadText(md, `dock-backup-${stamp}.md`, 'text/markdown');
       toast.success('Markdown 备份已导出');
     } else {
       const full = JSON.parse(await importExportService.exportJSON());
@@ -139,7 +140,7 @@ async function onExport() {
         out.noteBooks = full.noteBooks ?? [];
         out.notes = full.notes ?? [];
       }
-      downloadFile(JSON.stringify(out, null, 2), `dock-backup-${stamp}.json`, 'application/json');
+      downloadText(JSON.stringify(out, null, 2), `dock-backup-${stamp}.json`, 'application/json');
       toast.success('JSON 备份已导出');
     }
   } catch (e) {
@@ -177,20 +178,6 @@ async function importFile(file: File) {
   } catch (e) {
     toast.error('文件格式不正确，导入失败');
   }
-}
-
-function downloadFile(content: string, filename: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  downloadBlob(blob, filename);
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 async function onImportNotes(event: Event): Promise<void> {

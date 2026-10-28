@@ -166,3 +166,39 @@ describe('markdown file archive', () => {
     expect(text).toBe('# C');
   });
 });
+
+describe('notebook archive', () => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
+  });
+
+  it('exports only the notes of the selected notebook at the zip root', async () => {
+    const workId = await noteBookRepo.create('工作');
+    const lifeId = await noteBookRepo.create('生活');
+    await noteRepo.create({ notebookId: workId, title: '部署', content: '# 部署' });
+    await noteRepo.create({ notebookId: workId, title: '部署', content: '# 重复' });
+    await noteRepo.create({ notebookId: lifeId, title: '清单', content: '# 清单' });
+
+    const { blob, count, name } = await importExportService.exportNotebookZip(workId);
+    expect(name).toBe('工作');
+    expect(count).toBe(2);
+
+    const files = unzipSync(await readBytes(blob));
+    expect(Object.keys(files).sort()).toEqual(['部署 (2).md', '部署.md']);
+  });
+
+  it('imports a single markdown file into the given notebook', async () => {
+    const bookId = await noteBookRepo.create('工作');
+
+    const result = await importExportService.importNoteFiles(
+      [{ name: 'Kafka消息协议.md', text: '# Kafka\n内容' }],
+      bookId,
+    );
+
+    expect(result.notebookId).toBe(bookId);
+    expect(result.created).toBe(1);
+    const notes = await noteRepo.all();
+    expect(notes[0]).toMatchObject({ notebookId: bookId, title: 'Kafka消息协议' });
+  });
+});

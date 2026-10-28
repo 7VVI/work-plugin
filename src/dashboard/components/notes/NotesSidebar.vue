@@ -143,6 +143,14 @@
         </button>
       </div>
     </Teleport>
+
+    <input
+      ref="importInput"
+      type="file"
+      accept=".md,.markdown,text/markdown"
+      class="hidden-input"
+      @change="onImportFileChange"
+    />
   </aside>
 </template>
 
@@ -153,6 +161,11 @@ import { useNoteStore, type NoteSummary } from '@shared/stores/noteStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { formatRelativeTime } from '@shared/utils/time';
+import { sanitizeFilename } from '@shared/utils/noteUtils';
+import { downloadBlob, downloadText } from '@shared/utils/download';
+import { renderNoteHtml } from '@shared/utils/noteHtmlExport';
+import { importExportService } from '@shared/services/importExportService';
+import { noteRepo } from '@shared/db/repositories/noteRepo';
 import { LastNotebookError } from '@shared/db/repositories/noteBookRepo';
 import type { NoteBook } from '@shared/types/entities';
 
@@ -179,6 +192,8 @@ interface TreeMenuItem {
 }
 
 const menu = ref<{ x: number; y: number; items: TreeMenuItem[] } | null>(null);
+const importInput = ref<HTMLInputElement | null>(null);
+let importBookId: string | null = null;
 
 const activeBookId = computed(() => store.activeNote?.notebookId ?? null);
 
@@ -257,6 +272,8 @@ async function runMenuItem(item: TreeMenuItem): Promise<void> {
 function openBookMenu(event: MouseEvent, book: NoteBook): void {
   openMenu(event, [
     { label: '新建笔记', icon: 'fa-plus', run: () => onCreateNote(book.id) },
+    { label: '导入 Markdown', icon: 'fa-file-import', run: () => pickNoteFile(book.id) },
+    { label: '导出笔记（zip）', icon: 'fa-file-zipper', run: () => exportBook(book) },
     { label: '重命名', icon: 'fa-pen', run: () => onRenameNotebook(book) },
     {
       label: '删除笔记本',
@@ -269,8 +286,82 @@ function openBookMenu(event: MouseEvent, book: NoteBook): void {
 
 function openNoteMenu(event: MouseEvent, note: NoteSummary): void {
   openMenu(event, [
+    { label: '导出 Markdown', icon: 'fa-file-lines', run: () => exportNote(note, 'md') },
+    { label: '导出 HTML', icon: 'fa-code', run: () => exportNote(note, 'html') },
     { label: '删除笔记', icon: 'fa-trash', danger: true, run: () => onDeleteNote(note) },
   ]);
+}
+
+/** 选中单个 .md 导入到指定笔记本 */
+function pickNoteFile(bookId: string): void {
+  importBookId = bookId;
+  importInput.value?.click();
+}
+
+async function onImportFileChange(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  const targetBookId = importBookId;
+  importBookId = null;
+  try {
+    const result = await importExportService.importNoteFiles(
+      [{ name: file.name, text: await file.text() }],
+      targetBookId ?? undefined,
+    );
+    if (!result.created) {
+      toast.error(result.skipped[0]?.reason ?? '没有可导入的内容');
+      return;
+    }
+    await store.load();
+    expanded.value = { ...expanded.value, [result.notebookId]: true };
+    toast.success(`已导入「${file.name}」`);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function exportBook(book: NoteBook): Promise<void> {
+  try {
+    const { blob, count, name } = await importExportService.exportNotebookZip(book.id);
+    if (!count) {
+      toast.error('该笔记本下还没有笔记');
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlob(blob, `${sanitizeFilename(name) || '笔记本'}-${stamp}.zip`);
+    toast.success(`已导出 ${count} 篇笔记`);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function exportNote(note: NoteSummary, kind: 'md' | 'html'): Promise<void> {
+  try {
+    // 导出的若是当前正在编辑的笔记，先把未保存内容落盘
+    if (note.id === store.activeId) await props.beforeChange();
+    const full = await noteRepo.byId(note.id);
+    if (!full) {
+      toast.error('笔记不存在');
+      return;
+    }
+    const title = full.title || '未命名笔记';
+    const base = sanitizeFilename(title) || '未命名笔记';
+    if (kind === 'md') {
+      downloadText(full.content, `${base}.md`, 'text/markdown');
+      toast.success('笔记已导出');
+    } else {
+      const html = await renderNoteHtml(full.content, {
+        title,
+        bookName: store.bookName(full.notebookId),
+      });
+      downloadText(html, `${base}.html`, 'text/html');
+      toast.success('已导出 HTML');
+    }
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 function toggleBook(id: string): void {
@@ -679,6 +770,7 @@ function onNoteDragStart(): void {
 .foot-btn:hover { background: var(--panel2); color: var(--ink); }
 
 /* 树行「更多」菜单（对齐思源右键菜单的紧凑样式） */
+.hidden-input { display: none; }
 .tree-menu {
   position: fixed;
   z-index: 400;

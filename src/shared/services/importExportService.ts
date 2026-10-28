@@ -69,6 +69,28 @@ export function noteTitleFromFile(name: string, content: string): string {
   return (heading?.[1] ?? '').trim().slice(0, 200);
 }
 
+/** 把笔记按「目录/标题.md」装进 zip 文件表；folderOf 返回空串表示放根目录 */
+function packNoteFiles<T extends { title: string; content: string }>(
+  notes: T[],
+  folderOf: (note: T) => string,
+): Record<string, Uint8Array> {
+  const files: Record<string, Uint8Array> = {};
+  const used = new Set<string>();
+  for (const note of notes) {
+    const folder = folderOf(note);
+    const base = sanitizeFilename(note.title) || '未命名笔记';
+    let path = folder ? `${folder}/${base}.md` : `${base}.md`;
+    let index = 2;
+    while (used.has(path)) {
+      path = folder ? `${folder}/${base} (${index}).md` : `${base} (${index}).md`;
+      index += 1;
+    }
+    used.add(path);
+    files[path] = strToU8(note.content);
+  }
+  return files;
+}
+
 export const importExportService = {
   async exportMarkdown(options: { includePasswords: boolean; scope?: { systems?: boolean; servers?: boolean; middlewares?: boolean; configs?: boolean; groups?: boolean } }): Promise<string> {
     const [systems, servers, middlewares, tags, projects, groups] = await Promise.all([
@@ -716,26 +738,24 @@ export const importExportService = {
   async exportNotesZip(): Promise<{ blob: Blob; count: number }> {
     const [books, notes] = await Promise.all([noteBookRepo.all(), noteRepo.all()]);
     const bookName = new Map(books.map(book => [book.id, book.name]));
-    const files: Record<string, Uint8Array> = {};
-    const used = new Set<string>();
-
-    for (const note of notes) {
-      const folder = sanitizeFilename(bookName.get(note.notebookId) ?? '未分类') || '未分类';
-      const base = sanitizeFilename(note.title) || '未命名笔记';
-      let path = `${folder}/${base}.md`;
-      let index = 2;
-      while (used.has(path)) {
-        path = `${folder}/${base} (${index}).md`;
-        index += 1;
-      }
-      used.add(path);
-      files[path] = strToU8(note.content);
-    }
-
-    const zipped = zipSync(files, { level: 6 });
+    const files = packNoteFiles(notes, note => sanitizeFilename(bookName.get(note.notebookId) ?? '未分类') || '未分类');
     return {
-      blob: new Blob([zipped], { type: 'application/zip' }),
+      blob: new Blob([zipSync(files, { level: 6 })], { type: 'application/zip' }),
       count: notes.length,
+    };
+  },
+
+  /** 导出某个笔记本下的笔记为 zip：文件直接放 zip 根目录 */
+  async exportNotebookZip(notebookId: string): Promise<{ blob: Blob; count: number; name: string }> {
+    const [book, notes] = await Promise.all([
+      noteBookRepo.byId(notebookId),
+      noteRepo.all().then(all => all.filter(note => note.notebookId === notebookId)),
+    ]);
+    const files = packNoteFiles(notes, () => '');
+    return {
+      blob: new Blob([zipSync(files, { level: 6 })], { type: 'application/zip' }),
+      count: notes.length,
+      name: book?.name ?? '笔记本',
     };
   },
 };

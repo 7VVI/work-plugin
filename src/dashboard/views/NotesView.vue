@@ -173,6 +173,7 @@ import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { countNoteWords, extractOutline, sanitizeFilename } from '@shared/utils/noteUtils';
 import { renderNoteHtml } from '@shared/utils/noteHtmlExport';
+import { downloadText } from '@shared/utils/download';
 import { formatRelativeTime } from '@shared/utils/time';
 
 const NoteEditor = defineAsyncComponent(() => import('../components/notes/NoteEditor.vue'));
@@ -434,16 +435,6 @@ function runExport(kind: 'md' | 'html'): void {
       toast.success('已导出 HTML');
     })
     .catch(error => toast.error(error instanceof Error ? error.message : String(error)));
-}
-
-function downloadText(content: string, filename: string, mime: string): void {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 /** 选择本地图片插入到当前光标处 */
