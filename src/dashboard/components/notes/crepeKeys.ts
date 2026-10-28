@@ -8,6 +8,7 @@ import {
   selectNodeForward,
 } from '@milkdown/kit/prose/commands';
 import { Selection } from '@milkdown/kit/prose/state';
+import type { Node } from '@milkdown/kit/prose/model';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import type { Ctx } from '@milkdown/kit/ctx';
 
@@ -76,14 +77,28 @@ function handleHeadingDelete(view: EditorView, event: KeyboardEvent): boolean {
   return true;
 }
 
+/** 视觉上是空行：没有内容，或只由硬换行/空白组成（Milkdown 会把空段落存成 <br />） */
+function isBlankBlock(node: Node): boolean {
+  if (!node.isTextblock || node.type.spec.code) return false;
+  if (node.content.size === 0) return true;
+  let blank = true;
+  node.forEach(child => {
+    if (child.isText) {
+      if ((child.text ?? '').trim().length > 0) blank = false;
+    } else if (child.type.name !== 'hardbreak') {
+      blank = false;
+    }
+  });
+  return blank;
+}
+
 function handleEmptyBlockDelete(view: EditorView, event: KeyboardEvent): boolean {
   if (event.key !== 'Backspace' && event.key !== 'Delete') return false;
   if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false;
   const { selection } = view.state;
   if (!selection.empty) return false;
   const { $from } = selection;
-  if (!$from.parent.isTextblock || $from.parent.content.size !== 0) return false;
-  if ($from.parentOffset !== 0) return false;
+  if (!isBlankBlock($from.parent)) return false;
 
   const backspace = event.key === 'Backspace';
   const parent = $from.node(-1);

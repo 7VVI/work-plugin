@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Schema } from '@milkdown/kit/prose/model';
 import { EditorState, TextSelection } from '@milkdown/kit/prose/state';
 import { EditorView } from '@milkdown/kit/prose/view';
-import { noteKeyHandlers } from '../../../src/dashboard/components/notes/crepeKeys';
+import { noteKeyBehavior, noteKeyHandlers } from '../../../src/dashboard/components/notes/crepeKeys';
 
 const schema = new Schema({
   nodes: {
@@ -23,6 +23,7 @@ const schema = new Schema({
       defining: true,
       toDOM: () => ['pre', ['code', 0]],
     },
+    hardbreak: { inline: true, group: 'inline', selectable: false, toDOM: () => ['br'] },
     text: { group: 'inline' },
   },
   marks: {},
@@ -98,6 +99,30 @@ describe('note editor key behavior', () => {
     expect(outline(view)).toEqual(['code_block:docker tag xxx']);
   });
 
+  it('removes a blank line saved as a hard break (Milkdown writes <br />)', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('code_block', null, [schema.text('docker tag xxx')]),
+      schema.node('paragraph', null, [schema.node('hardbreak')]),
+      schema.node('paragraph', null, [schema.text('国内：hi-cors')]),
+    ]);
+    const view = makeView(doc, doc.firstChild!.nodeSize + 1);
+
+    const handled = noteKeyHandlers.handleEmptyBlockDelete(view, keyEvent('Backspace'));
+
+    expect(handled).toBe(true);
+    expect(outline(view)).toEqual(['code_block:docker tag xxx', 'paragraph:国内：hi-cors']);
+  });
+
+  it('still merges a blank hard-break line when the neighbour is a normal paragraph', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('paragraph', null, [schema.text('上一行')]),
+      schema.node('paragraph', null, [schema.node('hardbreak')]),
+    ]);
+    const view = makeView(doc, 1 + '上一行'.length + 2);
+
+    expect(noteKeyHandlers.handleEmptyBlockDelete(view, keyEvent('Backspace'))).toBe(false);
+  });
+
   it('leaves normal Backspace inside a heading untouched', () => {
     const doc = schema.node('doc', null, [
       schema.node('heading', { level: 2 }, [schema.text('二级标题')]),
@@ -105,5 +130,24 @@ describe('note editor key behavior', () => {
     const view = makeView(doc, 1 + 2);
 
     expect(noteKeyHandlers.handleHeadingDelete(view, keyEvent('Backspace'))).toBe(false);
+  });
+});
+
+describe('noteKeyBehavior wiring', () => {
+  it('installs key and text-input handlers on the editor view options', () => {
+    let apply: ((prev: Record<string, unknown>) => Record<string, unknown>) | undefined;
+    const ctx = {
+      update: (slice: unknown, updater: (prev: Record<string, unknown>) => Record<string, unknown>) => {
+        expect((slice as { key?: unknown; name?: string }).name ?? '').toBeDefined();
+        apply = updater;
+      },
+    };
+
+    noteKeyBehavior(ctx as never);
+    expect(apply).toBeTypeOf('function');
+
+    const merged = apply!({}) as Record<string, unknown>;
+    expect(merged.handleKeyDown).toBeTypeOf('function');
+    expect(merged.handleTextInput).toBeTypeOf('function');
   });
 });
