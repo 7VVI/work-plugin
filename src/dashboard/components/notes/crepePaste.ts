@@ -16,6 +16,14 @@ function codeBlocksIn(state: EditorState, from: number, to: number): Array<{ fro
   return blocks;
 }
 
+function countCodeBlocks(doc: EditorState['doc']): number {
+  let count = 0;
+  doc.descendants(node => {
+    if (node.type.name === 'code_block') count++;
+  });
+  return count;
+}
+
 /**
  * 去掉指定范围内代码块末尾的多余换行。
  * 返回的 transaction 只删除尾部换行，没有需要清理的内容时返回 null。
@@ -37,7 +45,8 @@ export function trimCodeBlockTail(state: EditorState, from: number, to: number):
 
 /**
  * 从其它 Markdown 编辑器/VS Code 粘贴代码块时，剪贴板内容尾部常带换行，
- * 落进代码块后就会多出一行空行。这里只在粘贴后做一次收敛。
+ * 落进代码块后就会多出一行空行（新建的代码块同理）。
+ * 这里只在「粘贴」或「新建代码块」时收敛一次，正常编辑/回车换行不受影响。
  */
 export const trimPastedCodeBlock = $prose(() => new Plugin({
   props: {
@@ -49,12 +58,22 @@ export const trimPastedCodeBlock = $prose(() => new Plugin({
     },
   },
   appendTransaction(transactions: readonly Transaction[], oldState: EditorState, newState: EditorState) {
-    if (!lastPasteAt || Date.now() - lastPasteAt > PASTE_WINDOW_MS) return null;
-    lastPasteAt = 0;
     if (!transactions.some(tr => tr.docChanged)) return null;
+    const pasted = !!lastPasteAt && Date.now() - lastPasteAt <= PASTE_WINDOW_MS;
+    if (pasted) lastPasteAt = 0;
 
-    const from = Math.min(...transactions.map(tr => tr.mapping.map(oldState.selection.from)));
-    const to = Math.max(newState.selection.to, from);
-    return trimCodeBlockTail(newState, from, to);
+    const createdCodeBlock = countCodeBlocks(newState.doc) > countCodeBlocks(oldState.doc);
+    if (!pasted && !createdCodeBlock) return null;
+
+    if (pasted) {
+      // 粘贴内容在新文档里的范围：起点向前、终点向后各取一次映射，正好包住插入的内容
+      const from = Math.min(...transactions.map(tr => tr.mapping.map(oldState.selection.from, -1)));
+      const to = Math.max(...transactions.map(tr => tr.mapping.map(oldState.selection.to, 1)), from);
+      const inRange = trimCodeBlockTail(newState, from, to);
+      if (inRange) return inRange;
+    }
+
+    // 兜底（含新建代码块的情况）：清理整篇代码块的尾部空行
+    return trimCodeBlockTail(newState, 0, newState.doc.content.size);
   },
 }));

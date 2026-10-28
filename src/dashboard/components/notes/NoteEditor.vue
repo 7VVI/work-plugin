@@ -50,7 +50,7 @@ import { assetRef } from '@shared/utils/noteAssets';
 import NoteContextMenu from './NoteContextMenu.vue';
 import { zhCrepeConfig } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
-import { trimPastedCodeBlock } from './crepePaste';
+import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
@@ -125,7 +125,7 @@ async function createEditor(): Promise<void> {
       }));
     });
 
-    // 粘贴代码块时去掉末尾多余空行
+    // 粘贴 / 新建代码块时去掉末尾多余空行
     instance.editor.use(trimPastedCodeBlock);
 
     await instance.create();
@@ -133,6 +133,7 @@ async function createEditor(): Promise<void> {
       await instance.destroy();
       return;
     }
+    normalizeLoadedCodeBlocks(instance);
     crepe = instance;
     ready.value = true;
     emit('ready');
@@ -150,6 +151,12 @@ async function destroyEditor(): Promise<void> {
   if (instance) await instance.destroy();
 }
 
+/** 打开历史笔记时，把代码块尾部的空行也收敛掉（旧数据可能已经带上了） */
+function normalizeLoadedCodeBlocks(instance: Crepe): void {
+  const view = instance.editor.ctx.get(editorViewCtx);
+  const tr = trimCodeBlockTail(view.state, 0, view.state.doc.content.size);
+  if (tr) view.dispatch(tr);
+}
 function retry(): void {
   void destroyEditor().finally(() => void createEditor());
 }
