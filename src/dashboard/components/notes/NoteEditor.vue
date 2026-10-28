@@ -51,6 +51,7 @@ import NoteContextMenu from './NoteContextMenu.vue';
 import { zhCrepeConfig } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
 import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
+import { noteKeyBehavior } from './crepeKeys';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
@@ -124,6 +125,8 @@ async function createEditor(): Promise<void> {
         extensions: [crepeHighlightExtension],
       }));
     });
+    // 代码围栏整段吞并、标题降级、代码块旁空行删不掉，统一在这里修正
+    instance.editor.config(noteKeyBehavior);
 
     // 粘贴 / 新建代码块时去掉末尾多余空行
     instance.editor.use(trimPastedCodeBlock);
