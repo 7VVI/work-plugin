@@ -5,6 +5,7 @@ import { noteBookRepo } from '../../../src/shared/db/repositories/noteBookRepo';
 import { noteRepo } from '../../../src/shared/db/repositories/noteRepo';
 import { MAX_NOTE_CONTENT } from '../../../shared/protocol/index';
 import { deletionId } from '../../../src/shared/db/deletionLog';
+import { strFromU8, unzipSync } from 'fflate';
 
 describe('note import / export', () => {
   beforeEach(async () => {
@@ -104,5 +105,64 @@ describe('note import / export', () => {
     expect(await db.noteBooks.count()).toBe(0);
     expect(await db.deletions.get(deletionId('note', noteId))).toBeDefined();
     expect(await db.deletions.get(deletionId('noteBook', bookId))).toBeDefined();
+  });
+});
+
+function readBytes(blob: Blob): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+describe('markdown file archive', () => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
+  });
+
+  it('imports markdown files into notes using the file name as title', async () => {
+    const bookId = await noteBookRepo.create('工作');
+
+    const result = await importExportService.importNoteFiles([
+      { name: '部署指南.md', text: '# 部署\n\n正文' },
+      { name: '空文件.md', text: '   ' },
+      { name: '超限.md', text: 'x'.repeat(MAX_NOTE_CONTENT + 1) },
+    ], bookId);
+
+    expect(result.created).toBe(1);
+    expect(result.skipped.map(item => item.name)).toEqual(['空文件.md', '超限.md']);
+
+    const notes = await noteRepo.all();
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({ notebookId: bookId, title: '部署指南', content: '# 部署\n\n正文' });
+  });
+
+  it('falls back to the first heading when the file name has no stem', async () => {
+    const result = await importExportService.importNoteFiles([{ name: '.md', text: '# 只有标题\n内容' }]);
+    const book = await noteBookRepo.byId(result.notebookId);
+    expect(book?.name).toBe('导入笔记');
+    const notes = await noteRepo.all();
+    expect(notes[0].title).toBe('只有标题');
+  });
+
+  it('exports every note into a zip grouped by notebook', async () => {
+    const workId = await noteBookRepo.create('工作');
+    const lifeId = await noteBookRepo.create('生活');
+    await noteRepo.create({ notebookId: workId, title: '部署/指南', content: '# A' });
+    await noteRepo.create({ notebookId: workId, title: '部署/指南', content: '# B' });
+    await noteRepo.create({ notebookId: lifeId, title: '清单', content: '# C' });
+
+    const { blob, count } = await importExportService.exportNotesZip();
+    expect(count).toBe(3);
+    expect(blob.type).toBe('application/zip');
+
+    const files = unzipSync(await readBytes(blob));
+    const names = Object.keys(files).sort();
+    expect(names).toEqual(['工作/部署 指南 (2).md', '工作/部署 指南.md', '生活/清单.md']);
+    const text = strFromU8(files['生活/清单.md']);
+    expect(text).toBe('# C');
   });
 });

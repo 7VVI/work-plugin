@@ -56,6 +56,31 @@
         </div>
         <input ref="fileInput" type="file" accept=".json,application/json,.md,text/markdown" class="hidden-input" @change="onFileChange" />
       </section>
+
+      <!-- 笔记归档 -->
+      <section class="panel ie-card ie-wide">
+        <div class="io-icon archive"><i class="fa-solid fa-box-archive"></i></div>
+        <h3 class="io-title">笔记归档</h3>
+        <p class="io-desc">把一批 .md 文档导入成笔记，或把全部笔记按笔记本分目录导出为 zip。</p>
+        <div class="io-row">
+          <span class="io-label">导入到</span>
+          <select v-model="importBookId" class="form-select archive-select">
+            <option value="">自动（导入笔记）</option>
+            <option v-for="book in books" :key="book.id" :value="book.id">{{ book.name }}</option>
+          </select>
+        </div>
+        <div class="archive-actions">
+          <button class="btn btn-primary io-btn" @click="mdInput?.click()">
+            <i class="fa-solid fa-file-import"></i>
+            <span>导入 Markdown 文件</span>
+          </button>
+          <button class="btn btn-ghost io-btn" @click="onExportNotesZip">
+            <i class="fa-solid fa-file-zipper"></i>
+            <span>导出全部笔记（zip）</span>
+          </button>
+        </div>
+        <input ref="mdInput" type="file" accept=".md,.markdown,text/markdown" multiple class="hidden-input" @change="onImportNotes" />
+      </section>
     </div>
 
     <!-- 琥珀警示 -->
@@ -67,9 +92,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { importExportService } from '@shared/services/importExportService';
+import { noteBookRepo } from '@shared/db/repositories/noteBookRepo';
 import { useToastStore } from '@shared/stores/toastStore';
+import type { NoteBook } from '@shared/types/entities';
 
 const toast = useToastStore();
 
@@ -78,6 +105,17 @@ const format = ref<'json' | 'md'>('json');
 const includePasswords = ref(false);
 const dragOver = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+const mdInput = ref<HTMLInputElement | null>(null);
+const books = ref<NoteBook[]>([]);
+const importBookId = ref('');
+
+onMounted(async () => {
+  try {
+    books.value = await noteBookRepo.all();
+  } catch {
+    books.value = [];
+  }
+});
 
 async function onExport() {
   const stamp = new Date().toISOString().slice(0, 10);
@@ -143,12 +181,51 @@ async function importFile(file: File) {
 
 function downloadFile(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime });
+  downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function onImportNotes(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  if (!files.length) return;
+  try {
+    const payload = await Promise.all(files.map(async file => ({ name: file.name, text: await file.text() })));
+    const result = await importExportService.importNoteFiles(payload, importBookId.value || undefined);
+    books.value = await noteBookRepo.all();
+    if (result.created === 0) {
+      toast.error(result.skipped[0]?.reason ?? '没有可导入的笔记');
+      return;
+    }
+    const skipped = result.skipped.length ? `，跳过 ${result.skipped.length} 个` : '';
+    toast.success(`已导入 ${result.created} 篇笔记${skipped}`);
+  } catch (e) {
+    toast.error((e as Error).message || '导入失败');
+  }
+}
+
+async function onExportNotesZip(): Promise<void> {
+  try {
+    const { blob, count } = await importExportService.exportNotesZip();
+    if (count === 0) {
+      toast.error('还没有可导出的笔记');
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlob(blob, `dock-notes-${stamp}.zip`);
+    toast.success(`已导出 ${count} 篇笔记`);
+  } catch (e) {
+    toast.error((e as Error).message || '导出失败');
+  }
 }
 </script>
 
@@ -243,6 +320,13 @@ function downloadFile(content: string, filename: string, mime: string) {
 .dz-text { font-size: var(--text-sm); }
 .dz-ext { font-size: var(--text-xs); color: var(--text-quaternary); }
 .hidden-input { display: none; }
+
+/* 笔记归档：整行卡片，两个动作并排 */
+.ie-wide { grid-column: 1 / -1; }
+.io-icon.archive { background: rgba(124,58,237,.08); color: #7c3aed; box-shadow: inset 0 0 0 1px rgba(124,58,237,.2); }
+.archive-select { max-width: 260px; }
+.archive-actions { display: flex; gap: var(--gap-sm); flex-wrap: wrap; }
+.archive-actions .io-btn { margin-top: 0; }
 
 .warn-bar {
   margin-top: var(--gap-lg);

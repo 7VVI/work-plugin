@@ -13,6 +13,8 @@ import { db } from '../db/schema';
 import { deletionId } from '../db/deletionLog';
 import { generateId } from '../utils/id';
 import { MAX_NOTE_CONTENT } from '@protocol/limits';
+import { strToU8, zipSync } from 'fflate';
+import { sanitizeFilename } from '../utils/noteUtils';
 import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
@@ -51,6 +53,20 @@ export interface ImportSummary {
   };
   skipped: { count: number; reasons: string[] };
   errors: string[];
+}
+
+export interface NoteFileImportResult {
+  notebookId: string;
+  created: number;
+  skipped: Array<{ name: string; reason: string }>;
+}
+
+/** 从文件名/首个标题推断笔记标题 */
+export function noteTitleFromFile(name: string, content: string): string {
+  const base = name.replace(/\.(md|markdown)$/i, '').trim();
+  if (base) return base.slice(0, 200);
+  const heading = content.match(/^\s*#{1,6}\s+(.+?)\s*$/m);
+  return (heading?.[1] ?? '').trim().slice(0, 200);
 }
 
 export const importExportService = {
@@ -659,5 +675,67 @@ export const importExportService = {
     ]);
     await noteRepo.clearAll();
     await noteBookRepo.clearAll();
+  },
+
+  /** 把一批 .md 文档导入为笔记；不指定笔记本时放进「导入笔记」 */
+  async importNoteFiles(
+    files: Array<{ name: string; text: string }>,
+    targetNotebookId?: string,
+  ): Promise<NoteFileImportResult> {
+    let notebookId = targetNotebookId;
+    if (notebookId && !(await noteBookRepo.byId(notebookId))) notebookId = undefined;
+    if (!notebookId) {
+      const all = await noteBookRepo.all();
+      notebookId = all.find(book => book.name === '导入笔记')?.id ?? await noteBookRepo.create('导入笔记');
+    }
+
+    const skipped: Array<{ name: string; reason: string }> = [];
+    let created = 0;
+    for (const file of files) {
+      const text = file.text;
+      if (!text.trim()) {
+        skipped.push({ name: file.name, reason: '文件内容为空' });
+        continue;
+      }
+      if (text.length > MAX_NOTE_CONTENT) {
+        skipped.push({ name: file.name, reason: `超过单篇 ${MAX_NOTE_CONTENT} 字符上限` });
+        continue;
+      }
+      await noteRepo.create({
+        notebookId,
+        title: noteTitleFromFile(file.name, text) || '未命名笔记',
+        content: text,
+      });
+      created += 1;
+    }
+
+    return { notebookId, created, skipped };
+  },
+
+  /** 导出全部笔记为 zip：按笔记本分目录，一篇一个 .md */
+  async exportNotesZip(): Promise<{ blob: Blob; count: number }> {
+    const [books, notes] = await Promise.all([noteBookRepo.all(), noteRepo.all()]);
+    const bookName = new Map(books.map(book => [book.id, book.name]));
+    const files: Record<string, Uint8Array> = {};
+    const used = new Set<string>();
+
+    for (const note of notes) {
+      const folder = sanitizeFilename(bookName.get(note.notebookId) ?? '未分类') || '未分类';
+      const base = sanitizeFilename(note.title) || '未命名笔记';
+      let path = `${folder}/${base}.md`;
+      let index = 2;
+      while (used.has(path)) {
+        path = `${folder}/${base} (${index}).md`;
+        index += 1;
+      }
+      used.add(path);
+      files[path] = strToU8(note.content);
+    }
+
+    const zipped = zipSync(files, { level: 6 });
+    return {
+      blob: new Blob([zipped], { type: 'application/zip' }),
+      count: notes.length,
+    };
   },
 };
