@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import DOMPurify from 'dompurify';
 import { noteAssetRepo, bufferToBase64 } from '../db/repositories/noteAssetRepo';
 import { ASSET_REF_PREFIX, collectAssetRefs } from './noteAssets';
 
@@ -93,7 +94,8 @@ export interface NoteHtmlOptions {
 
 /** 把笔记 Markdown 渲染成可独立打开的单文件 HTML（样式对齐编辑器） */
 export async function renderNoteHtml(source: string, options: NoteHtmlOptions): Promise<string> {
-  const body = markdown.render(await inlineAssets(source));
+  // 正文里的原始 HTML（导入的思源片段等）先清洗再输出，导出的文件可直接分享
+  const body = DOMPurify.sanitize(markdown.render(await inlineAssets(source)));
   const meta = [options.bookName, new Date().toLocaleString()].filter(Boolean).join(' · ');
   return `<!DOCTYPE html>
 <html lang="zh-CN">

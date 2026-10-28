@@ -27,3 +27,17 @@ describe('note html export', () => {
     expect(html).toContain('src="https://example.com/a.png"');
   });
 });
+
+describe('note html export sanitizing', () => {
+  it('strips scripts and event handlers from raw html in the note', async () => {
+    const html = await renderNoteHtml(
+      '正文 <span style="color: red">红色</span>\n\n<script>alert(1)</script>\n\n<img src="x" onerror="alert(2)">',
+      { title: '清洗' },
+    );
+
+    expect(html).toContain('红色');
+    expect(html).toContain('color: red');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('onerror');
+  });
+});
