@@ -10,7 +10,7 @@
           <i class="fa-solid fa-file-circle-plus"></i>
         </button>
         <button class="mini-btn" title="新建笔记本" @click="onCreateNotebook">
-          <i class="fa-solid fa-folder-plus"></i>
+          <i class="fa-solid fa-folder-plus folder-action"></i>
         </button>
       </div>
     </div>
@@ -535,6 +535,9 @@ function onNoteDragStart(): void {
 .mini-btn:hover { background: var(--panel2); color: var(--ink); }
 .mini-btn.danger:hover { color: var(--danger); }
 .mini-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* 新建笔记本用与列表一致的暖黄文件夹，突出"笔记本"语义 */
+.mini-btn .folder-action { color: #d3a13c; }
+.mini-btn:hover .folder-action { color: #c08f2c; }
 
 .sidebar-search {
   position: relative;
