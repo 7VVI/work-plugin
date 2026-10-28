@@ -6,7 +6,23 @@ import { ASSET_REF_PREFIX, collectAssetRefs } from './noteAssets';
 const markdown = new MarkdownIt({ html: true, linkify: true, breaks: false });
 
 const PAGE_STYLE = `
-  :root { color-scheme: light; }
+  :root {
+    color-scheme: light;
+    /* 思源导出内容里的颜色变量，保证导出的 HTML 单文件也能还原颜色 */
+    --b3-font-color1: #0f1726;
+    --b3-font-color2: #6b7280;
+    --b3-font-color3: #d97706;
+    --b3-font-color4: #dc2626;
+    --b3-font-color5: #16a34a;
+    --b3-font-color6: #2563eb;
+    --b3-font-color7: #7c3aed;
+    --b3-font-color8: #db2777;
+    --b3-font-color9: #ec4899;
+    --b3-font-color10: #0891b2;
+    --b3-font-color11: #65a30d;
+    --b3-font-color12: #ca8a04;
+    --b3-font-color13: #475569;
+  }
   body {
     margin: 0;
     padding: 48px 24px 96px;

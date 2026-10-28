@@ -2,6 +2,38 @@
    Values mirror the day-light theme used by SiYuan 3.1.x:
    body 16px/1.625, headings 1.75/1.55/1.38/1.25/1.13/1em at 600,
    list marker column 34px, quote bar 4px, code block rgba(27,31,35,.05). */
+
+/* 思源导出内容里的颜色变量：导入的 <span style="color: var(--b3-font-colorN)"> 要能解析，
+   否则文字会退回正文色。数值为对齐思源配色的近似值，明暗两套各自可读。 */
+.dock-notes {
+  --b3-font-color1: #0f1726;
+  --b3-font-color2: #6b7280;
+  --b3-font-color3: #d97706;
+  --b3-font-color4: #dc2626;
+  --b3-font-color5: #16a34a;
+  --b3-font-color6: #2563eb;
+  --b3-font-color7: #7c3aed;
+  --b3-font-color8: #db2777;
+  --b3-font-color9: #ec4899;
+  --b3-font-color10: #0891b2;
+  --b3-font-color11: #65a30d;
+  --b3-font-color12: #ca8a04;
+  --b3-font-color13: #475569;
+  --b3-font-background1: color-mix(in srgb, var(--b3-font-color1) 16%, transparent);
+  --b3-font-background2: color-mix(in srgb, var(--b3-font-color2) 16%, transparent);
+  --b3-font-background3: color-mix(in srgb, var(--b3-font-color3) 16%, transparent);
+  --b3-font-background4: color-mix(in srgb, var(--b3-font-color4) 16%, transparent);
+  --b3-font-background5: color-mix(in srgb, var(--b3-font-color5) 16%, transparent);
+  --b3-font-background6: color-mix(in srgb, var(--b3-font-color6) 16%, transparent);
+  --b3-font-background7: color-mix(in srgb, var(--b3-font-color7) 16%, transparent);
+  --b3-font-background8: color-mix(in srgb, var(--b3-font-color8) 16%, transparent);
+  --b3-font-background9: color-mix(in srgb, var(--b3-font-color9) 16%, transparent);
+  --b3-font-background10: color-mix(in srgb, var(--b3-font-color10) 16%, transparent);
+  --b3-font-background11: color-mix(in srgb, var(--b3-font-color11) 16%, transparent);
+  --b3-font-background12: color-mix(in srgb, var(--b3-font-color12) 16%, transparent);
+  --b3-font-background13: color-mix(in srgb, var(--b3-font-color13) 16%, transparent);
+}
+
 .dock-notes .milkdown {
   --crepe-color-background: transparent;
   --crepe-color-on-background: var(--ink);
@@ -526,6 +558,20 @@
 [data-theme='dark'] .dock-notes .milkdown {
   --note-code-bg: rgba(255, 255, 255, 0.07);
   --note-link: #6ea8ff;
+  /* 思源文字色在暗色下提亮，保证可读 */
+  --b3-font-color1: #e8eaed;
+  --b3-font-color2: #9ba3ae;
+  --b3-font-color3: #f0a44a;
+  --b3-font-color4: #f87171;
+  --b3-font-color5: #4ade80;
+  --b3-font-color6: #60a5fa;
+  --b3-font-color7: #a78bfa;
+  --b3-font-color8: #f472b6;
+  --b3-font-color9: #f9a8c9;
+  --b3-font-color10: #22d3ee;
+  --b3-font-color11: #a3e635;
+  --b3-font-color12: #facc15;
+  --b3-font-color13: #94a3b8;
   /* 代码高亮：GitHub 暗色主题，避免浅色主题的深色文字看不清 */
   --note-tok-comment: #8b949e;
   --note-tok-keyword: #ff7b72;
