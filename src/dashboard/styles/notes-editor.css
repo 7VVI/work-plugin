@@ -361,7 +361,7 @@
   color: color-mix(in srgb, var(--ink3) 70%, transparent);
 }
 
-/* 图片块：居中显示、圆角，说明文字弱化，与正文节奏一致 */
+/* 图片块：居中显示、圆角，与正文节奏一致；不提供"图片说明"（隐藏悬浮按钮与说明输入框） */
 .dock-notes .milkdown .milkdown-image-block {
   margin: 6px 0;
 }
@@ -369,9 +369,9 @@
   border-radius: var(--radius-sm);
   background: var(--note-code-bg);
 }
+.dock-notes .milkdown .milkdown-image-block > .image-wrapper .operation,
 .dock-notes .milkdown .milkdown-image-block > .caption-input {
-  color: var(--ink3);
-  font-size: 12.5px;
+  display: none !important;
 }
 .dock-notes .milkdown .milkdown-image-inline img {
   max-width: 100%;

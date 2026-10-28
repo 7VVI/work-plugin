@@ -46,7 +46,6 @@ export const imageFeatureConfig: ImageFeatureConfig = {
   inlineConfirmButton: '确认',
   blockUploadPlaceholderText: '或粘贴图片链接',
   inlineUploadPlaceholderText: '或粘贴图片链接',
-  blockCaptionPlaceholderText: '写下图片说明…',
   onImageLoadError: () => {
     useToastStore().error('图片加载失败，可能已被删除');
   },
