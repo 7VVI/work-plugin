@@ -330,7 +330,7 @@ async function replaceLocalWithVersion(version: { snapshot: SyncSnapshot; tombst
   const tables = [
     db.groups, db.tags, db.systems, db.accounts, db.servers, db.middlewares,
     db.systemTags, db.serverTags, db.middlewareTags, db.recents,
-    db.configProjects, db.configDefs, db.deletions, db.noteBooks, db.notes,
+    db.configProjects, db.configDefs, db.deletions, db.noteBooks, db.notes, db.noteAssets,
   ];
   return withDirtyTrackingSuspended(async () => {
     await db.transaction('rw', tables, async () => {
