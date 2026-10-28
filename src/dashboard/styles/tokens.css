@@ -66,6 +66,7 @@
   --ink: #0F1726;
   --ink2: #4E5D75;
   --ink3: #8593A9;
+  --ink4: #AEB8C9;
   /* 兼容旧名 */
   --text-primary: #0F1726;
   --text-secondary: #4E5D75;
@@ -662,6 +663,7 @@ input[type="checkbox"].form-check:checked::after {
   --ink: #E8EAED;
   --ink2: #9BA3AE;
   --ink3: #6B7480;
+  --ink4: #4E545B;
   --text-primary: #E8EAED;
   --text-secondary: #9BA3AE;
   --text-tertiary: #6B7480;
