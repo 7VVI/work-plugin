@@ -38,9 +38,26 @@
             <button v-if="!sourceMode" class="note-action-btn" title="插入图片" @click="onPickImage">
               <i class="fa-solid fa-image"></i>
             </button>
-            <button class="note-action-btn" title="导出 Markdown" @click="onExport">
-              <i class="fa-solid fa-download"></i>
-            </button>
+            <div class="export-wrap">
+              <button
+                class="note-action-btn"
+                :class="{ active: exportMenuOpen }"
+                title="导出"
+                @click.stop="exportMenuOpen = !exportMenuOpen"
+              >
+                <i class="fa-solid fa-download"></i>
+              </button>
+              <div v-if="exportMenuOpen" class="export-menu" @click.stop>
+                <button class="export-item" @click="runExport('md')">
+                  <i class="fa-regular fa-file-lines"></i>
+                  <span>Markdown<span class="export-ext">.md</span></span>
+                </button>
+                <button class="export-item" @click="runExport('html')">
+                  <i class="fa-solid fa-code"></i>
+                  <span>HTML<span class="export-ext">.html</span></span>
+                </button>
+              </div>
+            </div>
             <button class="note-action-btn danger" title="删除当前笔记" @click="onDeleteActive">
               <i class="fa-solid fa-trash"></i>
             </button>
@@ -155,6 +172,7 @@ import { useCloudSyncStore } from '@shared/stores/cloudSyncStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { countNoteWords, extractOutline, sanitizeFilename } from '@shared/utils/noteUtils';
+import { renderNoteHtml } from '@shared/utils/noteHtmlExport';
 import { formatRelativeTime } from '@shared/utils/time';
 
 const NoteEditor = defineAsyncComponent(() => import('../components/notes/NoteEditor.vue'));
@@ -180,6 +198,7 @@ const activeHeading = ref(0);
 const sidebarOpen = ref(false);
 const outlineOpen = ref(readOutlineOpen());
 const sourceMode = ref(readSourceMode());
+const exportMenuOpen = ref(false);
 
 let saveTimer: number | undefined;
 let savePromise: Promise<boolean> | null = null;
@@ -396,17 +415,35 @@ async function onDeleteActive(): Promise<void> {
   }
 }
 
-function onExport(): void {
+/** 导出面板：Markdown / HTML（HTML 为单文件，图片内嵌为 data URL） */
+function runExport(kind: 'md' | 'html'): void {
+  exportMenuOpen.value = false;
   const content = editorRef.value?.getMarkdown?.() ?? draftContent.value;
-  const filename = `${sanitizeFilename(displayTitle.value)}.md`;
-  const blob = new Blob([content], { type: 'text/markdown' });
+  const base = sanitizeFilename(displayTitle.value) || '未命名笔记';
+  if (kind === 'md') {
+    downloadText(content, `${base}.md`, 'text/markdown');
+    toast.success('笔记已导出');
+    return;
+  }
+  void renderNoteHtml(content, {
+    title: displayTitle.value,
+    bookName: store.activeNote ? store.bookName(store.activeNote.notebookId) : undefined,
+  })
+    .then(html => {
+      downloadText(html, `${base}.html`, 'text/html');
+      toast.success('已导出 HTML');
+    })
+    .catch(error => toast.error(error instanceof Error ? error.message : String(error)));
+}
+
+function downloadText(content: string, filename: string, mime: string): void {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-  toast.success('笔记已导出');
 }
 
 /** 选择本地图片插入到当前光标处 */
@@ -490,6 +527,8 @@ onMounted(async () => {
   await store.load();
   if (store.activeNote) resetDraftFromStore(true);
   document.addEventListener('visibilitychange', onVisibilityChange);
+  document.addEventListener('mousedown', onExportMenuDismiss, true);
+  document.addEventListener('keydown', onExportMenuKeydown, true);
   window.addEventListener('pagehide', onPageHide);
 });
 
@@ -497,9 +536,22 @@ onBeforeUnmount(() => {
   if (saveTimer) window.clearTimeout(saveTimer);
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
   document.removeEventListener('visibilitychange', onVisibilityChange);
+  document.removeEventListener('mousedown', onExportMenuDismiss, true);
+  document.removeEventListener('keydown', onExportMenuKeydown, true);
   window.removeEventListener('pagehide', onPageHide);
   void flushSave();
 });
+
+function onExportMenuDismiss(event: MouseEvent): void {
+  if (!exportMenuOpen.value) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.('.export-wrap')) return;
+  exportMenuOpen.value = false;
+}
+
+function onExportMenuKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') exportMenuOpen.value = false;
+}
 
 onBeforeRouteLeave(async () => {
   const ok = await flushSave();
@@ -595,6 +647,39 @@ onBeforeRouteLeave(async () => {
 .note-action-btn:hover { background: var(--panel2); color: var(--ink); }
 .note-action-btn.active { background: var(--panel2); color: var(--accent); }
 .note-action-btn.danger:hover { color: var(--danger); }
+/* 导出下拉：图标与思源的导出菜单一致，右侧按钮 + 浮层 */
+.export-wrap { position: relative; display: inline-flex; }
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 80;
+  min-width: 168px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.export-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink2);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.export-item:hover { background: var(--panel2); color: var(--ink); }
+.export-item i { width: 14px; font-size: 12px; text-align: center; color: var(--ink3); }
+.export-item:hover i { color: var(--accent); }
+.export-ext { margin-left: 6px; color: var(--ink4); font-family: var(--font-mono); font-size: 11px; }
 .note-banners { flex-shrink: 0; }
 .note-banner {
   display: flex;
