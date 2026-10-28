@@ -43,6 +43,8 @@ const PAGE_STYLE = `
   h5 { font-size: 1.13em; }
   h6 { font-size: 1em; }
   p { margin: 2px 0; padding: 4px; }
+  mark { padding: 0 .1em; border-radius: 2px; background: rgba(255, 214, 0, .38); color: inherit; }
+  sup, sub { line-height: 0; }
   a { color: #4285f4; text-decoration: none; }
   a:hover { text-decoration: underline; }
   ul, ol { margin: 2px 0; padding: 4px 4px 4px 1.8em; }

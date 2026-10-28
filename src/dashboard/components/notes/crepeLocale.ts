@@ -1,5 +1,6 @@
 import { CrepeFeature } from '@milkdown/crepe';
 import { languages as codeLanguages } from '@codemirror/language-data';
+import { buildNoteToolbar } from './crepeInlineStyles';
 
 /** 代码块语言按字母序排列（思源的语言列表也是 A-Z），便于快速定位 */
 export const sortedCodeLanguages = [...codeLanguages].sort((a, b) =>
@@ -41,6 +42,7 @@ export const zhCrepeConfig = {
     codeLabel: '行内代码',
     latexLabel: '行内公式',
     linkLabel: '链接',
+    buildToolbar: buildNoteToolbar,
   },
   [CrepeFeature.Placeholder]: {
     text: '输入 / 打开命令菜单，或直接开始写作…',

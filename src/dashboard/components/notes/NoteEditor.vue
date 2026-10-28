@@ -52,6 +52,7 @@ import { zhCrepeConfig, sortedCodeLanguages } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
 import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
 import { htmlRenderSchema, htmlRemark } from './crepeHtml';
+import { inlineStyleSchemas, inlineStyleStringify, closeColorPanel } from './crepeInlineStyles';
 import { noteKeyBehavior } from './crepeKeys';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
@@ -137,6 +138,9 @@ async function createEditor(): Promise<void> {
     instance.editor.use(trimPastedCodeBlock);
     // Markdown 里的行内 HTML（如思源导出的 <span style>）按 HTML 渲染
     instance.editor.use(htmlRemark).use(htmlRenderSchema);
+    // 下划线 / 高亮 / 上下标 / 字体颜色：工具栏可切换，写回 Markdown 仍是 HTML 标签
+    for (const schema of inlineStyleSchemas) instance.editor.use(schema);
+    instance.editor.config(inlineStyleStringify);
 
     await instance.create();
     if (destroyed) {
@@ -554,6 +558,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onMenuDismiss, true);
   document.removeEventListener('keydown', onMenuKeydown, true);
   closeMenu();
+  closeColorPanel();
   destroyed = true;
   void destroyEditor();
 });

@@ -18,6 +18,21 @@ describe('note html export', () => {
     expect(html).toContain('工作');
   });
 
+  it('keeps inline style tags and the siyuan color variables', async () => {
+    const html = await renderNoteHtml(
+      '<u>下划线</u> <mark>高亮</mark> <sup>2</sup> <sub>2</sub> <span style="color: var(--b3-font-color6)">蓝色</span>',
+      { title: '样式' },
+    );
+
+    expect(html).toContain('<u>下划线</u>');
+    expect(html).toContain('<mark>高亮</mark>');
+    expect(html).toContain('<sup>2</sup>');
+    expect(html).toContain('<sub>2</sub>');
+    expect(html).toContain('color: var(--b3-font-color6)');
+    expect(html).toContain('--b3-font-color6: #2563eb');
+    expect(html).toContain('mark {');
+  });
+
   it('escapes the title and keeps external images untouched', async () => {
     const html = await renderNoteHtml('![图](https://example.com/a.png)', {
       title: '<script>alert(1)</script>',

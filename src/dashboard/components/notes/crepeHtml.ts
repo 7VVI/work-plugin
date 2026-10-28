@@ -2,16 +2,21 @@ import DOMPurify from 'dompurify';
 import { htmlSchema } from '@milkdown/kit/preset/commonmark';
 import { $remark } from '@milkdown/kit/utils';
 import remarkParse from 'remark-parse';
+import { INLINE_STYLE_TAGS, inlineHtmlColor } from './crepeInlineStyles';
 
 interface MdastLike {
   type?: string;
   value?: string;
+  color?: string;
   children?: MdastLike[];
 }
 
 const TAG_RE = /^<([a-zA-Z][\w-]*)(\s[^>]*)?>$/;
 const CLOSE_RE = /^<\/([a-zA-Z][\w-]*)\s*>$/;
 const SELF_CLOSING_RE = /^<([a-zA-Z][\w-]*)(\s[^>]*)?\/>$/;
+
+/** 空元素没有闭合标签，按原样保留，避免 <br> 之类被当成落单标签丢掉 */
+const VOID_TAGS = new Set(['br', 'img', 'hr', 'input', 'wbr']);
 
 function tagName(value: string, re: RegExp): string | null {
   const match = re.exec(value.trim());
@@ -26,8 +31,10 @@ function inlineText(node: MdastLike): string {
 }
 
 /**
- * remark 会把行内 HTML 拆成「开标签 + 内容 + 闭标签」三个节点，
- * 这里把成对的标签合并回一个 html 节点；落单的标签直接丢弃，避免露出原始标签。
+ * remark 会把行内 HTML 拆成「开标签 + 内容 + 闭标签」三个节点：
+ * - <u>/<mark>/<sup>/<sub> 和带颜色的 span 转成对应的 mark 节点，
+ *   这样工具栏能识别状态，写回 Markdown 时仍是原生标签；
+ * - 其余成对标签合并回一个 html 节点；落单的标签直接丢弃，避免露出原始标签。
  */
 export function mergeInlineHtml(children: MdastLike[]): MdastLike[] {
   const result: MdastLike[] = [];
@@ -43,7 +50,7 @@ export function mergeInlineHtml(children: MdastLike[]): MdastLike[] {
 
     const raw = node.value.trim();
     const openName = SELF_CLOSING_RE.test(raw) ? null : tagName(raw, TAG_RE);
-    if (!openName) {
+    if (!openName || VOID_TAGS.has(openName)) {
       result.push(node);
       index += 1;
       continue;
@@ -51,7 +58,6 @@ export function mergeInlineHtml(children: MdastLike[]): MdastLike[] {
 
     let depth = 1;
     let cursor = index + 1;
-    let inner = '';
     let closed = false;
     for (; cursor < children.length; cursor++) {
       const current = children[cursor];
@@ -65,10 +71,7 @@ export function mergeInlineHtml(children: MdastLike[]): MdastLike[] {
         } else if (tagName(current.value, TAG_RE) === openName) {
           depth += 1;
         }
-        inner += current.value;
-        continue;
       }
-      inner += inlineText(current);
     }
 
     if (!closed) {
@@ -77,7 +80,31 @@ export function mergeInlineHtml(children: MdastLike[]): MdastLike[] {
       continue;
     }
 
-    result.push({ type: 'html', value: `${children[index].value}${inner}${children[cursor].value}` });
+    const inner = children.slice(index + 1, cursor);
+    const styleType = (INLINE_STYLE_TAGS as Record<string, string | undefined>)[openName];
+    if (styleType) {
+      result.push({ type: styleType, children: mergeInlineHtml(inner) });
+      index = cursor + 1;
+      continue;
+    }
+
+    const color = openName === 'span' ? inlineHtmlColor(node.value) : null;
+    if (color) {
+      result.push({ type: 'textColor', color, children: mergeInlineHtml(inner) });
+      index = cursor + 1;
+      continue;
+    }
+
+    const parts: string[] = [node.value];
+    for (const current of inner) {
+      parts.push(
+        current.type === 'html' && typeof current.value === 'string'
+          ? current.value
+          : inlineText(current),
+      );
+    }
+    parts.push(children[cursor].value ?? '');
+    result.push({ type: 'html', value: parts.join('') });
     index = cursor + 1;
   }
 

@@ -88,6 +88,18 @@
   line-height: 1.625;
 }
 
+/* 高亮用思源的荧光笔暖黄，正文与暗色模式下文字颜色都保持不变 */
+.dock-notes .milkdown .ProseMirror mark {
+  padding: 0 0.1em;
+  border-radius: 2px;
+  background: rgba(255, 214, 0, 0.38);
+  color: inherit;
+}
+.dock-notes .milkdown .ProseMirror sup,
+.dock-notes .milkdown .ProseMirror sub {
+  line-height: 0;
+}
+
 /* SiYuan blocks share the same 2px margin / 4px padding rhythm. */
 .dock-notes .milkdown .ProseMirror p,
 .dock-notes .milkdown .ProseMirror h1,
@@ -554,6 +566,40 @@
 .milkdown-toolbar .toolbar-item:hover { background: var(--panel2); color: var(--ink); }
 .dock-notes .milkdown-toolbar .toolbar-item.active svg,
 .milkdown-toolbar .toolbar-item.active svg { color: var(--accent); }
+
+/* 字体颜色面板：挂在 .milkdown 下以便复用思源的 --b3-font-colorN */
+.note-color-panel {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(7, 18px);
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.note-color-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.note-color-swatch:hover { transform: scale(1.15); }
+.note-color-reset {
+  grid-column: 1 / -1;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.note-color-reset:hover { background: var(--panel2); color: var(--ink); }
 
 [data-theme='dark'] .dock-notes .milkdown {
   --note-code-bg: rgba(255, 255, 255, 0.07);
