@@ -31,32 +31,32 @@
         @end="onDragEnd"
       >
         <div v-for="m in filtered" :key="m.id" class="panel stat-card mw-card" @click="onEdit(m)">
-          <!-- 图标 + 环境 -->
+          <!-- 环境 + 操作 -->
           <div class="card-top">
-            <span class="card-icon" :style="iconStyle(m)">
-              <i :class="mwMeta(m.type).icon"></i>
-            </span>
-            <div class="card-top-right">
-              <EnvBadge :env="mwEnv(m)" />
-              <div class="card-actions">
-                <button class="ibtn ibtn-sm" title="编辑 / 查看详情" @click.stop="onEdit(m)">
-                  <i class="fa-solid fa-pen"></i>
-                </button>
-                <button class="ibtn ibtn-sm danger" title="删除" @click.stop="onDelete(m.id)">
-                  <i class="fa-regular fa-trash-can"></i>
-                </button>
-              </div>
+            <EnvBadge :env="mwEnv(m)" />
+            <div class="card-actions">
+              <button class="ibtn ibtn-sm" title="编辑 / 查看详情" @click.stop="onEdit(m)">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="ibtn ibtn-sm danger" title="删除" @click.stop="onDelete(m.id)">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
             </div>
           </div>
 
-          <!-- 名称 + 类型 -->
-          <div class="card-title-row">
-            <span class="card-name t1">{{ m.name }}</span>
-            <span class="type-badge t2">{{ m.type }}{{ m.version ? ' ' + m.version : '' }}</span>
+          <!-- 图标 + 名称 -->
+          <div class="card-id">
+            <span class="card-icon" :style="iconStyle(m)">
+              <i :class="mwMeta(m.type).icon"></i>
+            </span>
+            <div class="card-id-text">
+              <div class="card-title-row">
+                <span class="card-name t1">{{ m.name }}</span>
+                <span class="type-badge t2">{{ m.type }}{{ m.version ? ' ' + m.version : '' }}</span>
+              </div>
+              <div class="card-addr t3">{{ m.host }}:{{ m.port }}{{ m.database ? ' / ' + m.database : '' }}</div>
+            </div>
           </div>
-
-          <!-- 地址 -->
-          <div class="card-addr t3">{{ m.host }}:{{ m.port }}{{ m.database ? ' / ' + m.database : '' }}</div>
 
           <!-- 详情 -->
           <dl class="card-dl">
@@ -316,12 +316,13 @@ async function onDragEnd(event: any) {
 }
 .card-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
 }
 .card-icon {
   width: 40px;
   height: 40px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -329,11 +330,14 @@ async function onDragEnd(event: any) {
   color: #fff;
   font-size: var(--text-base);
 }
-.card-top-right {
+.card-id {
+  margin-top: 12px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  min-width: 0;
 }
+.card-id-text { min-width: 0; }
 .card-actions {
   display: flex;
   gap: 2px;
@@ -346,16 +350,20 @@ async function onDragEnd(event: any) {
 
 /* 名称 + 类型 */
 .card-title-row {
-  margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .card-name {
   font-size: 14px;
   font-weight: var(--font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .type-badge {
+  flex: none;
   font-family: var(--font-mono);
   font-size: 10px;
   border-radius: 4px;

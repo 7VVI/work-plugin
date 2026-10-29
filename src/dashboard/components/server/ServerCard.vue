@@ -1,17 +1,11 @@
 <template>
   <div class="panel stat-card server-card" @click="$emit('select')">
-    <!-- 状态点 + 操作 -->
+    <!-- 环境 + 操作 -->
     <div class="card-top">
-      <span class="status" :style="{ color: online ? 'var(--ok)' : 'var(--ink3)' }">
-        <span class="dot-ping">
-          <span v-if="online" class="ping" :style="{ background: 'var(--ok)' }"></span>
-          <span class="dot" :style="dotStyle"></span>
-        </span>
-        {{ statusLabel }}
-      </span>
+      <EnvBadge :env="server.environment" />
       <div class="card-actions">
-        <button class="ibtn ibtn-sm" title="终端" @click.stop="onCopySsh">
-          <i class="fa-solid fa-terminal"></i>
+        <button class="ibtn ibtn-sm" title="复制 SSH 连接信息" @click.stop="onCopySsh">
+          <i class="fa-regular fa-copy"></i>
         </button>
         <button class="ibtn ibtn-sm danger" title="删除" @click.stop="$emit('delete')">
           <i class="fa-regular fa-trash-can"></i>
@@ -28,10 +22,9 @@
       </div>
     </div>
 
-    <!-- 环境徽章 -->
-    <div class="card-env">
-      <EnvBadge :env="server.environment" />
-      <span v-if="server.purpose" class="chip">{{ server.purpose }}</span>
+    <!-- 用途 -->
+    <div v-if="server.purpose" class="card-env">
+      <span class="chip">{{ server.purpose }}</span>
     </div>
 
     <!-- 详情列表 -->
@@ -52,18 +45,17 @@
 
     <!-- 操作按钮 -->
     <div class="card-btns">
+      <button class="btn-p card-btn card-btn-primary" @click.stop="$emit('connect')">
+        <i class="fa-solid fa-terminal"></i>连接
+      </button>
       <button class="btn-g card-btn" @click.stop="onCopyIp">
         <i class="fa-regular fa-copy"></i>复制 IP
-      </button>
-      <button class="btn-g card-btn" @click.stop="onCopySsh">
-        <i class="fa-solid fa-terminal"></i>复制 SSH
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { Server } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
 import { copyToClipboard } from '@shared/utils/clipboard';
@@ -72,22 +64,9 @@ import { useToastStore } from '@shared/stores/toastStore';
 import EnvBadge from '../common/EnvBadge.vue';
 
 const props = defineProps<{ server: Server }>();
-defineEmits<{ select: []; delete: [] }>();
+defineEmits<{ select: []; delete: []; connect: [] }>();
 
 const toast = useToastStore();
-
-const statusKey = computed(() => props.server.status ?? 'online');
-const online = computed(() => statusKey.value !== 'offline');
-const statusLabel = computed(() => ({
-  online: '在线',
-  warn: '告警',
-  offline: '离线',
-}[statusKey.value as string] ?? '在线'));
-
-const dotStyle = computed(() => ({
-  background: online.value ? 'var(--ok)' : 'var(--ink3)',
-  boxShadow: online.value ? '0 0 8px var(--ok)' : 'transparent',
-}));
 
 async function onCopyIp() {
   try {
@@ -124,37 +103,6 @@ async function onCopySsh() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: var(--font-medium);
-}
-.dot-ping {
-  position: relative;
-  display: inline-flex;
-  width: 6px;
-  height: 6px;
-}
-.dot-ping .ping {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  opacity: 0.6;
-  animation: svrPing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-.dot-ping .dot {
-  position: relative;
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-@keyframes svrPing {
-  0% { transform: scale(1); opacity: 0.6; }
-  75%, 100% { transform: scale(2.4); opacity: 0; }
 }
 .card-actions {
   display: flex;
@@ -241,13 +189,25 @@ async function onCopySsh() {
 .card-btns {
   margin-top: 12px;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .card-btn {
   flex: 1;
   justify-content: center;
-  padding: 6px 14px;
+  padding: 6px 10px;
   font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.card-btn-primary {
+  flex: 1.2;
+  background: #4e5d75;
+  box-shadow: 0 2px 8px rgba(15, 23, 38, 0.14);
+}
+.card-btn-primary:hover {
+  background: #3a475c;
+  filter: none;
+  box-shadow: 0 4px 14px rgba(15, 23, 38, 0.18);
 }
 .card-btn i { font-size: 10px; }
 </style>

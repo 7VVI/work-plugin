@@ -47,6 +47,7 @@
 - 记录服务器 IP、端口、SSH 凭据等
 - 按环境（生产/开发/测试/预发）筛选
 - 一键复制连接信息
+- 卡片「连接」直接打开 SSH 终端（扩展与云端 Web 面板均可）：服务端用 `ssh2` 建立真实 SSH 会话并通过 WebSocket 转发终端流，插件只做透传；支持密码与无口令私钥、终端自适应尺寸、断线重连、复制选中与清屏。终端内右键可快速复制选区或粘贴剪贴板内容。使用前需启用云端同步，服务端需开启 `DOCK_SSH_ENABLED`（默认开启）
 
 ### 中间件管理
 - 支持 Redis、MySQL、PostgreSQL、MongoDB、Elasticsearch、RabbitMQ、Kafka、Nginx、MinIO 等
@@ -104,6 +105,7 @@
 | 路由 | Vue Router 4 |
 | 拖拽排序 | vue-draggable-plus |
 | 笔记编辑器 | Milkdown Crepe（ProseMirror + remark）/ KaTeX |
+| SSH 终端 | @xterm/xterm（前端）+ ssh2（服务端，WebSocket 透传） |
 | 加密 | Web Crypto API (PBKDF2 / AES-GCM) |
 | 云端服务 | Node 22 + Fastify + SQLite (better-sqlite3) |
 | 云端面板 | Vue 3（复用管理面板）+ 内存 IndexedDB |
@@ -126,13 +128,15 @@ src/
     ├── crypto/       # 加密模块
     ├── db/           # Dexie 数据库 & 仓库
     ├── services/     # 业务服务层
+    ├── ssh/          # SSH 取票、WebSocket 客户端封装
     ├── sync/         # 云端同步（快照/恢复/调度）
     ├── stores/       # Pinia 状态
     ├── types/        # TypeScript 类型
     └── utils/        # 工具函数
 
-shared/protocol/      # 扩展与服务端共用的同步协议
+shared/protocol/      # 扩展与服务端共用的同步协议 + SSH WS 协议
 server/               # 云端 Node/Fastify 服务与 SQLite
+└── src/ssh/          # SSH 票据、WebSocket 路由、ssh2 会话
 ```
 
 ## 开发
@@ -183,6 +187,7 @@ npm run lint
 - **主密码**：扩展启用主密码时，上传/恢复要求保险库已解锁；Token 也用主密钥加密后保存在 `chrome.storage.local`。
 - **版本历史**：每次变更的快照同样使用 `DOCK_DATA_KEY` 派生的密钥加密落盘；默认保留最近 100 条，可用 `DOCK_HISTORY_LIMIT` 调整。
 - **传输与落盘**：域名必须使用 HTTPS；IP 地址（含内网 IP:端口）允许 HTTP，但会明文传输，仅建议内网使用；生产部署请用 Caddy/Nginx/Traefik 终止 TLS。
+- **SSH 终端**：服务端在这里充当 SSH 堡垒机。扩展/Web 先通过已认证的 HTTP 接口换取 30 秒一次性票据（绑定 `serverId` 与 Origin、单次使用），再用票据升级 WebSocket；服务端只允许连接云端快照中存在的服务器，客户端不能任意指定 host/port。会话默认全局 8、单服务器 2、30 分钟空闲断开；日志只记录 serverId、结果、主机指纹与时长，不记录凭据或终端内容。当前接受任意主机指纹（服务端与终端标题栏会展示 SHA256 指纹），不支持带口令的私钥，生产环境请确保云端与目标服务器网络可信。
 
 ### Docker 部署
 
@@ -195,8 +200,21 @@ docker compose up -d --build
 - 镜像默认监听 `8080`，SQLite 数据在 `/data/dock.sqlite`，使用命名卷 `dock-data` 持久化。
 - 访问 `https://你的域名/`，输入 `DOCK_ADMIN_SECRET` 进入与插件一致的云端管理面板。
 - 反向代理需转发到容器 `8080`；保持 `DOCK_COOKIE_SECURE=true`，并设置 `DOCK_PUBLIC_ORIGIN=https://你的域名`。
+- **SSH 终端**默认开启（`DOCK_SSH_ENABLED=true`），可用 `DOCK_SSH_MAX_SESSIONS` / `DOCK_SSH_MAX_PER_SERVER` / `DOCK_SSH_IDLE_MS` / `DOCK_SSH_TICKET_TTL_MS` 调整会话与票据；设为 `DOCK_SSH_ENABLED=false` 可完全关闭。
+- 反向代理必须支持 WebSocket Upgrade（Nginx 示例）：
+  ```nginx
+  location /api/ssh/ws {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;
+    proxy_buffering off;
+  }
+  ```
+  终端票据在 WS query 中，建议关闭或脱敏反代访问日志中的 `ticket` 参数。
 - 本地 HTTP 调试可设置 `DOCK_COOKIE_SECURE=false`、`DOCK_PUBLIC_ORIGIN=http://localhost:8080`；使用内网 IP 时填 `http://192.168.1.10:8080` 即可。
-- **升级顺序**：包含笔记同步的版本请先更新服务端镜像，再更新扩展。新服务端兼容旧客户端缺少笔记表的快照；旧服务端会忽略笔记字段，升级后下一次同步会自动补齐。
+- **升级顺序**：包含笔记或 SSH 终端的版本请先更新服务端镜像，再更新扩展。新服务端兼容旧客户端缺少笔记表的快照；旧服务端会忽略笔记字段，升级后下一次同步会自动补齐；旧服务端没有 `/api/ssh/*`，终端会提示先升级服务端。
 
 ### 扩展配置
 
@@ -228,6 +246,8 @@ docker compose up -d --build
 - 冲突按整条记录 `updatedAt` 后写胜出；同一记录不同字段的并发编辑可能丢失较旧的一次。笔记编辑页会检测远端更新并提示「覆盖保存 / 加载云端」。
 - 单进程 SQLite，不支持多副本水平扩展。
 - 云端 API Token 使用主密码加密保存在本地；修改或关闭主密码后需要重新输入 Token。
+- SSH 终端 v1 不支持 SFTP/文件传输、端口转发、多窗口分屏、会话录制与审计；不支持带口令的私钥；当前接受任意主机指纹（展示 SHA256，尚未做 known_hosts/TOFU pinning）。
+- SSH 终端依赖云端同步与已解锁的保险库；本地尚未同步的服务器会先触发一次同步。服务端必须能访问目标 SSH 端口，反向代理必须支持 WebSocket Upgrade；连接阶段会显示进度，约 20 秒未建立会提示超时与网络可达性检查。
 
 ## 快捷键
 
