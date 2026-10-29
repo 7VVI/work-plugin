@@ -57,6 +57,17 @@
             </template>
           </div>
         </VueDraggable>
+
+        <!-- 未分组（虚拟项：groupId 为空的记录自动归到这里） -->
+        <div
+          class="group-item ungrouped-item"
+          :class="{ active: modelValue === UNGROUPED_GROUP_ID }"
+          @click="select(UNGROUPED_GROUP_ID)"
+        >
+          <span class="group-dot ungrouped-dot"></span>
+          <span class="group-name">未分组</span>
+          <span class="group-count t3">{{ ungroupedCount }}</span>
+        </div>
       </div>
     </div>
 
@@ -109,11 +120,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from 'vue';
+import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useGroupStore } from '@shared/stores/groupStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import { UNGROUPED_GROUP_ID, isUngrouped } from '@shared/utils/groupFilter';
 import type { Group, EntityType } from '@shared/types/entities';
 
 const props = defineProps<{
@@ -155,6 +167,7 @@ function select(id: string) {
 function countOf(id: string) {
   return props.records.filter(r => r.groupId === id).length;
 }
+const ungroupedCount = computed(() => props.records.filter(r => isUngrouped(r.groupId)).length);
 
 /* ---------- 新建分组 ---------- */
 const createOpen = ref(false);
@@ -283,6 +296,11 @@ async function onDelete(g: Group) {
 .group-item.active .group-dot { box-shadow: 0 0 6px currentColor; }
 .all-dot {
   background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+.ungrouped-item { margin-top: 4px; }
+.ungrouped-dot {
+  background: var(--ink4);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink3) 35%, transparent);
 }
 .group-name {
   flex: 1;

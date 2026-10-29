@@ -53,7 +53,7 @@
       </VueDraggable>
     </div>
 
-    <ServerForm :visible="formVisible" :server="editing" :default-group-id="selectedGroupId === 'all' ? '' : selectedGroupId" @close="formVisible = false" @saved="onSaved" />
+    <ServerForm :visible="formVisible" :server="editing" :default-group-id="defaultGroupId" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
 
@@ -67,6 +67,7 @@ import type { Server, Environment } from '@shared/types/entities';
 import ServerCard from '../components/server/ServerCard.vue';
 import ServerForm from '../components/server/ServerForm.vue';
 import GroupSidebar from '../components/common/GroupSidebar.vue';
+import { UNGROUPED_GROUP_ID, matchesGroupFilter } from '@shared/utils/groupFilter';
 
 const store = useServerStore();
 const dialog = useDialogStore();
@@ -75,15 +76,17 @@ const formVisible = ref(false);
 const editing = ref<Server | null>(null);
 const search = ref('');
 const selectedGroupId = ref<string>('all');
+const defaultGroupId = computed(() => (
+  selectedGroupId.value === 'all' || selectedGroupId.value === UNGROUPED_GROUP_ID
+    ? ''
+    : selectedGroupId.value
+));
 const selectedEnv = ref<Environment | 'all'>('all');
 
 onMounted(async () => { await store.load(); });
 
 const filteredServers = computed(() => {
-  let result = store.list;
-  if (selectedGroupId.value !== 'all') {
-    result = result.filter(s => s.groupId === selectedGroupId.value);
-  }
+  let result = store.list.filter(s => matchesGroupFilter(s.groupId, selectedGroupId.value));
   if (selectedEnv.value !== 'all') {
     result = result.filter(s => s.environment === selectedEnv.value);
   }

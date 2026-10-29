@@ -89,7 +89,7 @@
       </VueDraggable>
     </div>
 
-    <MiddlewareForm :visible="formVisible" :middleware="editing" :default-group-id="selectedGroupId === 'all' ? '' : selectedGroupId" @close="formVisible = false" @saved="onSaved" />
+    <MiddlewareForm :visible="formVisible" :middleware="editing" :default-group-id="defaultGroupId" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
 
@@ -104,6 +104,7 @@ import { formatRelativeTime } from '@shared/utils/time';
 import MiddlewareForm from '../components/middleware/MiddlewareForm.vue';
 import EnvBadge from '../components/common/EnvBadge.vue';
 import GroupSidebar from '../components/common/GroupSidebar.vue';
+import { UNGROUPED_GROUP_ID, matchesGroupFilter } from '@shared/utils/groupFilter';
 
 const MW_TYPES: Record<string, { icon: string; color: string }> = {
   redis: { icon: 'fa-solid fa-bolt', color: '#DC382D' },
@@ -138,15 +139,17 @@ const formVisible = ref(false);
 const editing = ref<Middleware | null>(null);
 const search = ref('');
 const selectedGroupId = ref<string>('all');
+const defaultGroupId = computed(() => (
+  selectedGroupId.value === 'all' || selectedGroupId.value === UNGROUPED_GROUP_ID
+    ? ''
+    : selectedGroupId.value
+));
 const selectedEnv = ref<Environment | 'all'>('all');
 
 onMounted(async () => { await store.load(); });
 
 const filtered = computed(() => {
-  let result = store.list;
-  if (selectedGroupId.value !== 'all') {
-    result = result.filter(m => m.groupId === selectedGroupId.value);
-  }
+  let result = store.list.filter(m => matchesGroupFilter(m.groupId, selectedGroupId.value));
   if (selectedEnv.value !== 'all') {
     result = result.filter(m => mwEnv(m) === selectedEnv.value);
   }

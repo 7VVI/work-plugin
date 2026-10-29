@@ -144,7 +144,7 @@
     </VueDraggable>
 
     </div>
-    <SystemForm v-if="formVisible" :visible="formVisible" :system="editing" :system-id="editing?.id || ''" :default-group-id="selectedGroupId === 'all' ? '' : selectedGroupId" @close="formVisible = false" @saved="onSaved" />
+    <SystemForm v-if="formVisible" :visible="formVisible" :system="editing" :system-id="editing?.id || ''" :default-group-id="defaultGroupId" @close="formVisible = false" @saved="onSaved" />
   </div>
 </template>
 
@@ -156,6 +156,7 @@ import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import type { System, Environment } from '@shared/types/entities';
 import { formatRelativeTime } from '@shared/utils/time';
+import { UNGROUPED_GROUP_ID, matchesGroupFilter } from '@shared/utils/groupFilter';
 import { accountService } from '@shared/services/accountService';
 import { accountRepo } from '@shared/db/repositories/accountRepo';
 import { copyToClipboard } from '@shared/utils/clipboard';
@@ -170,6 +171,11 @@ const formVisible = ref(false);
 const editing = ref<System | null>(null);
 const search = ref('');
 const selectedGroupId = ref<string>('all');
+const defaultGroupId = computed(() => (
+  selectedGroupId.value === 'all' || selectedGroupId.value === UNGROUPED_GROUP_ID
+    ? ''
+    : selectedGroupId.value
+));
 const selectedEnv = ref<Environment | 'all'>('all');
 const selectedIds = ref<Set<string>>(new Set());
 const acctCounts = ref<Record<string, number>>({});
@@ -216,10 +222,7 @@ onMounted(async () => {
 });
 
 const filteredSystems = computed(() => {
-  let result = store.list;
-  if (selectedGroupId.value !== 'all') {
-    result = result.filter(s => s.groupId === selectedGroupId.value);
-  }
+  let result = store.list.filter(s => matchesGroupFilter(s.groupId, selectedGroupId.value));
   if (selectedEnv.value !== 'all') {
     result = result.filter(s => s.environment === selectedEnv.value);
   }
