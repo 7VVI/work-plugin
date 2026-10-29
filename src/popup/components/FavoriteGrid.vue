@@ -30,7 +30,6 @@
               <EnvBadge :env="s.environment" />
               <div class="item-actions">
                 <button class="row-act" title="复制（URL+默认账号密码）" @click.stop="onCopySystem(s)"><i class="fa-regular fa-copy"></i></button>
-                <button class="row-act" title="打开" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
               </div>
             </div>
           </div>

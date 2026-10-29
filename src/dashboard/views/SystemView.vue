@@ -93,7 +93,6 @@
               <div class="row-actions-fade">
                 <button class="ibtn" title="复制（URL+默认账号密码）" @click.stop="onCopySystem(s)"><i class="fa-regular fa-copy"></i></button>
                 <button class="ibtn" title="编辑" @click.stop="onEdit(s)"><i class="fa-solid fa-pen"></i></button>
-                <button class="ibtn" title="打开系统" @click.stop="onOpen(s)"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
                 <button class="ibtn danger" title="删除" @click.stop="onDelete(s.id)"><i class="fa-regular fa-trash-can"></i></button>
                 <i class="fa-solid fa-grip-vertical drag-handle row-grip" title="拖动排序"></i>
               </div>
