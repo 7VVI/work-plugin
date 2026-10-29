@@ -43,7 +43,7 @@ import {
   wrapInHeadingCommand,
   wrapInOrderedListCommand,
 } from '@milkdown/kit/preset/commonmark';
-import { insertTableCommand } from '@milkdown/kit/preset/gfm';
+import { columnResizingPlugin, insertTableCommand } from '@milkdown/kit/preset/gfm';
 import { useToastStore } from '@shared/stores/toastStore';
 import { noteAssetRepo } from '@shared/db/repositories/noteAssetRepo';
 import { assetRef } from '@shared/utils/noteAssets';
@@ -54,6 +54,14 @@ import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
 import { htmlRenderSchema, htmlRemark } from './crepeHtml';
 import { inlineStyleSchemas, inlineStyleStringify, closeColorPanel } from './crepeInlineStyles';
 import { noteKeyBehavior } from './crepeKeys';
+import {
+  destroyTableUi,
+  isTableTarget,
+  openTableMenu,
+  tableDragPlugin,
+  tableMarkdownSchemas,
+  tablePanelPlugin,
+} from './crepeTable';
 import { crepeHighlightExtension } from './crepeHighlight';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
@@ -86,6 +94,8 @@ async function createEditor(): Promise<void> {
   creating = true;
   ready.value = false;
   error.value = '';
+  // 重建编辑器前清掉属于旧实例的表格菜单/面板
+  destroyTableUi();
 
   let instance: Crepe | null = null;
 
@@ -101,7 +111,9 @@ async function createEditor(): Promise<void> {
         [Crepe.Feature.BlockEdit]: true,
         [Crepe.Feature.Toolbar]: true,
         [Crepe.Feature.LinkTooltip]: true,
-        [Crepe.Feature.Table]: true,
+        // 关闭 Crepe 的表格块：它会渲染 +/拖拽手柄，并覆盖 prosemirror-tables 的
+        // TableView（列宽拖拽因此失效）；表格能力由 GFM 预设提供
+        [Crepe.Feature.Table]: false,
         [Crepe.Feature.CodeMirror]: true,
         [Crepe.Feature.Latex]: true,
         [Crepe.Feature.ListItem]: true,
@@ -141,6 +153,14 @@ async function createEditor(): Promise<void> {
     // 下划线 / 高亮 / 上下标 / 字体颜色：工具栏可切换，写回 Markdown 仍是 HTML 标签
     for (const schema of inlineStyleSchemas) instance.editor.use(schema);
     instance.editor.config(inlineStyleStringify);
+    // GFM 预设没默认启用列宽拖拽；它同时提供表格的 TableView（.tableWrapper + colgroup）
+    instance.editor.use(columnResizingPlugin);
+    // 合并单元格/自定义列宽无法用 GFM 管道语法表达，序列化成 HTML 表并支持读回
+    for (const schema of tableMarkdownSchemas) instance.editor.use(schema);
+    // 单元格多选时的思源式面板（合并/对齐/复制/粘贴）
+    instance.editor.use(tablePanelPlugin);
+    // 表格左上角的拖拽手柄（移动整张表格）
+    instance.editor.use(tableDragPlugin);
 
     await instance.create();
     if (destroyed) {
@@ -253,6 +273,15 @@ function closeMenu(): void {
 }
 
 function onContextMenu(event: MouseEvent): void {
+  const view = getView();
+  if (!view) return;
+  if (isTableTarget(event.target, rootEl.value) && openTableMenu(view, event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeMenu();
+    closeColorPanel();
+    return;
+  }
   openMenu(event);
 }
 
@@ -559,6 +588,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onMenuKeydown, true);
   closeMenu();
   closeColorPanel();
+  destroyTableUi();
   destroyed = true;
   void destroyEditor();
 });

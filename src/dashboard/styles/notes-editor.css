@@ -359,9 +359,9 @@
 /* 代码高亮配色来自 crepeHighlight.ts（思源同款 GitHub 浅色主题）。 */
 
 /* Tables: SiYuan uses compact 4px/8px cells, 1px light borders and even-row tint. */
-.dock-notes .milkdown .milkdown-table-block {
+.dock-notes .milkdown .ProseMirror .tableWrapper {
   margin: 2px 0;
-  padding: 4px;
+  padding: 4px 0;
   border-radius: var(--radius-xs);
 }
 .dock-notes .milkdown .ProseMirror table {
@@ -373,6 +373,7 @@
 }
 .dock-notes .milkdown .ProseMirror th,
 .dock-notes .milkdown .ProseMirror td {
+  position: relative;
   padding: 4px 8px;
   border: 1px solid var(--border);
   line-height: 1.625;
@@ -389,6 +390,16 @@
 /* Crepe puts the header row inside tbody; SiYuan's first body row is not tinted. */
 .dock-notes .milkdown .ProseMirror tbody tr:nth-child(odd) td {
   background: color-mix(in srgb, var(--ink) 2%, transparent);
+}
+/* 拖拽列宽时显示的高亮线，使用主题色而非 prosemirror-tables 默认的浅蓝 */
+.dock-notes .milkdown .ProseMirror .column-resize-handle {
+  width: 3px;
+  right: -2px;
+  background: var(--accent);
+  opacity: 0.65;
+}
+.dock-notes .milkdown .ProseMirror .selectedCell::after {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .dock-notes .milkdown .ProseMirror hr {
@@ -568,8 +579,7 @@
 .milkdown-toolbar .toolbar-item.active svg { color: var(--accent); }
 
 /* 字体颜色面板：挂在 .milkdown 下以便复用思源的 --b3-font-colorN */
-.note-color-panel {
-  position: fixed;
+.note-color-panel {  position: fixed;
   z-index: 40;
   display: grid;
   grid-template-columns: repeat(7, 18px);
@@ -600,6 +610,91 @@
   cursor: pointer;
 }
 .note-color-reset:hover { background: var(--panel2); color: var(--ink); }
+
+/* 单元格右键菜单与多选面板（Teleport 到 body，与笔记右键菜单同风格） */
+.note-table-menu {
+  position: fixed;
+  z-index: 10050;
+  min-width: 214px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans);
+  color: var(--ink2);
+  font-size: 12px;
+  user-select: none;
+}
+.note-table-panel { min-width: 206px; }
+.ntm-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  cursor: default;
+}
+.ntm-item:hover { background: var(--panel2); color: var(--ink); }
+.ntm-icon { width: 14px; font-size: 11px; color: var(--ink3); text-align: center; }
+.ntm-item:hover .ntm-icon { color: var(--accent); }
+.ntm-label { flex: 1; }
+.ntm-key { color: var(--ink4); font-size: 11px; }
+.ntm-arrow { font-size: 9px; color: var(--ink4); }
+.ntm-sep { height: 1px; margin: 4px; background: var(--border); }
+.ntm-submenu {
+  position: absolute;
+  left: calc(100% - 2px);
+  top: -6px;
+  display: none;
+  min-width: 168px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.ntm-item.has-sub:hover .ntm-submenu { display: block; }
+
+/* 表格左上角的拖拽手柄：悬停表格出现，拖到其他块位置即可移动整张表 */
+.note-table-drag {
+  position: fixed;
+  z-index: 60;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink3);
+  cursor: grab;
+  box-shadow: var(--shadow-sm);
+}
+.note-table-drag:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.note-table-drag.dragging {
+  z-index: 10071;
+  cursor: grabbing;
+  opacity: 0.92;
+  box-shadow: var(--shadow-lg);
+}
+.note-table-drag svg { pointer-events: none; }
+.note-table-drop {
+  position: fixed;
+  z-index: 10060;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  pointer-events: none;
+}
 
 [data-theme='dark'] .dock-notes .milkdown {
   --note-code-bg: rgba(255, 255, 255, 0.07);

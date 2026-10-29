@@ -3,6 +3,7 @@ import { htmlSchema } from '@milkdown/kit/preset/commonmark';
 import { $remark } from '@milkdown/kit/utils';
 import remarkParse from 'remark-parse';
 import { INLINE_STYLE_TAGS, inlineHtmlColor } from './crepeInlineStyles';
+import { parseHtmlTable } from './crepeTableHtml';
 
 interface MdastLike {
   type?: string;
@@ -111,10 +112,30 @@ export function mergeInlineHtml(children: MdastLike[]): MdastLike[] {
   return result;
 }
 
-function mergeInTree(node: MdastLike): void {
+/** 表格写在 HTML 块里时，先还原成 GFM 表格节点，再走行内 HTML 合并 */
+const BLOCK_CONTAINERS = new Set(['root', 'blockquote', 'listItem']);
+
+/** commonmark 预设会把块级 HTML 包进「只含一个 html 节点的段落」，两种形态都要认 */
+function tableFromHtmlChild(child: MdastLike): MdastLike | null {
+  if (child.type === 'html' && typeof child.value === 'string') {
+    return parseHtmlTable(child.value) as MdastLike | null;
+  }
+  if (child.type === 'paragraph' && child.children?.length === 1) {
+    const only = child.children[0];
+    if (only.type === 'html' && typeof only.value === 'string') {
+      return parseHtmlTable(only.value) as MdastLike | null;
+    }
+  }
+  return null;
+}
+
+export function mergeRawHtmlTree(node: MdastLike): void {
   if (!node.children) return;
+  if (BLOCK_CONTAINERS.has(node.type ?? 'root')) {
+    node.children = node.children.map((child) => tableFromHtmlChild(child) ?? child);
+  }
   node.children = mergeInlineHtml(node.children);
-  for (const child of node.children) mergeInTree(child);
+  for (const child of node.children) mergeRawHtmlTree(child);
 }
 
 /** 开启 remark 的原生 HTML 解析，并把行内标签合并成完整片段 */
@@ -123,7 +144,7 @@ export const htmlRemark = $remark('dock-raw-html', () => {
     use: (plugin: unknown, options?: unknown) => unknown;
   }): (tree: MdastLike) => void {
     this.use(remarkParse, { html: true });
-    return (tree: MdastLike) => mergeInTree(tree);
+    return (tree: MdastLike) => mergeRawHtmlTree(tree);
   };
   return plugin as never;
 });

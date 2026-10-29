@@ -1,6 +1,7 @@
 import { CrepeFeature } from '@milkdown/crepe';
 import { languages as codeLanguages } from '@codemirror/language-data';
 import { buildNoteToolbar } from './crepeInlineStyles';
+import { buildNoteMenu } from './crepeTable';
 
 /** 代码块语言按字母序排列（思源的语言列表也是 A-Z），便于快速定位 */
 export const sortedCodeLanguages = [...codeLanguages].sort((a, b) =>
@@ -34,6 +35,7 @@ export const zhCrepeConfig = {
       table: { label: '表格' },
       math: { label: '公式' },
     },
+    buildMenu: buildNoteMenu,
   },
   [CrepeFeature.Toolbar]: {
     boldLabel: '加粗',
