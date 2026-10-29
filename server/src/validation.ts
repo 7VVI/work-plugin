@@ -280,3 +280,12 @@ export function validateRevisionParam(params: unknown): number {
   if (!Number.isInteger(value) || value <= 0) badRequest('INVALID_PAYLOAD', 'Invalid revision');
   return value;
 }
+
+export function validateSshTicketBody(body: unknown): { serverId: string } {
+  if (!body || typeof body !== 'object') badRequest('INVALID_PAYLOAD', 'Body must be an object');
+  const serverId = (body as Record<string, unknown>).serverId;
+  if (typeof serverId !== 'string' || !ID_RE.test(serverId)) {
+    badRequest('INVALID_PAYLOAD', 'Invalid serverId');
+  }
+  return { serverId };
+}

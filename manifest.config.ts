@@ -56,6 +56,7 @@ export default defineManifest({
     'contextMenus',
     'tabs',
     'clipboardWrite',
+    'clipboardRead',
     'notifications',
     'commands',
     'alarms',

@@ -10,6 +10,7 @@ import {
   normalizeSnapshot,
   normalizeTombstones,
   type ServerState,
+  type ServerRec,
   type SnapshotCounts,
   type SyncPushRequest,
   type SyncStats,
@@ -142,6 +143,10 @@ export class StateStore {
 
   getState(): ServerState {
     return this.state;
+  }
+
+  getServer(id: string): ServerRec | undefined {
+    return this.state.snapshot.data.servers.find(server => server.id === id);
   }
 
   getRevision(): number {

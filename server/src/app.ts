@@ -4,11 +4,17 @@ import { join } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
+import websocket from '@fastify/websocket';
+import { SSH_PROTOCOL } from '@protocol/ssh';
 import type { ServerConfig } from './config';
 import { openDatabase, pruneExpiredSessions, setSetting, type Db } from './db';
 import { StateStore } from './stateStore';
 import { AuthService, getBearer } from './auth';
 import { HttpError, notFound, unauthorized } from './errors';
+import { RealSshConnector, type SshConnector } from './ssh/connector';
+import { registerSshRoutes } from './ssh/routes';
+import { SshSessionManager } from './ssh/sessionManager';
+import { SshTicketStore } from './ssh/ticketStore';
 import {
   validateHistoryQuery,
   validateLoginBody,
@@ -24,6 +30,10 @@ export interface DockApp {
   auth: AuthService;
 }
 
+export interface BuildAppOptions {
+  sshConnector?: SshConnector;
+}
+
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
@@ -35,12 +45,18 @@ const CSP = [
   "base-uri 'self'",
 ].join('; ');
 
-export async function buildApp(config: ServerConfig): Promise<DockApp> {
+export async function buildApp(config: ServerConfig, options: BuildAppOptions = {}): Promise<DockApp> {
   const db = openDatabase(config.dbPath);
   pruneExpiredSessions(db);
   const store = new StateStore(db, config);
   await store.init();
   const auth = new AuthService(db, config);
+  const sshTickets = new SshTicketStore({ ttlMs: config.sshTicketTtlMs });
+  const sshSessions = new SshSessionManager(options.sshConnector ?? new RealSshConnector(), {
+    maxSessions: config.sshMaxSessions,
+    maxPerServer: config.sshMaxPerServer,
+    idleMs: config.sshIdleMs,
+  });
 
   const app = Fastify({
     logger: false,
@@ -48,13 +64,20 @@ export async function buildApp(config: ServerConfig): Promise<DockApp> {
     trustProxy: config.trustProxy,
   });
   await app.register(cookie);
+  await app.register(websocket, {
+    options: { maxPayload: 256 * 1024, perMessageDeflate: false },
+  });
 
   app.addHook('onSend', async (req, reply, payload) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');
     if (req.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
-    if (req.url.startsWith('/api/sync/') || req.url.startsWith('/api/health')) {
+    if (
+      req.url.startsWith('/api/sync/')
+      || req.url.startsWith('/api/health')
+      || req.url.startsWith('/api/ssh/')
+    ) {
       reply.header('Access-Control-Allow-Origin', '*');
     }
     if (typeof payload === 'string' && payload.includes('<!DOCTYPE html>')) {
@@ -70,9 +93,22 @@ export async function buildApp(config: ServerConfig): Promise<DockApp> {
     return reply.code(204).send();
   });
 
+  app.options('/api/ssh/*', async (_req, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    reply.header('Access-Control-Allow-Headers', 'authorization, content-type, x-dock-csrf');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    return reply.code(204).send();
+  });
+
   app.get('/api/health', async (_req, reply) => {
     reply.header('Access-Control-Allow-Origin', '*');
-    return { ok: true, service: 'dock-cloud', version: '1.0.0', time: Date.now() };
+    return {
+      ok: true,
+      service: 'dock-cloud',
+      version: '1.0.0',
+      features: { sshTerminal: config.sshEnabled, sshProtocol: SSH_PROTOCOL },
+      time: Date.now(),
+    };
   });
 
   async function requireCookie(req: FastifyRequest): Promise<void> {
@@ -187,6 +223,15 @@ export async function buildApp(config: ServerConfig): Promise<DockApp> {
     };
   });
 
+  registerSshRoutes(app, {
+    config,
+    store,
+    tickets: sshTickets,
+    sessions: sshSessions,
+    requireSyncAuth,
+    assertCsrfForCookie,
+  });
+
   if (existsSync(config.webDist)) {
     const assetsDir = join(config.webDist, 'assets');
     if (existsSync(assetsDir)) {
@@ -220,6 +265,8 @@ export async function buildApp(config: ServerConfig): Promise<DockApp> {
   });
 
   app.addHook('onClose', async () => {
+    sshSessions.closeAll();
+    sshTickets.close();
     store.close();
   });
 

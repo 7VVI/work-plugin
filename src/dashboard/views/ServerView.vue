@@ -36,6 +36,7 @@
           :server="s"
           @select="onSelect(s.id)"
           @delete="onDelete(s.id)"
+          @connect="terminalServer = s"
         />
         <button
           v-if="filteredServers.length > 0"
@@ -54,11 +55,12 @@
     </div>
 
     <ServerForm :visible="formVisible" :server="editing" :default-group-id="defaultGroupId" @close="formVisible = false" @saved="onSaved" />
+    <ServerTerminal v-if="terminalServer" :server="terminalServer" @close="terminalServer = null" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -69,11 +71,14 @@ import ServerForm from '../components/server/ServerForm.vue';
 import GroupSidebar from '../components/common/GroupSidebar.vue';
 import { UNGROUPED_GROUP_ID, matchesGroupFilter } from '@shared/utils/groupFilter';
 
+const ServerTerminal = defineAsyncComponent(() => import('../components/server/ServerTerminal.vue'));
+
 const store = useServerStore();
 const dialog = useDialogStore();
 const toast = useToastStore();
 const formVisible = ref(false);
 const editing = ref<Server | null>(null);
+const terminalServer = ref<Server | null>(null);
 const search = ref('');
 const selectedGroupId = ref<string>('all');
 const defaultGroupId = computed(() => (

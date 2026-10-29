@@ -15,6 +15,11 @@ export interface ServerConfig {
   cookieSecure: boolean;
   trustProxy: boolean;
   webDist: string;
+  sshEnabled: boolean;
+  sshMaxSessions: number;
+  sshMaxPerServer: number;
+  sshIdleMs: number;
+  sshTicketTtlMs: number;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -33,6 +38,12 @@ function parseHistoryLimit(value: string | undefined, fallback: number): number 
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(1000, Math.max(1, Math.floor(parsed)));
+}
+
+function parseLimit(value: string | undefined, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -68,5 +79,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     cookieSecure: env.DOCK_COOKIE_SECURE !== 'false',
     trustProxy: env.DOCK_TRUST_PROXY === 'true',
     webDist: resolve(env.DOCK_WEB_DIST?.trim() || '../dist-web'),
+    sshEnabled: env.DOCK_SSH_ENABLED !== 'false',
+    sshMaxSessions: parseLimit(env.DOCK_SSH_MAX_SESSIONS, 8, 1, 64),
+    sshMaxPerServer: parseLimit(env.DOCK_SSH_MAX_PER_SERVER, 2, 1, 16),
+    sshIdleMs: parseLimit(env.DOCK_SSH_IDLE_MS, 30 * 60_000, 60_000, 24 * 60 * 60_000),
+    sshTicketTtlMs: parseLimit(env.DOCK_SSH_TICKET_TTL_MS, 30_000, 5_000, 5 * 60_000),
   };
 }

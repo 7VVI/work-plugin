@@ -60,6 +60,16 @@ async function resolveToken(config: CloudConfig): Promise<string> {
   }
 }
 
+/** 终端等独立能力复用云端地址与 Bearer Token，不触发整库同步 */
+export async function createSshCloudClient(): Promise<{ endpoint: string; client: CloudClient }> {
+  const config = await readCloudConfig();
+  if (!config?.enabled || !config.endpoint) throw new CloudNotConfiguredError();
+  await ensureSecretsUnlocked();
+  const token = await resolveToken(config);
+  const endpoint = normalizeEndpoint(config.endpoint);
+  return { endpoint, client: new CloudClient(endpoint, token) };
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     if (error.name === 'AbortError') return '云端请求超时';

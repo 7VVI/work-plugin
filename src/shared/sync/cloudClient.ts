@@ -6,6 +6,7 @@ import type {
   SyncVersionMeta,
   TombstoneMap,
 } from '@protocol/types';
+import type { SshTicketResponse } from '@protocol/ssh';
 
 export class CloudHttpError extends Error {
   constructor(
@@ -83,6 +84,13 @@ export class CloudClient {
     return this.request('/api/sync/push', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async createSshTicket(serverId: string): Promise<SshTicketResponse> {
+    return this.request('/api/ssh/ticket', {
+      method: 'POST',
+      body: JSON.stringify({ serverId }),
     });
   }
 

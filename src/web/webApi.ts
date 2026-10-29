@@ -4,6 +4,7 @@ import type {
   SyncSnapshot,
   TombstoneMap,
 } from '@protocol/types';
+import type { SshTicketResponse } from '@protocol/ssh';
 
 export class WebApiError extends Error {
   constructor(
@@ -113,6 +114,13 @@ export const webApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { keepalive });
+  },
+
+  async createSshTicket(serverId: string): Promise<SshTicketResponse> {
+    return request<SshTicketResponse>('/api/ssh/ticket', {
+      method: 'POST',
+      body: JSON.stringify({ serverId }),
+    });
   },
 
   async getSettings(): Promise<{ sessionDays: number; serverTime: number; version: string }> {

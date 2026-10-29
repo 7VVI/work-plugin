@@ -29,6 +29,11 @@ function testConfig(dir: string, overrides: Partial<ServerConfig> = {}): ServerC
     cookieSecure: false,
     trustProxy: false,
     webDist: join(dir, 'web'),
+    sshEnabled: true,
+    sshMaxSessions: 8,
+    sshMaxPerServer: 2,
+    sshIdleMs: 30 * 60_000,
+    sshTicketTtlMs: 30_000,
     ...overrides,
   };
 }
