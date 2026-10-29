@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { urlMatchScore, urlMatchesSystem, matchUrl } from '../../../src/shared/utils/url';
+import { hostMatchesSystem, urlMatchScore, urlMatchesSystem, matchUrl } from '../../../src/shared/utils/url';
 
 describe('urlMatchScore', () => {
   it('同 hostname 但端口不同时不匹配（localhost 开发环境）', () => {
@@ -98,5 +98,22 @@ describe('urlMatchScore', () => {
 
   it('非法 URL 不匹配', () => {
     expect(urlMatchesSystem('not a url', 'https://example.com')).toBe(false);
+  });
+});
+
+describe('hostMatchesSystem', () => {
+  it('同一 host 不同路径视为同站（用于登录页兜底）', () => {
+    expect(hostMatchesSystem('https://agtest.zhdgps.com/user/login', 'https://agtest.zhdgps.com/system/user')).toBe(true);
+    expect(hostMatchesSystem('https://example.com/anything', 'https://example.com')).toBe(true);
+  });
+
+  it('端口不同、域名不同都不算同站', () => {
+    expect(hostMatchesSystem('http://localhost:3000/login', 'http://localhost:8080')).toBe(false);
+    expect(hostMatchesSystem('https://a.example.com/login', 'https://example.com')).toBe(false);
+  });
+
+  it('http/https 跨协议仍算同站，其他协议不算', () => {
+    expect(hostMatchesSystem('https://example.com/login', 'http://example.com')).toBe(true);
+    expect(hostMatchesSystem('ftp://example.com/login', 'http://example.com')).toBe(false);
   });
 });

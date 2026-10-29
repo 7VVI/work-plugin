@@ -12,7 +12,7 @@ export function detectLoginForm(): LoginForm[] {
   const results: LoginForm[] = [];
 
   for (const pwd of passwordFields) {
-    if (pwd.hidden || pwd.disabled) continue;
+    if (!isFillable(pwd)) continue;
     const form = pwd.closest('form');
     const usernameField = findUsernameField(pwd, form);
     if (usernameField) {
@@ -27,15 +27,28 @@ export function detectLoginForm(): LoginForm[] {
   return results;
 }
 
+/** 隐藏/禁用的输入框不能算登录字段（SPA 常放 0×0 的占位 input） */
+function isFillable(el: HTMLInputElement): boolean {
+  if (el.hidden || el.disabled || el.type === 'hidden') return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
+    return false;
+  }
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
 function findUsernameField(pwd: HTMLInputElement, form: HTMLFormElement | null): HTMLInputElement | null {
   const searchRoot = form || document;
   const candidates = Array.from(
-    searchRoot.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="email"], input:not([type])')
+    searchRoot.querySelectorAll<HTMLInputElement>(
+      'input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type])',
+    ),
   );
   return candidates
-    .filter(c => !c.hidden && !c.disabled)
+    .filter(isFillable)
     .filter(c => compareDocumentPosition(c, pwd) <= 0)
-    .sort((a, b) => getDistance(b, pwd) - getDistance(a, pwd))[0] ?? null;
+    .sort((a, b) => getDistance(a, pwd) - getDistance(b, pwd))[0] ?? null;
 }
 
 function findSubmitButton(form: HTMLFormElement | null): HTMLElement | undefined {

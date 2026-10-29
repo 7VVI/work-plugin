@@ -111,6 +111,21 @@ describe('autoFillService', () => {
 
       expect(await autoFillService.findSystemByUrl('https://example.com/login')).toBeUndefined();
     });
+
+    it('登录页路径与保存路径不同时，退回同 host 的唯一系统', async () => {
+      const systemId = await addSystem('农机国内平台', 'https://agtest.zhdgps.com/system/user', 0);
+      await addAccount(systemId, 'admin', 'secret');
+
+      const system = await autoFillService.findSystemByUrl('https://agtest.zhdgps.com/user/login');
+      expect(system?.name).toBe('农机国内平台');
+    });
+
+    it('同 host 多个系统且路径都不匹配时仍视为不确定', async () => {
+      await addSystem('App 1', 'https://example.com/app1', 0);
+      await addSystem('App 2', 'https://example.com/app2', 1);
+
+      expect(await autoFillService.findSystemByUrl('https://example.com/other/login')).toBeUndefined();
+    });
   });
 
   describe('findDefaultAccountForUrl', () => {
@@ -134,6 +149,25 @@ describe('autoFillService', () => {
       const match = await autoFillService.findDefaultAccountForUrl('http://10.0.0.5:8080/app2/login');
       expect(match?.systemName).toBe('App 2');
       expect(match?.account.plainPassword).toBe('password-2');
+    });
+
+    it('登录页路径与保存路径不同时，唯一系统仍返回默认账号', async () => {
+      const systemId = await addSystem('AG 平台', 'https://agtest.zhdgps.com/system/user', 0);
+      await addAccount(systemId, 'admin', 'ag-password');
+
+      const match = await autoFillService.findDefaultAccountForUrl('https://agtest.zhdgps.com/user/login');
+      expect(match?.systemName).toBe('AG 平台');
+      expect(match?.account.username).toBe('admin');
+      expect(match?.account.plainPassword).toBe('ag-password');
+    });
+
+    it('同 host 多个系统且路径都不匹配时不自动填充', async () => {
+      const a = await addSystem('App 1', 'https://example.com/app1', 0);
+      const b = await addSystem('App 2', 'https://example.com/app2', 1);
+      await addAccount(a, 'user1', 'password-1');
+      await addAccount(b, 'user2', 'password-2');
+
+      expect(await autoFillService.findDefaultAccountForUrl('https://example.com/other/login')).toBeNull();
     });
 
     it('多个系统同样精确时返回 null，宁可不填也不填错', async () => {

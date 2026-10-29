@@ -60,7 +60,10 @@ export async function tryAutoFillTab(tabId: number, url: string): Promise<void> 
 
   try {
     const match = await autoFillService.findDefaultAccountForUrl(url);
-    if (!match) return;
+    if (!match) {
+      console.info('[Dock] 自动填充跳过：没有可用的默认账号', url);
+      return;
+    }
 
     const payload: AutoFillPayload = {
       systemId: match.systemId,

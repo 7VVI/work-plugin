@@ -1,7 +1,7 @@
 import { systemRepo } from '../db/repositories/systemRepo';
 import { accountRepo } from '../db/repositories/accountRepo';
 import { cryptoService } from './cryptoService';
-import { matchUrl } from '../utils/url';
+import { hostMatchesSystem, matchUrl } from '../utils/url';
 import type { System } from '../types/entities';
 import type { AccountMatch } from '../types/messages';
 
@@ -15,6 +15,7 @@ interface SystemMatch {
 /**
  * 返回与 URL 匹配度最高的系统。
  * 同分时先按查询参数、再按协议区分；仍然并列则返回多个，表示无法确定是哪个项目。
+ * 路径完全不匹配时退回同 host 匹配（登录页/SPA 路由常与保存地址不同）。
  */
 async function findBestSystems(url: string): Promise<System[]> {
   const systems = await systemRepo.all();
@@ -24,7 +25,11 @@ async function findBestSystems(url: string): Promise<System[]> {
     const detail = matchUrl(url, system.url);
     if (detail) matches.push({ system, ...detail });
   }
-  if (matches.length === 0) return [];
+  if (matches.length === 0) {
+    // 登录页可能是 /user/login，而系统保存的是 /system/user；
+    // 同一 host 视为同一站点，唯一系统时自动填充，多个系统时交给选择器。
+    return systems.filter(system => hostMatchesSystem(url, system.url));
+  }
 
   const bestScore = Math.max(...matches.map(m => m.score));
   let candidates = matches.filter(m => m.score === bestScore);
@@ -50,8 +55,9 @@ async function decryptedAccounts(system: System): Promise<AccountMatch[]> {
         systemName: system.name,
         account: { ...account, plainPassword },
       });
-    } catch {
+    } catch (error) {
       // skip accounts that can't be decrypted
+      console.warn('[Dock] 账号密码解密失败（主密码未解锁时无法自动填充）', account.id, error);
     }
   }
 

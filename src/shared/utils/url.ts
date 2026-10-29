@@ -120,6 +120,23 @@ export function urlMatchesSystem(tabUrl: string, systemUrl: string): boolean {
   return matchUrl(tabUrl, systemUrl) !== null;
 }
 
+/**
+ * 只比较 host（含端口）与协议大类，忽略路径和 hash。
+ * 用于登录页/SPA 路由与系统保存地址不同时的兜底匹配：
+ * 例如系统保存 /system/user，登录页实际是 /user/login。
+ */
+export function hostMatchesSystem(tabUrl: string, systemUrl: string): boolean {
+  try {
+    const target = new URL(tabUrl);
+    const saved = new URL(systemUrl);
+    if (target.host !== saved.host) return false;
+    const httpLike = isHttpLike(target) && isHttpLike(saved);
+    return httpLike || target.protocol === saved.protocol;
+  } catch {
+    return false;
+  }
+}
+
 export function getHostname(url: string): string | null {
   try { return new URL(url).hostname; } catch { return null; }
 }
