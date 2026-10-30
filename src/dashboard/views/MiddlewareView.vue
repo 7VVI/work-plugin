@@ -35,9 +35,6 @@
           <div class="card-top">
             <EnvBadge :env="mwEnv(m)" />
             <div class="card-actions">
-              <button class="ibtn ibtn-sm" title="编辑 / 查看详情" @click.stop="onEdit(m)">
-                <i class="fa-solid fa-pen"></i>
-              </button>
               <button class="ibtn ibtn-sm danger" title="删除" @click.stop="onDelete(m.id)">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
