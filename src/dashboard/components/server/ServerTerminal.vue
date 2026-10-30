@@ -33,14 +33,19 @@
         <div
           ref="terminalHost"
           class="terminal-host"
-          @contextmenu.prevent="openMenu"
-          @mousedown="captureSelection"
+          @contextmenu.prevent="pasteFromClipboard"
+          @mouseup="onTerminalMouseUp"
         ></div>
 
         <div v-if="status === 'connecting' || busy" class="terminal-mask">
           <div class="terminal-progress" aria-hidden="true"></div>
-          <i class="fa-solid fa-spinner fa-spin"></i>
-          <span>{{ busy ? '正在同步服务器信息…' : `正在连接 ${server.ip}…${connectSeconds >= 3 ? ` (${connectSeconds}s)` : ''}` }}</span>
+          <span class="terminal-spinner" aria-hidden="true"></span>
+          <span>
+            <template v-if="busy">正在同步服务器信息</template>
+            <template v-else>正在连接 {{ server.ip }}</template>
+            <span class="terminal-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>
+            <span v-if="!busy && connectSeconds >= 3" class="terminal-elapsed"> ({{ connectSeconds }}s)</span>
+          </span>
         </div>
 
         <div v-if="errorText && status === 'error'" class="terminal-mask terminal-error">
@@ -57,31 +62,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <div
-      v-if="menuVisible"
-      class="terminal-menu-backdrop"
-      @mousedown="closeMenu"
-      @contextmenu.prevent="closeMenu"
-    ></div>
-    <div
-      v-if="menuVisible"
-      class="terminal-menu"
-      :style="{ left: `${menuX}px`, top: `${menuY}px` }"
-      @mousedown.stop
-    >
-      <button
-        type="button"
-        class="terminal-menu-item"
-        :disabled="!menuHasSelection"
-        @click="copyMenuItem"
-      >
-        <i class="fa-regular fa-copy"></i>复制
-      </button>
-      <button type="button" class="terminal-menu-item" @click="pasteMenuItem">
-        <i class="fa-regular fa-paste"></i>粘贴
-      </button>
     </div>
   </Teleport>
 </template>
@@ -115,10 +95,6 @@ const errorKind = ref<SshErrorKind>('unknown');
 const fingerprint = ref('');
 const busy = ref(false);
 const connectSeconds = ref(0);
-const menuVisible = ref(false);
-const menuX = ref(0);
-const menuY = ref(0);
-const menuHasSelection = ref(false);
 
 let term: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
@@ -130,7 +106,6 @@ let connectClock = 0;
 let retries = 0;
 let disposed = false;
 let fatal = false;
-let contextSelection = '';
 
 const statusText = computed(() => ({
   connecting: '连接中',
@@ -352,53 +327,26 @@ async function copySelection(): Promise<void> {
   }
 }
 
-function captureSelection(event: MouseEvent): void {
-  if (event.button !== 2) return;
-  contextSelection = term?.hasSelection() ? term.getSelection() : '';
-}
-
-function openMenu(event: MouseEvent): void {
-  const selection = term?.hasSelection() ? term.getSelection() : contextSelection;
-  contextSelection = selection;
-  menuHasSelection.value = selection.length > 0;
-  const width = 140;
-  const height = 88;
-  menuX.value = Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8));
-  menuY.value = Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8));
-  menuVisible.value = true;
-}
-
-function closeMenu(): void {
-  menuVisible.value = false;
-}
-
-async function copyMenuItem(): Promise<void> {
-  const selection = contextSelection || term?.getSelection() || '';
-  closeMenu();
-  if (!selection) {
-    toast.info('请先选择要复制的终端内容');
-    term?.focus();
-    return;
-  }
+async function copyOnSelection(): Promise<void> {
+  const selection = term?.getSelection() ?? '';
+  if (!selection) return;
   try {
     await navigator.clipboard.writeText(selection);
-    toast.success('已复制');
   } catch {
-    toast.error('复制失败');
+    toast.error('自动复制失败，请使用工具栏的复制按钮');
   }
-  term?.focus();
 }
 
-async function pasteMenuItem(): Promise<void> {
-  closeMenu();
+function onTerminalMouseUp(event: MouseEvent): void {
+  if (event.button !== 0) return;
+  void copyOnSelection();
+}
+
+async function pasteFromClipboard(): Promise<void> {
   if (!term) return;
   try {
     const text = await navigator.clipboard.readText();
-    if (!text) {
-      toast.info('剪贴板为空');
-      term.focus();
-      return;
-    }
+    if (!text) return;
     term.paste(text);
     term.focus();
   } catch {
@@ -417,7 +365,6 @@ function cleanup(): void {
   window.clearTimeout(retryTimer);
   window.clearTimeout(resizeTimer);
   stopConnectClock();
-  closeMenu();
   closeSocket();
   observer?.disconnect();
   observer = null;
@@ -512,38 +459,6 @@ onBeforeUnmount(cleanup);
 }
 .terminal-host :deep(.xterm) { height: 100%; }
 .terminal-host :deep(.xterm-viewport) { background: transparent !important; }
-.terminal-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-}
-.terminal-menu {
-  position: fixed;
-  z-index: 10000;
-  min-width: 132px;
-  padding: 4px;
-  border: 1px solid #2a3038;
-  border-radius: 8px;
-  background: #171b21;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-}
-.terminal-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #dfe4ea;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-.terminal-menu-item:hover:not(:disabled) { background: #232a33; }
-.terminal-menu-item:disabled { opacity: 0.4; cursor: default; }
-.terminal-menu-item i { width: 14px; font-size: 11px; text-align: center; color: #8b94a3; }
 .terminal-mask {
   position: absolute;
   inset: 50px 0 0;
@@ -557,7 +472,33 @@ onBeforeUnmount(cleanup);
   font-size: 13px;
   backdrop-filter: blur(2px);
 }
-.terminal-mask > i { color: #5b8def; font-size: 18px; }
+.terminal-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(91, 141, 239, 0.22);
+  border-top-color: #5b8def;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(91, 141, 239, 0.06);
+  animation: terminal-spin 0.8s linear infinite;
+}
+@keyframes terminal-spin {
+  to { transform: rotate(360deg); }
+}
+.terminal-dots {
+  display: inline-flex;
+  margin-left: 2px;
+}
+.terminal-dots i {
+  font-style: normal;
+  animation: terminal-dot 1.2s infinite ease-in-out;
+}
+.terminal-dots i:nth-child(2) { animation-delay: 0.18s; }
+.terminal-dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes terminal-dot {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.terminal-elapsed { color: #8b94a3; }
 .terminal-progress {
   position: absolute;
   top: 0;
