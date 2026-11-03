@@ -1,7 +1,8 @@
 import { Plugin } from '@milkdown/kit/prose/state';
 import { $prose } from '@milkdown/kit/utils';
-import type { Node as ProseNode } from '@milkdown/kit/prose/model';
+import { Fragment, type Node as ProseNode } from '@milkdown/kit/prose/model';
 import type { EditorState, Transaction } from '@milkdown/kit/prose/state';
+import type { EditorView } from '@milkdown/kit/prose/view';
 
 /** 记录最近一次粘贴的时间，用来只在粘贴后做一次清理 */
 let lastPasteAt = 0;
@@ -42,6 +43,79 @@ export function trimCodeBlockTail(state: EditorState, from: number, to: number):
   }
   return tr;
 }
+
+/** 只接受可直接引用的图片地址，网络图保持远程 URL，不落本地资源 */
+const IMAGE_MARKDOWN_RE = /!\[([^\]]*)\]\(\s*((?:https?:\/\/|data:image\/|dock-asset:)[^\s)]+)(?:\s+"([^"]*)")?\s*\)/g;
+
+/**
+ * 把 Markdown 图片语法插入为图片。
+ * 整段只有图片时用图片块；图片夹在文字中时用行内图片，都会保留原始 URL。
+ */
+export function insertMarkdownImages(view: EditorView, text: string): boolean {
+  const matches = [...text.matchAll(IMAGE_MARKDOWN_RE)];
+  if (!matches.length) return false;
+
+  const onlyImages = !text.replace(IMAGE_MARKDOWN_RE, '').trim();
+  if (onlyImages) {
+    const nodeType = view.state.schema.nodes['image-block'];
+    if (!nodeType) return false;
+    const nodes: ProseNode[] = [];
+    for (const match of matches) {
+      const node = nodeType.createAndFill({ src: match[2], caption: '', ratio: 1 });
+      if (node) nodes.push(node);
+    }
+    if (!nodes.length) return false;
+
+    try {
+      let tr = view.state.tr;
+      for (const node of nodes) {
+        tr = tr.replaceSelectionWith(node, false);
+      }
+      view.dispatch(tr.scrollIntoView());
+      view.focus();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // 行内图片：只处理单段落、无换行的粘贴，其它情况交给默认粘贴
+  const { from, to, $from, $to } = view.state.selection;
+  if (!$from.sameParent($to) || $from.parent.type.name !== 'paragraph') return false;
+  if (/[\r\n]/.test(text)) return false;
+  const imageType = view.state.schema.nodes.image;
+  if (!imageType) return false;
+
+  const nodes: ProseNode[] = [];
+  let last = 0;
+  for (const match of matches) {
+    const index = match.index ?? 0;
+    const before = text.slice(last, index);
+    if (before) nodes.push(view.state.schema.text(before));
+    nodes.push(imageType.create({ src: match[2], alt: match[1] ?? '', title: match[3] ?? '' }));
+    last = index + match[0].length;
+  }
+  const tail = text.slice(last);
+  if (tail) nodes.push(view.state.schema.text(tail));
+  if (!nodes.length) return false;
+
+  try {
+    view.dispatch(view.state.tr.replaceWith(from, to, Fragment.fromArray(nodes)).scrollIntoView());
+    view.focus();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const pasteMarkdownImages = $prose(() => new Plugin({
+  props: {
+    handlePaste: (view, event) => {
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      return insertMarkdownImages(view, text);
+    },
+  },
+}));
 
 /**
  * 从其它 Markdown 编辑器/VS Code 粘贴代码块时，剪贴板内容尾部常带换行，

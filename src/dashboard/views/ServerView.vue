@@ -16,14 +16,86 @@
           <button class="env-btn env-staging" :class="{ active: selectedEnv === 'staging' }" @click="selectedEnv = 'staging'">预发</button>
         </div>
         <div class="flex-spacer"></div>
+        <!-- 视图切换 -->
+        <div class="view-toggle">
+          <button class="view-btn" :class="{ active: viewMode === 'table' }" title="列表视图" @click="viewMode = 'table'">
+            <i class="fa-solid fa-list"></i>
+          </button>
+          <button class="view-btn" :class="{ active: viewMode === 'card' }" title="卡片视图" @click="viewMode = 'card'">
+            <i class="fa-solid fa-table-cells-large"></i>
+          </button>
+        </div>
         <div class="search-field">
           <i class="fa-solid fa-magnifying-glass search-ico t3"></i>
           <input v-model="search" class="inp search-inp" placeholder="搜索服务器名称、IP…" />
         </div>
       </div>
 
-      <!-- 服务器网格 - v3 风格 -->
+      <!-- 列表视图 -->
+      <div v-if="viewMode === 'table'" class="server-list panel">
+        <table class="server-table">
+          <thead class="table-head">
+            <tr>
+              <th class="col-server">服务器</th>
+              <th class="col-env">环境</th>
+              <th class="col-user">账号</th>
+              <th class="col-purpose">用途</th>
+              <th class="col-updated">最近更新</th>
+              <th class="col-actions">操作</th>
+            </tr>
+          </thead>
+          <VueDraggable
+            v-model="filteredServers"
+            tag="tbody"
+            :animation="200"
+            ghost-class="dragging"
+            handle=".drag-handle"
+            @end="onDragEnd"
+          >
+            <tr v-for="s in filteredServers" :key="s.id" class="row-group" @click="onSelect(s.id)">
+              <td class="col-server">
+                <div class="name-cell">
+                  <span class="server-icon"><i class="fa-solid fa-server"></i></span>
+                  <span class="name-text">
+                    <span class="server-name t1">{{ s.name }}</span>
+                    <span class="server-addr t3">{{ s.ip }}:{{ s.sshPort || 22 }}</span>
+                  </span>
+                </div>
+              </td>
+              <td class="col-env"><EnvBadge :env="s.environment" /></td>
+              <td class="col-user">
+                <span class="acct-cell mono t2"><i class="fa-regular fa-user t3"></i>{{ s.username || '—' }}</span>
+              </td>
+              <td class="col-purpose"><span class="purpose-cell t2">{{ s.purpose || '—' }}</span></td>
+              <td class="col-updated t3">{{ formatRelativeTime(s.updatedAt) }}</td>
+              <td class="col-actions">
+                <div class="row-actions-fade">
+                  <button class="ibtn" title="连接" @click.stop="terminalServer = s">
+                    <i class="fa-solid fa-terminal"></i>
+                  </button>
+                  <button class="ibtn" title="复制 SSH 连接信息" @click.stop="onCopySsh(s)">
+                    <i class="fa-regular fa-copy"></i>
+                  </button>
+                  <button class="ibtn danger" title="删除" @click.stop="onDelete(s.id)">
+                    <i class="fa-regular fa-trash-can"></i>
+                  </button>
+                  <i class="fa-solid fa-grip-vertical drag-handle" title="拖动排序" @click.stop></i>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="filteredServers.length === 0">
+              <td colspan="6" class="empty-row">
+                <i class="fa-solid fa-server empty-icon t3"></i>
+                <div class="empty-text t3">{{ search ? '未找到匹配的服务器' : '暂无服务器，点击"新增服务器"添加' }}</div>
+              </td>
+            </tr>
+          </VueDraggable>
+        </table>
+      </div>
+
+      <!-- 卡片视图 -->
       <VueDraggable
+        v-else
         v-model="filteredServers"
         class="server-grid"
         :animation="200"
@@ -60,14 +132,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue';
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useServerStore } from '@shared/stores/serverStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import type { Server, Environment } from '@shared/types/entities';
+import { formatRelativeTime } from '@shared/utils/time';
+import { serverService } from '@shared/services/serverService';
 import ServerCard from '../components/server/ServerCard.vue';
 import ServerForm from '../components/server/ServerForm.vue';
+import EnvBadge from '../components/common/EnvBadge.vue';
 import GroupSidebar from '../components/common/GroupSidebar.vue';
 import { UNGROUPED_GROUP_ID, matchesGroupFilter } from '@shared/utils/groupFilter';
 
@@ -87,6 +162,13 @@ const defaultGroupId = computed(() => (
     : selectedGroupId.value
 ));
 const selectedEnv = ref<Environment | 'all'>('all');
+const VIEW_KEY = 'dock-v3-server-view';
+const viewMode = ref<'table' | 'card'>(
+  (typeof localStorage !== 'undefined' && localStorage.getItem(VIEW_KEY) === 'table') ? 'table' : 'card',
+);
+watch(viewMode, (value) => {
+  try { localStorage.setItem(VIEW_KEY, value); } catch { /* ignore */ }
+});
 
 onMounted(async () => { await store.load(); });
 
@@ -107,6 +189,15 @@ function onCreate() { editing.value = null; formVisible.value = true; }
 function onEdit(s: Server) { editing.value = s; formVisible.value = true; }
 function onSelect(id: string) { onEdit(store.list.find(s => s.id === id)!); }
 async function onSaved() { formVisible.value = false; await store.load(); }
+
+async function onCopySsh(s: Server) {
+  try {
+    await serverService.copySshCommand(s.id);
+    toast.success('连接信息已复制');
+  } catch {
+    toast.error('复制失败');
+  }
+}
 
 async function onDelete(id: string) {
   const ok = await dialog.confirm('确认删除', '确认删除该服务器？');
@@ -157,6 +248,36 @@ async function onDragEnd(event: any) {
 }
 .flex-spacer { flex: 1; min-width: 0; }
 .btn-p i { font-size: 11px; }
+
+/* 视图切换 */
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg2);
+}
+.view-toggle .view-btn {
+  width: 30px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: 0.15s;
+  border: none;
+  background: transparent;
+}
+.view-toggle .view-btn:hover { color: var(--ink); }
+.view-toggle .view-btn.active {
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--border), 0 2px 8px -2px rgba(15, 23, 38, 0.1);
+}
 
 /* 环境筛选 */
 .env-filter {
@@ -210,6 +331,133 @@ async function onDragEnd(event: any) {
 .search-inp {
   width: 288px;
   padding-left: 32px;
+}
+
+/* 列表视图 */
+.server-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+.server-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+}
+.table-head th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 10.5px;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink3);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel2);
+}
+.col-server { min-width: 260px; }
+.col-env { width: 96px; }
+.col-user { width: 120px; }
+.col-purpose { width: 160px; }
+.col-updated { width: 112px; white-space: nowrap; }
+.col-actions { width: 150px; text-align: right !important; padding-right: 16px !important; }
+.server-table tbody td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+.row-group { cursor: pointer; transition: background 0.15s ease; }
+.row-group:hover { background: var(--surface-hover); }
+.row-group:last-child td { border-bottom: none; }
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.server-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 13px;
+  background: #F59E0B;
+  box-shadow: 0 4px 12px -4px rgba(245, 158, 11, 0.55);
+}
+.name-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.server-name {
+  font-size: 13.5px;
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.server-addr {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acct-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+}
+.purpose-cell {
+  display: block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+.row-actions-fade {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+.row-group:hover .row-actions-fade { opacity: 1; }
+.drag-handle {
+  cursor: move;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--ink3);
+  font-size: 12px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.drag-handle:hover { background: var(--panel2); color: var(--ink); }
+.empty-row {
+  text-align: center;
+  padding: 64px 16px !important;
+  border-bottom: none !important;
 }
 
 /* 服务器网格 */

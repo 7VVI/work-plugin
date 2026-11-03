@@ -9,6 +9,8 @@ import { configService } from './configService';
 import { groupRepo } from '../db/repositories/groupRepo';
 import { noteBookRepo } from '../db/repositories/noteBookRepo';
 import { noteRepo } from '../db/repositories/noteRepo';
+import { noteAssetRepo } from '../db/repositories/noteAssetRepo';
+import { collectAssetRefs } from '../utils/noteAssets';
 import { db } from '../db/schema';
 import { deletionId } from '../db/deletionLog';
 import { generateId } from '../utils/id';
@@ -19,7 +21,7 @@ import { cryptoService } from './cryptoService';
 import { parseMarkdown, type ParsedBackup } from './markdownParser';
 import { serializeMarkdown } from './markdownSerializer';
 import { systemTagRepo } from '../db/repositories/systemTagRepo';
-import type { EntityType, EncryptedField } from '../types/entities';
+import type { EntityType, EncryptedField, NoteAsset } from '../types/entities';
 
 /**
  * 将导入数据中的密码字段归一化为 EncryptedField：
@@ -61,6 +63,13 @@ export interface NoteFileImportResult {
   skipped: Array<{ name: string; reason: string }>;
 }
 
+export interface NoteMarkdownExport {
+  blob: Blob;
+  filename: string;
+  hasAssets: boolean;
+  assetCount: number;
+}
+
 /** 从文件名/首个标题推断笔记标题 */
 export function noteTitleFromFile(name: string, content: string): string {
   const base = name.replace(/\.(md|markdown)$/i, '').trim();
@@ -70,10 +79,74 @@ export function noteTitleFromFile(name: string, content: string): string {
 }
 
 /** 把笔记按「目录/标题.md」装进 zip 文件表；folderOf 返回空串表示放根目录 */
-function packNoteFiles<T extends { title: string; content: string }>(
+const ASSET_MIME_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+  'image/bmp': 'bmp',
+  'image/avif': 'avif',
+};
+
+function assetExtension(mime: string): string {
+  return ASSET_MIME_EXT[mime.split(';')[0].trim().toLowerCase()] ?? 'bin';
+}
+
+async function packNoteAssets(contents: string[]): Promise<{
+  names: Map<string, string>;
+  files: Record<string, Uint8Array>;
+  count: number;
+}> {
+  const ids = new Set<string>();
+  for (const content of contents) {
+    for (const id of collectAssetRefs(content)) ids.add(id);
+  }
+  if (!ids.size) return { names: new Map(), files: {}, count: 0 };
+
+  const assets = await noteAssetRepo.all();
+  const byId = new Map<string, NoteAsset>(assets.map(asset => [asset.id, asset]));
+  const names = new Map<string, string>();
+  const files: Record<string, Uint8Array> = {};
+  const nameByHash = new Map<string, string>();
+
+  for (const id of ids) {
+    const asset = byId.get(id);
+    if (!asset) continue;
+    const hashKey = asset.hash || `id:${asset.id}`;
+    let name = nameByHash.get(hashKey);
+    if (!name) {
+      const stem = (asset.hash || asset.id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'image';
+      const ext = assetExtension(asset.mime);
+      name = `${stem}.${ext}`;
+      let unique = name;
+      let index = 2;
+      while (Object.prototype.hasOwnProperty.call(files, `assets/${unique}`)) {
+        unique = `${stem}-${index}.${ext}`;
+        index += 1;
+      }
+      name = unique;
+      nameByHash.set(hashKey, name);
+      files[`assets/${name}`] = new Uint8Array(asset.data);
+    }
+    names.set(id, name);
+  }
+
+  return { names, files, count: Object.keys(files).length };
+}
+
+function rewriteNoteAssetLinks(content: string, names: Map<string, string>, prefix: string): string {
+  return content.replace(/dock-asset:([A-Za-z0-9_-]+)/g, (full, id: string) => {
+    const name = names.get(id);
+    return name ? `${prefix}/${name}` : full;
+  });
+}
+
+async function packNoteFiles<T extends { title: string; content: string }>(
   notes: T[],
   folderOf: (note: T) => string,
-): Record<string, Uint8Array> {
+): Promise<{ files: Record<string, Uint8Array>; assetCount: number }> {
+  const assets = await packNoteAssets(notes.map(note => note.content));
   const files: Record<string, Uint8Array> = {};
   const used = new Set<string>();
   for (const note of notes) {
@@ -86,9 +159,11 @@ function packNoteFiles<T extends { title: string; content: string }>(
       index += 1;
     }
     used.add(path);
-    files[path] = strToU8(note.content);
+    // 笔记在子目录时用 ../assets 指回 zip 根目录的资源文件夹
+    const assetsPrefix = folder ? '../assets' : 'assets';
+    files[path] = strToU8(rewriteNoteAssetLinks(note.content, assets.names, assetsPrefix));
   }
-  return files;
+  return { files: { ...files, ...assets.files }, assetCount: assets.count };
 }
 
 export const importExportService = {
@@ -734,28 +809,58 @@ export const importExportService = {
     return { notebookId, created, skipped };
   },
 
-  /** 导出全部笔记为 zip：按笔记本分目录，一篇一个 .md */
-  async exportNotesZip(): Promise<{ blob: Blob; count: number }> {
-    const [books, notes] = await Promise.all([noteBookRepo.all(), noteRepo.all()]);
-    const bookName = new Map(books.map(book => [book.id, book.name]));
-    const files = packNoteFiles(notes, note => sanitizeFilename(bookName.get(note.notebookId) ?? '未分类') || '未分类');
+  /** 单篇 Markdown：有本地图片时打包为 zip（md + assets），否则直接返回 md */
+  async exportNoteMarkdown(title: string, content: string): Promise<NoteMarkdownExport> {
+    const base = sanitizeFilename(title) || '未命名笔记';
+    const assets = await packNoteAssets([content]);
+    const markdown = rewriteNoteAssetLinks(content, assets.names, 'assets');
+    if (!assets.count) {
+      return {
+        blob: new Blob([markdown], { type: 'text/markdown' }),
+        filename: `${base}.md`,
+        hasAssets: false,
+        assetCount: 0,
+      };
+    }
+    const files: Record<string, Uint8Array> = {
+      [`${base}.md`]: strToU8(markdown),
+      ...assets.files,
+    };
     return {
       blob: new Blob([zipSync(files, { level: 6 })], { type: 'application/zip' }),
-      count: notes.length,
+      filename: `${base}.zip`,
+      hasAssets: true,
+      assetCount: assets.count,
     };
   },
 
-  /** 导出某个笔记本下的笔记为 zip：文件直接放 zip 根目录 */
-  async exportNotebookZip(notebookId: string): Promise<{ blob: Blob; count: number; name: string }> {
+  /** 导出全部笔记为 zip：按笔记本分目录，一篇一个 .md；本地图片统一放根目录 assets/ */
+  async exportNotesZip(): Promise<{ blob: Blob; count: number; assetCount: number }> {
+    const [books, notes] = await Promise.all([noteBookRepo.all(), noteRepo.all()]);
+    const bookName = new Map(books.map(book => [book.id, book.name]));
+    const { files, assetCount } = await packNoteFiles(
+      notes,
+      note => sanitizeFilename(bookName.get(note.notebookId) ?? '未分类') || '未分类',
+    );
+    return {
+      blob: new Blob([zipSync(files, { level: 6 })], { type: 'application/zip' }),
+      count: notes.length,
+      assetCount,
+    };
+  },
+
+  /** 导出某个笔记本下的笔记为 zip：文件直接放 zip 根目录，本地图片放 assets/ */
+  async exportNotebookZip(notebookId: string): Promise<{ blob: Blob; count: number; name: string; assetCount: number }> {
     const [book, notes] = await Promise.all([
       noteBookRepo.byId(notebookId),
       noteRepo.all().then(all => all.filter(note => note.notebookId === notebookId)),
     ]);
-    const files = packNoteFiles(notes, () => '');
+    const { files, assetCount } = await packNoteFiles(notes, () => '');
     return {
       blob: new Blob([zipSync(files, { level: 6 })], { type: 'application/zip' }),
       count: notes.length,
       name: book?.name ?? '笔记本',
+      assetCount,
     };
   },
 };

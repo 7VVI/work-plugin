@@ -97,9 +97,11 @@ import { importExportService } from '@shared/services/importExportService';
 import { noteBookRepo } from '@shared/db/repositories/noteBookRepo';
 import { downloadBlob, downloadText } from '@shared/utils/download';
 import { useToastStore } from '@shared/stores/toastStore';
+import { useDialogStore } from '@shared/stores/dialogStore';
 import type { NoteBook } from '@shared/types/entities';
 
 const toast = useToastStore();
+const dialog = useDialogStore();
 
 const scope = ref({ systems: true, servers: true, middlewares: true, configs: true, groups: true, notes: true });
 const format = ref<'json' | 'md'>('json');
@@ -126,8 +128,9 @@ async function onExport() {
         includePasswords: includePasswords.value,
         scope: { ...scope.value },
       });
-      downloadText(md, `dock-backup-${stamp}.md`, 'text/markdown');
-      toast.success('Markdown 备份已导出');
+      const filename = `dock-backup-${stamp}.md`;
+      downloadText(md, filename, 'text/markdown');
+      await dialog.alert('导出成功', `已生成 ${filename}，文件已开始下载。`);
     } else {
       const full = JSON.parse(await importExportService.exportJSON());
       const out: Record<string, unknown> = { app: 'Dock', version: '3.0.0', exportedAt: new Date().toISOString() };
@@ -140,8 +143,9 @@ async function onExport() {
         out.noteBooks = full.noteBooks ?? [];
         out.notes = full.notes ?? [];
       }
-      downloadText(JSON.stringify(out, null, 2), `dock-backup-${stamp}.json`, 'application/json');
-      toast.success('JSON 备份已导出');
+      const filename = `dock-backup-${stamp}.json`;
+      downloadText(JSON.stringify(out, null, 2), filename, 'application/json');
+      await dialog.alert('导出成功', `已生成 ${filename}，文件已开始下载。`);
     }
   } catch (e) {
     toast.error((e as Error).message || '导出失败');
@@ -174,7 +178,7 @@ async function importFile(file: File) {
     } else {
       await importExportService.importJSON(text, { mode: 'merge' });
     }
-    toast.success(`导入完成：${file.name}`);
+    await dialog.alert('导入成功', `已导入 ${file.name}。`);
   } catch (e) {
     toast.error('文件格式不正确，导入失败');
   }
@@ -193,8 +197,10 @@ async function onImportNotes(event: Event): Promise<void> {
       toast.error(result.skipped[0]?.reason ?? '没有可导入的笔记');
       return;
     }
-    const skipped = result.skipped.length ? `，跳过 ${result.skipped.length} 个` : '';
-    toast.success(`已导入 ${result.created} 篇笔记${skipped}`);
+    const skipped = result.skipped.length
+      ? `跳过 ${result.skipped.length} 个文件${result.skipped[0]?.reason ? `（${result.skipped[0].reason}）` : ''}。`
+      : '';
+    await dialog.alert('导入完成', `已导入 ${result.created} 篇笔记。${skipped}`);
   } catch (e) {
     toast.error((e as Error).message || '导入失败');
   }
@@ -202,14 +208,16 @@ async function onImportNotes(event: Event): Promise<void> {
 
 async function onExportNotesZip(): Promise<void> {
   try {
-    const { blob, count } = await importExportService.exportNotesZip();
+    const { blob, count, assetCount } = await importExportService.exportNotesZip();
     if (count === 0) {
       toast.error('还没有可导出的笔记');
       return;
     }
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadBlob(blob, `dock-notes-${stamp}.zip`);
-    toast.success(`已导出 ${count} 篇笔记`);
+    const filename = `dock-notes-${stamp}.zip`;
+    downloadBlob(blob, filename);
+    const assets = assetCount ? `（含 ${assetCount} 张本地图片）` : '';
+    await dialog.alert('导出完成', `已导出 ${count} 篇笔记${assets}，${filename} 已开始下载。`);
   } catch (e) {
     toast.error((e as Error).message || '导出失败');
   }

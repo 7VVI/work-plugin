@@ -50,7 +50,7 @@ import { assetRef } from '@shared/utils/noteAssets';
 import NoteContextMenu from './NoteContextMenu.vue';
 import { zhCrepeConfig, sortedCodeLanguages } from './crepeLocale';
 import { imageFeatureConfig } from './crepeImages';
-import { trimPastedCodeBlock, trimCodeBlockTail } from './crepePaste';
+import { trimPastedCodeBlock, trimCodeBlockTail, pasteMarkdownImages, insertMarkdownImages } from './crepePaste';
 import { htmlRenderSchema, htmlRemark } from './crepeHtml';
 import { inlineStyleSchemas, inlineStyleStringify, closeColorPanel } from './crepeInlineStyles';
 import { noteKeyBehavior } from './crepeKeys';
@@ -148,6 +148,8 @@ async function createEditor(): Promise<void> {
 
     // 粘贴 / 新建代码块时去掉末尾多余空行
     instance.editor.use(trimPastedCodeBlock);
+    // 粘贴 Markdown 图片语法时直接插入图片块，网络图保留远程地址
+    instance.editor.use(pasteMarkdownImages);
     // Markdown 里的行内 HTML（如思源导出的 <span style>）按 HTML 渲染
     instance.editor.use(htmlRemark).use(htmlRenderSchema);
     // 下划线 / 高亮 / 上下标 / 字体颜色：工具栏可切换，写回 Markdown 仍是 HTML 标签
@@ -196,11 +198,11 @@ function retry(): void {
 }
 
 /** 图片块把宽高比写进了 alt，这里还原成空 alt，正文更接近通用 Markdown */
-const ASSET_ALT_RE = /!\[(\d+(?:\.\d+)?)\]\((dock-asset:[^)]+)\)/g;
+const IMAGE_ALT_RE = /!\[(\d+(?:\.\d+)?)\]\(((?:dock-asset:|https?:\/\/|data:image\/)[^)]+)\)/g;
 
 function getMarkdown(): string {
   const raw = crepe?.getMarkdown() ?? props.initialContent;
-  return raw.replace(ASSET_ALT_RE, '![]($2)');
+  return raw.replace(IMAGE_ALT_RE, '![]($2)');
 }
 
 function focus(): void {
@@ -449,6 +451,7 @@ async function pasteInto(view: NonNullable<ReturnType<typeof getView>>, keepMark
   if (text === null) return;
   const value = keepMarkdown ? text : stripMarkdown(text);
   if (!value) return;
+  if (keepMarkdown && insertMarkdownImages(view, value)) return;
   const { from } = view.state.selection;
   view.dispatch(view.state.tr.insertText(value, from));
   view.focus();

@@ -173,7 +173,8 @@ import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { countNoteWords, extractOutline, sanitizeFilename } from '@shared/utils/noteUtils';
 import { renderNoteHtml } from '@shared/utils/noteHtmlExport';
-import { downloadText } from '@shared/utils/download';
+import { downloadBlob, downloadText } from '@shared/utils/download';
+import { importExportService } from '@shared/services/importExportService';
 import { formatRelativeTime } from '@shared/utils/time';
 
 const NoteEditor = defineAsyncComponent(() => import('../components/notes/NoteEditor.vue'));
@@ -422,8 +423,12 @@ function runExport(kind: 'md' | 'html'): void {
   const content = editorRef.value?.getMarkdown?.() ?? draftContent.value;
   const base = sanitizeFilename(displayTitle.value) || '未命名笔记';
   if (kind === 'md') {
-    downloadText(content, `${base}.md`, 'text/markdown');
-    toast.success('笔记已导出');
+    void importExportService.exportNoteMarkdown(displayTitle.value, content)
+      .then(result => {
+        downloadBlob(result.blob, result.filename);
+        toast.success(result.hasAssets ? `已导出笔记（含 ${result.assetCount} 张本地图片）` : '笔记已导出');
+      })
+      .catch(error => toast.error(error instanceof Error ? error.message : String(error)));
     return;
   }
   void renderNoteHtml(content, {

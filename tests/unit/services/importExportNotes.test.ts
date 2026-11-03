@@ -3,6 +3,7 @@ import { db } from '../../../src/shared/db/schema';
 import { importExportService } from '../../../src/shared/services/importExportService';
 import { noteBookRepo } from '../../../src/shared/db/repositories/noteBookRepo';
 import { noteRepo } from '../../../src/shared/db/repositories/noteRepo';
+import { noteAssetRepo } from '../../../src/shared/db/repositories/noteAssetRepo';
 import { MAX_NOTE_CONTENT } from '../../../shared/protocol/index';
 import { deletionId } from '../../../src/shared/db/deletionLog';
 import { strFromU8, unzipSync } from 'fflate';
@@ -117,6 +118,10 @@ function readBytes(blob: Blob): Promise<Uint8Array> {
   });
 }
 
+function pngBlob(): Blob {
+  return new Blob([new Uint8Array([137, 80, 78, 71, 7])], { type: 'image/png' });
+}
+
 describe('markdown file archive', () => {
   beforeEach(async () => {
     await db.delete();
@@ -164,6 +169,44 @@ describe('markdown file archive', () => {
     expect(names).toEqual(['工作/部署 指南 (2).md', '工作/部署 指南.md', '生活/清单.md']);
     const text = strFromU8(files['生活/清单.md']);
     expect(text).toBe('# C');
+  });
+
+  it('exports a single note with local images as a zip with an assets folder', async () => {
+    const asset = await noteAssetRepo.save(pngBlob(), 'image/png');
+    const content = `# 图\n\n![](dock-asset:${asset.id})`;
+
+    const result = await importExportService.exportNoteMarkdown('带图笔记', content);
+    expect(result).toMatchObject({ filename: '带图笔记.zip', hasAssets: true, assetCount: 1 });
+
+    const files = unzipSync(await readBytes(result.blob));
+    const names = Object.keys(files).sort();
+    expect(names).toContain('带图笔记.md');
+    const assetPath = names.find(name => name.startsWith('assets/'));
+    expect(assetPath).toMatch(/^assets\/[a-f0-9]+\.png$/);
+    const markdown = strFromU8(files['带图笔记.md']);
+    expect(markdown).toContain(`assets/${assetPath!.slice('assets/'.length)}`);
+    expect(markdown).not.toContain('dock-asset:');
+  });
+
+  it('keeps a single note as plain markdown when it has no local images', async () => {
+    const result = await importExportService.exportNoteMarkdown('纯文本', '# hello');
+    expect(result).toMatchObject({ filename: '纯文本.md', hasAssets: false, assetCount: 0 });
+    expect(result.blob.type).toBe('text/markdown');
+    expect(strFromU8(await readBytes(result.blob))).toBe('# hello');
+  });
+
+  it('rewrites local image links to ../assets for notes inside notebook folders', async () => {
+    const bookId = await noteBookRepo.create('工作');
+    const asset = await noteAssetRepo.save(pngBlob(), 'image/png');
+    await noteRepo.create({ notebookId: bookId, title: '带图', content: `![](dock-asset:${asset.id})` });
+
+    const { blob, assetCount } = await importExportService.exportNotesZip();
+    expect(assetCount).toBe(1);
+    const files = unzipSync(await readBytes(blob));
+    const markdown = strFromU8(files['工作/带图.md']);
+    expect(markdown).toContain('../assets/');
+    expect(markdown).not.toContain('dock-asset:');
+    expect(Object.keys(files).some(name => name.startsWith('assets/'))).toBe(true);
   });
 });
 

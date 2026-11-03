@@ -6,7 +6,7 @@
           <h3>{{ store.state.title }}</h3>
         </div>
         <div class="dialog-body">
-          <p v-if="store.state.type === 'confirm'" class="dialog-message">{{ store.state.message }}</p>
+          <p v-if="store.state.type !== 'prompt'" class="dialog-message">{{ store.state.message }}</p>
           <input
             v-else
             v-model="inputValue"
@@ -18,8 +18,10 @@
           />
         </div>
         <div class="dialog-footer">
-          <button class="btn btn-default" @click="store.cancel()">取消</button>
-          <button class="btn btn-primary" @click="store.ok()">{{ store.state.type === 'confirm' ? '确认' : '确定' }}</button>
+          <button v-if="store.state.type !== 'alert'" class="btn btn-default" @click="store.cancel()">取消</button>
+          <button class="btn btn-primary" @click="store.ok()">
+            {{ store.state.type === 'alert' ? '知道了' : store.state.type === 'confirm' ? '确认' : '确定' }}
+          </button>
         </div>
       </div>
     </div>

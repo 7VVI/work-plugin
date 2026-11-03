@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-type DialogType = 'confirm' | 'prompt';
+type DialogType = 'confirm' | 'prompt' | 'alert';
 
 interface DialogState {
   visible: boolean;
@@ -43,6 +43,21 @@ export const useDialogStore = defineStore('dialog', () => {
     });
   }
 
+  function alert(title: string, message: string = ''): Promise<void> {
+    return new Promise((resolve) => {
+      state.value = {
+        visible: true,
+        type: 'alert',
+        title,
+        message,
+        placeholder: '',
+        inputValue: '',
+        inputType: 'text',
+        resolver: () => resolve(),
+      };
+    });
+  }
+
   function prompt(
     title: string,
     placeholder: string = '',
@@ -66,6 +81,8 @@ export const useDialogStore = defineStore('dialog', () => {
   function ok() {
     if (state.value.type === 'confirm') {
       state.value.resolver?.(true);
+    } else if (state.value.type === 'alert') {
+      state.value.resolver?.(null);
     } else {
       const val = state.value.inputValue.trim();
       state.value.resolver?.(val || null);
@@ -82,5 +99,5 @@ export const useDialogStore = defineStore('dialog', () => {
     state.value = { ...initialState };
   }
 
-  return { state, confirm, prompt, ok, cancel, close };
+  return { state, confirm, alert, prompt, ok, cancel, close };
 });

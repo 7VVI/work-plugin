@@ -324,14 +324,14 @@ async function onImportFileChange(event: Event): Promise<void> {
 
 async function exportBook(book: NoteBook): Promise<void> {
   try {
-    const { blob, count, name } = await importExportService.exportNotebookZip(book.id);
+    const { blob, count, name, assetCount } = await importExportService.exportNotebookZip(book.id);
     if (!count) {
       toast.error('该笔记本下还没有笔记');
       return;
     }
     const stamp = new Date().toISOString().slice(0, 10);
     downloadBlob(blob, `${sanitizeFilename(name) || '笔记本'}-${stamp}.zip`);
-    toast.success(`已导出 ${count} 篇笔记`);
+    toast.success(`已导出 ${count} 篇笔记${assetCount ? `（含 ${assetCount} 张本地图片）` : ''}`);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : String(error));
   }
@@ -349,8 +349,9 @@ async function exportNote(note: NoteSummary, kind: 'md' | 'html'): Promise<void>
     const title = full.title || '未命名笔记';
     const base = sanitizeFilename(title) || '未命名笔记';
     if (kind === 'md') {
-      downloadText(full.content, `${base}.md`, 'text/markdown');
-      toast.success('笔记已导出');
+      const result = await importExportService.exportNoteMarkdown(title, full.content);
+      downloadBlob(result.blob, result.filename);
+      toast.success(result.hasAssets ? `已导出笔记（含 ${result.assetCount} 张本地图片）` : '笔记已导出');
     } else {
       const html = await renderNoteHtml(full.content, {
         title,
