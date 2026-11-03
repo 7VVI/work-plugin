@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import type { ServerRec } from '@protocol/types';
 import { SSH_PROTOCOL, type SshErrorCode, type SshServerMessage } from '@protocol/ssh';
 import { SshConnectError, type SshChannel, type SshConnector, type SshTarget } from './connector';
+import { FS_CONTROL_MAX_CHARS, SshFsGateway } from './fsGateway';
 
 export interface SshSessionLimits {
   maxSessions: number;
   maxPerServer: number;
   idleMs: number;
+  fs?: { enabled: boolean; maxEdit: number; maxTransfer: number };
 }
 
 export interface SshSocketLike {
@@ -51,6 +53,14 @@ const ERROR_TEXT: Record<SshErrorCode, string> = {
   SSH_SHELL_FAILED: 'SSH 终端创建失败',
   SSH_SESSION_LIMIT: 'SSH 会话数已达上限，请稍后再试',
   SSH_IDLE_TIMEOUT: 'SSH 会话空闲超时，已断开',
+  SFTP_DISABLED: '服务端未启用文件管理',
+  SFTP_NOT_FOUND: '文件或目录不存在',
+  SFTP_PERMISSION_DENIED: '没有权限执行该操作',
+  SFTP_TIMEOUT: 'SFTP 请求超时，请重试',
+  SFTP_TOO_LARGE: '文件超过大小上限',
+  SFTP_BINARY: '该文件不是文本文件，无法编辑',
+  SFTP_BUSY: '已有文件传输进行中，请稍后再试',
+  SFTP_FAILED: '文件操作失败',
 };
 
 const HIGH_WATER = 1024 * 1024;
@@ -130,16 +140,41 @@ export class SshSessionManager {
     this.sessions.add(session);
     this.perServer.set(server.id, (this.perServer.get(server.id) ?? 0) + 1);
 
-    const sendJson = (message: SshServerMessage): void => {
+    const sendJson = (message: SshServerMessage, onSent?: () => void): void => {
       if (session.closed) return;
-      try { socket.send(JSON.stringify(message)); } catch { /* closed */ }
+      try {
+        socket.send(JSON.stringify(message), undefined, typeof onSent === 'function' ? onSent : undefined);
+      } catch {
+        if (typeof onSent === 'function') onSent();
+      }
     };
+
+    const fsGateway = new SshFsGateway({
+      openSftp: () => {
+        if (!session.channel) {
+          return Promise.reject(new SshConnectError('SFTP_FAILED', 'SSH 会话尚未就绪'));
+        }
+        return session.channel.openSftp();
+      },
+      caps: {
+        enabled: this.limits.fs?.enabled ?? true,
+        maxEdit: this.limits.fs?.maxEdit ?? 2 * 1024 * 1024,
+        maxTransfer: this.limits.fs?.maxTransfer ?? 200 * 1024 * 1024,
+      },
+      sendJson,
+      onActivity: () => {
+        session.lastActivity = Date.now();
+      },
+      isBlocked: () => session.socket.bufferedAmount > HIGH_WATER,
+      logger: console,
+    });
 
     const cleanup = (): void => {
       if (session.closed) return;
       session.closed = true;
       if (session.idleTimer) clearInterval(session.idleTimer);
       if (session.drainTimer) clearInterval(session.drainTimer);
+      fsGateway.abortAll();
       try { session.channel?.close(); } catch { /* closed */ }
       this.sessions.delete(session);
       const remaining = (this.perServer.get(server.id) ?? 1) - 1;
@@ -171,9 +206,18 @@ export class SshSessionManager {
     };
 
     const handleControl = (text: string): void => {
-      if (!text || text.length > 4096) return;
+      if (!text || !text.length) return;
       let message: { type?: unknown; cols?: unknown; rows?: unknown; t?: unknown };
       try { message = JSON.parse(text) as typeof message; } catch { return; }
+      const type = typeof message.type === 'string' ? message.type : '';
+      if (type.startsWith('fs-')) {
+        // 文件操作帧体积远大于终端控制帧，独立上限；并计入空闲活跃时间
+        if (text.length > FS_CONTROL_MAX_CHARS) return;
+        session.lastActivity = Date.now();
+        fsGateway.handleMessage(message as Record<string, unknown>);
+        return;
+      }
+      if (text.length > 4096) return;
       if (message.type === 'resize') {
         const cols = clamp(message.cols, 20, 500);
         const rows = clamp(message.rows, 5, 200);
@@ -245,6 +289,9 @@ export class SshSessionManager {
         serverId: server.id,
         sessionId: session.id,
         fingerprint: session.fingerprint,
+        ...(this.limits.fs?.enabled
+          ? { sftp: true as const, fsMaxEdit: this.limits.fs.maxEdit, fsMaxTransfer: this.limits.fs.maxTransfer }
+          : {}),
       });
       this.logger.info?.('[dock-ssh] connected', server.id, session.fingerprint);
       for (const chunk of session.pending) channel.write(chunk);

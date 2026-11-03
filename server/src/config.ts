@@ -20,6 +20,9 @@ export interface ServerConfig {
   sshMaxPerServer: number;
   sshIdleMs: number;
   sshTicketTtlMs: number;
+  sshFsEnabled: boolean;
+  sshFsMaxEdit: number;
+  sshFsMaxTransfer: number;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -84,5 +87,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     sshMaxPerServer: parseLimit(env.DOCK_SSH_MAX_PER_SERVER, 2, 1, 16),
     sshIdleMs: parseLimit(env.DOCK_SSH_IDLE_MS, 30 * 60_000, 60_000, 24 * 60 * 60_000),
     sshTicketTtlMs: parseLimit(env.DOCK_SSH_TICKET_TTL_MS, 30_000, 5_000, 5 * 60_000),
+    sshFsEnabled: env.DOCK_SSH_FS_ENABLED !== 'false',
+    sshFsMaxEdit: parseLimit(env.DOCK_SSH_FS_MAX_EDIT, 2 * 1024 * 1024, 1024, 64 * 1024 * 1024),
+    sshFsMaxTransfer: parseLimit(env.DOCK_SSH_FS_MAX_TRANSFER, 200 * 1024 * 1024, 1024, 2 * 1024 * 1024 * 1024),
   };
 }

@@ -39,7 +39,7 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
   "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-  "img-src 'self' data:",
+  "img-src 'self' data: https: http:",
   "connect-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -56,6 +56,11 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
     maxSessions: config.sshMaxSessions,
     maxPerServer: config.sshMaxPerServer,
     idleMs: config.sshIdleMs,
+    fs: {
+      enabled: config.sshEnabled && config.sshFsEnabled,
+      maxEdit: config.sshFsMaxEdit,
+      maxTransfer: config.sshFsMaxTransfer,
+    },
   });
 
   const app = Fastify({
@@ -106,7 +111,11 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
       ok: true,
       service: 'dock-cloud',
       version: '1.0.0',
-      features: { sshTerminal: config.sshEnabled, sshProtocol: SSH_PROTOCOL },
+      features: {
+        sshTerminal: config.sshEnabled,
+        sshFiles: config.sshEnabled && config.sshFsEnabled,
+        sshProtocol: SSH_PROTOCOL,
+      },
       time: Date.now(),
     };
   });

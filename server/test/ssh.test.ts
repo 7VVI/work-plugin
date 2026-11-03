@@ -3,12 +3,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { WebSocket } from 'ws';
 import type { ServerRec } from '@protocol/index';
 import { buildApp } from '../src/app';
 import type { ServerConfig } from '../src/config';
 import { SshTicketStore } from '../src/ssh/ticketStore';
 import { FakeSshConnector } from './sshFake';
+import { collector, waitTick } from './wsTest';
 
 function testConfig(dir: string, overrides: Partial<ServerConfig> = {}): ServerConfig {
   return {
@@ -28,6 +28,9 @@ function testConfig(dir: string, overrides: Partial<ServerConfig> = {}): ServerC
     sshMaxPerServer: 2,
     sshIdleMs: 30 * 60_000,
     sshTicketTtlMs: 30_000,
+    sshFsEnabled: true,
+    sshFsMaxEdit: 2 * 1024 * 1024,
+    sshFsMaxTransfer: 200 * 1024 * 1024,
     ...overrides,
   };
 }
@@ -45,43 +48,6 @@ const serverRec: ServerRec = {
   updatedAt: 1,
   tagIds: [],
 };
-
-interface Message {
-  data: Buffer;
-  isBinary: boolean;
-}
-
-function collector(socket: WebSocket) {
-  const messages: Message[] = [];
-  const waiters: Array<(message: Message) => void> = [];
-  socket.on('message', (data: Buffer, isBinary: boolean) => {
-    const message = { data, isBinary };
-    const waiter = waiters.shift();
-    if (waiter) waiter(message);
-    else messages.push(message);
-  });
-  return {
-    next(timeoutMs = 1500): Promise<Message> {
-      const queued = messages.shift();
-      if (queued) return Promise.resolve(queued);
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('timed out waiting for websocket message')), timeoutMs);
-        waiters.push((message) => {
-          clearTimeout(timer);
-          resolve(message);
-        });
-      });
-    },
-    text(message: Message): string {
-      return message.data.toString('utf8');
-    },
-  };
-}
-
-async function waitTick(ms = 30): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, ms));
-}
-
 describe('ssh ticket endpoint', () => {
   let dir: string;
   let app: FastifyInstance;

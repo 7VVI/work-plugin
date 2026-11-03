@@ -34,6 +34,9 @@ function testConfig(dir: string, overrides: Partial<ServerConfig> = {}): ServerC
     sshMaxPerServer: 2,
     sshIdleMs: 30 * 60_000,
     sshTicketTtlMs: 30_000,
+    sshFsEnabled: true,
+    sshFsMaxEdit: 2 * 1024 * 1024,
+    sshFsMaxTransfer: 200 * 1024 * 1024,
     ...overrides,
   };
 }

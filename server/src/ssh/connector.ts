@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Client } from 'ssh2';
-import type { ClientChannel, ConnectConfig } from 'ssh2';
-import type { SshErrorCode } from '@protocol/ssh';
+import type { ClientChannel, ConnectConfig, FileEntryWithStats, SFTPWrapper, Stats } from 'ssh2';
+import type { SshErrorCode, SshFsEntry } from '@protocol/ssh';
 
 export class SshConnectError extends Error {
   constructor(
@@ -36,6 +36,136 @@ export interface SshChannel {
   pause(): void;
   resume(): void;
   close(): void;
+  /** 打开 SFTP 子系统通道（ssh2 支持同连接多路复用） */
+  openSftp(): Promise<SshSftp>;
+}
+
+export interface SshFsAttrs {
+  isDir: boolean;
+  isFile: boolean;
+  isLink: boolean;
+  size: number;
+  mtimeMs: number;
+}
+
+export interface SshFsReadStream {
+  on(event: 'data', listener: (chunk: Buffer) => void): void;
+  on(event: 'error', listener: (error: Error) => void): void;
+  on(event: 'end', listener: () => void): void;
+  on(event: 'close', listener: () => void): void;
+  destroy(): void;
+  pause(): void;
+  resume(): void;
+}
+
+export interface SshFsWriteStream {
+  write(chunk: Buffer): void;
+  end(): void;
+  on(event: 'error', listener: (error: Error) => void): void;
+  on(event: 'finish', listener: () => void): void;
+  on(event: 'close', listener: () => void): void;
+  destroy(): void;
+}
+
+export interface SshSftp {
+  stat(path: string): Promise<SshFsAttrs>;
+  lstat(path: string): Promise<SshFsAttrs>;
+  list(path: string): Promise<SshFsEntry[]>;
+  mkdir(path: string): Promise<void>;
+  unlink(path: string): Promise<void>;
+  rmdir(path: string): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  createReadStream(path: string): SshFsReadStream;
+  createWriteStream(path: string): SshFsWriteStream;
+  end(): void;
+}
+
+function toMs(value: number): number {
+  return value > 1e12 ? value : value * 1000;
+}
+
+function attrsOf(stats: {
+  isDirectory(): boolean;
+  isFile(): boolean;
+  isSymbolicLink(): boolean;
+  size: number;
+  mtime: number;
+}): SshFsAttrs {
+  return {
+    isDir: stats.isDirectory(),
+    isFile: stats.isFile(),
+    isLink: stats.isSymbolicLink(),
+    size: Number(stats.size) || 0,
+    mtimeMs: toMs(Number(stats.mtime) || 0),
+  };
+}
+
+/** ssh2 SFTP 错误映射：数字为 SFTP 状态码 */
+export function mapSftpError(error: unknown): SshErrorCode {
+  const err = error as { code?: unknown; level?: string; message?: string };
+  if (typeof err.code === 'number') {
+    if (err.code === 2) return 'SFTP_NOT_FOUND';
+    if (err.code === 3) return 'SFTP_PERMISSION_DENIED';
+    if (err.code >= 4 && err.code <= 8) return 'SFTP_FAILED';
+  }
+  const message = err.message ?? '';
+  if (/ENOENT|no such file/i.test(message)) return 'SFTP_NOT_FOUND';
+  if (/EACCES|EPERM|permission denied/i.test(message)) return 'SFTP_PERMISSION_DENIED';
+  if (/timed? ?out/i.test(message)) return 'SFTP_TIMEOUT';
+  return 'SFTP_FAILED';
+}
+
+function adaptSftp(sftp: SFTPWrapper): SshSftp {
+  function call<T>(run: (cb: (err: Error | undefined, result: T) => void) => void): Promise<T> {
+    return new Promise((resolve, reject) => {
+      run((err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+  }
+  function callVoid(run: (cb: (err: Error | null | undefined) => void) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+      run(err => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+  return {
+    stat: async path => attrsOf(await call<Stats>(cb => sftp.stat(path, cb))),
+    lstat: async path => attrsOf(await call<Stats>(cb => sftp.lstat(path, cb))),
+    list: async path => {
+      const entries = await call<FileEntryWithStats[]>(cb => sftp.readdir(path, cb));
+      return entries.map(entry => ({
+        name: entry.filename,
+        type: entry.attrs.isDirectory()
+          ? 'dir'
+          : entry.attrs.isSymbolicLink()
+            ? 'link'
+            : entry.attrs.isFile()
+              ? 'file'
+              : 'other',
+        size: Number(entry.attrs.size) || 0,
+        mtime: toMs(Number(entry.attrs.mtime) || 0),
+      }));
+    },
+    mkdir: async path => {
+      await callVoid(cb => sftp.mkdir(path, cb));
+    },
+    unlink: async path => {
+      await callVoid(cb => sftp.unlink(path, cb));
+    },
+    rmdir: async path => {
+      await callVoid(cb => sftp.rmdir(path, cb));
+    },
+    rename: async (from, to) => {
+      await callVoid(cb => sftp.rename(from, to, cb));
+    },
+    createReadStream: path => sftp.createReadStream(path) as unknown as SshFsReadStream,
+    createWriteStream: path => sftp.createWriteStream(path) as unknown as SshFsWriteStream,
+    end: () => sftp.end(),
+  };
 }
 
 export interface SshConnector {
@@ -133,6 +263,20 @@ export class RealSshConnector implements SshConnector {
               try { stream.close(); } catch { /* already closed */ }
               try { client.end(); } catch { /* already closed */ }
             },
+            openSftp: () =>
+              new Promise<SshSftp>((resolve, reject) => {
+                try {
+                  client.sftp((error, sftp) => {
+                    if (error) {
+                      reject(new SshConnectError(mapSftpError(error), error.message || 'SFTP 子系统不可用'));
+                      return;
+                    }
+                    resolve(adaptSftp(sftp));
+                  });
+                } catch (error) {
+                  reject(new SshConnectError('SFTP_FAILED', error instanceof Error ? error.message : 'SFTP 打开失败'));
+                }
+              }),
           });
         });
       });

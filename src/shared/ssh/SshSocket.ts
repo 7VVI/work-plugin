@@ -1,9 +1,23 @@
-import type { SshClientMessage, SshErrorCode, SshServerMessage } from '@protocol/ssh';
+import type {
+  SshClientMessage,
+  SshErrorCode,
+  SshFsClientMessage,
+  SshFsServerMessage,
+  SshServerMessage,
+} from '@protocol/ssh';
 
 export type SshWebSocketFactory = (url: string) => WebSocket;
 
 export interface SshSocketCallbacks {
-  onReady: (info: { serverId: string; sessionId: string; fingerprint: string }) => void;
+  onReady: (info: {
+    serverId: string;
+    sessionId: string;
+    fingerprint: string;
+    /** 服务端是否支持 SFTP 文件管理 */
+    sftp?: true;
+    fsMaxEdit?: number;
+    fsMaxTransfer?: number;
+  }) => void;
   onOutput: (data: Uint8Array) => void;
   onExit: (code: number | null, signal: string | null) => void;
   onError: (code: SshErrorCode, message: string) => void;
@@ -27,6 +41,9 @@ const INPUT_CHUNK = 64 * 1024;
  * 定时 ping，长时间没有 pong 视为断线。重连由上层用新票据重新创建。
  */
 export class SshSocket {
+  /** SFTP 文件操作响应回调（由 SshFs 注册） */
+  onFsMessage: ((message: SshFsServerMessage) => void) | null = null;
+
   private readonly socket: WebSocket;
   private readonly callbacks: SshSocketCallbacks;
   private readonly pingIntervalMs: number;
@@ -85,6 +102,14 @@ export class SshSocket {
   resize(cols: number, rows: number): void {
     this.pendingSize = { cols, rows };
     if (this.socket.readyState === OPEN) this.sendControl({ type: 'resize', cols, rows });
+  }
+
+  /** 发送 SFTP 文件操作请求 */
+  sendFs(message: SshFsClientMessage): void {
+    if (this.socket.readyState !== OPEN) return;
+    try {
+      this.socket.send(JSON.stringify(message));
+    } catch { /* closed */ }
   }
 
   close(): void {
@@ -161,6 +186,10 @@ export class SshSocket {
   private handleControl(text: string): void {
     let message: SshServerMessage;
     try { message = JSON.parse(text) as SshServerMessage; } catch { return; }
+    if (typeof message.type === 'string' && message.type.startsWith('fs-')) {
+      this.onFsMessage?.(message as SshFsServerMessage);
+      return;
+    }
     switch (message.type) {
       case 'ready':
         this.clearTimer('ready');

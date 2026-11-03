@@ -15,6 +15,15 @@
             <span class="terminal-state">{{ statusText }}</span>
           </div>
           <div class="terminal-actions">
+            <button
+              type="button"
+              class="terminal-btn"
+              :class="{ active: showFiles }"
+              title="文件管理"
+              @click="toggleFiles"
+            >
+              <i class="fa-solid fa-folder-tree"></i>
+            </button>
             <button type="button" class="terminal-btn" title="复制选中" @click="copySelection">
               <i class="fa-regular fa-copy"></i>
             </button>
@@ -30,12 +39,46 @@
           </div>
         </header>
 
-        <div
-          ref="terminalHost"
-          class="terminal-host"
-          @contextmenu.prevent="pasteFromClipboard"
-          @mouseup="onTerminalMouseUp"
-        ></div>
+        <div class="terminal-body">
+          <aside v-if="showFiles" class="file-panel">
+            <ServerFileTree
+              ref="treeRef"
+              :fs="fsClient"
+              :supported="sftpSupported"
+              @open-file="onOpenFile"
+              @download="onDownloadFile"
+              @open-terminal="onOpenTerminal"
+              @pick-files="onPickFiles"
+              @upload-files="onUploadFiles"
+            />
+            <div v-if="transfers.length" class="transfer-list">
+              <div v-for="item in transfers" :key="item.name" class="transfer-item">
+                <span class="transfer-name">{{ item.name }}</span>
+                <span class="transfer-percent">{{ item.percent }}%</span>
+              </div>
+            </div>
+          </aside>
+
+          <div class="terminal-stage">
+            <div
+              v-show="viewMode === 'terminal'"
+              ref="terminalHost"
+              class="terminal-host"
+              @contextmenu.prevent="pasteFromClipboard"
+              @mouseup="onTerminalMouseUp"
+            ></div>
+            <RemoteFileEditor
+              v-if="viewMode === 'editor' && editorFile"
+              :path="editorFile.path"
+              :name="editorFile.name"
+              :content="editorFile.content"
+              :saving="savingFile"
+              @save="onSaveFile"
+              @close="onCloseEditor"
+              @dirty="onEditorDirty"
+            />
+          </div>
+        </div>
 
         <div v-if="status === 'connecting' || busy" class="terminal-mask">
           <div class="terminal-progress" aria-hidden="true"></div>
@@ -67,16 +110,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import type { Server } from '@shared/types/entities';
 import type { SshErrorCode } from '@protocol/ssh';
 import { SshSocket } from '@shared/ssh/SshSocket';
+import { SshFs, joinPath, looksBinary } from '@shared/ssh/sshFs';
+import { downloadBlob } from '@shared/utils/download';
+import { sanitizeFilename } from '@shared/utils/noteUtils';
 import { describeSshError, requestSshWsUrl, syncBeforeSsh, type SshErrorKind } from '@shared/ssh/ticket';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import { useToastStore } from '@shared/stores/toastStore';
+import ServerFileTree from './ServerFileTree.vue';
+import RemoteFileEditor from './RemoteFileEditor.vue';
 import '@xterm/xterm/css/xterm.css';
 
 const props = defineProps<{ server: Server }>();
@@ -95,10 +143,21 @@ const errorKind = ref<SshErrorKind>('unknown');
 const fingerprint = ref('');
 const busy = ref(false);
 const connectSeconds = ref(0);
+const showFiles = ref(false);
+const sftpSupported = ref(false);
+const fsMaxEdit = ref(2 * 1024 * 1024);
+const fsMaxTransfer = ref(200 * 1024 * 1024);
+const viewMode = ref<'terminal' | 'editor'>('terminal');
+const editorFile = ref<{ path: string; name: string; content: string; mtime: number } | null>(null);
+const editorDirty = ref(false);
+const savingFile = ref(false);
+const treeRef = ref<InstanceType<typeof ServerFileTree> | null>(null);
+const transfers = reactive<Array<{ name: string; percent: number }>>([]);
 
 let term: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
 let socket: SshSocket | null = null;
+let fsClient: SshFs | null = null;
 let observer: ResizeObserver | null = null;
 let resizeTimer = 0;
 let retryTimer = 0;
@@ -168,6 +227,7 @@ function initTerminal(): void {
   term.onData(data => socket?.sendInput(new TextEncoder().encode(data)));
   term.onResize(({ cols, rows }) => socket?.resize(cols, rows));
   observer = new ResizeObserver(() => {
+    if (viewMode.value !== 'terminal') return;
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
       fit();
@@ -226,6 +286,9 @@ function connect(): void {
           stopConnectClock();
           status.value = 'connected';
           fingerprint.value = info.fingerprint;
+          sftpSupported.value = info.sftp === true;
+          fsMaxEdit.value = info.fsMaxEdit ?? fsMaxEdit.value;
+          fsMaxTransfer.value = info.fsMaxTransfer ?? fsMaxTransfer.value;
           errorText.value = '';
           retries = 0;
           fit();
@@ -255,6 +318,9 @@ function connect(): void {
         },
         onClose: ({ code, reason, intentional }) => {
           stopConnectClock();
+          fsClient?.dispose();
+          fsClient = null;
+          sftpSupported.value = false;
           if (disposed || intentional || fatal) return;
           if (status.value === 'closed') return;
           status.value = 'error';
@@ -268,6 +334,7 @@ function connect(): void {
           }
         },
       });
+      fsClient = new SshFs(socket);
     } catch (error) {
       if (disposed) return;
       stopConnectClock();
@@ -355,6 +422,143 @@ async function pasteFromClipboard(): Promise<void> {
   }
 }
 
+/* ---------- 文件管理 ---------- */
+
+function toggleFiles(): void {
+  showFiles.value = !showFiles.value;
+  if (showFiles.value) {
+    void treeRef.value?.refresh();
+  } else {
+    nextTick(() => {
+      fit();
+      if (term && socket) socket.resize(term.cols, term.rows);
+    });
+  }
+}
+
+async function onOpenFile(path: string, name: string, size: number): Promise<void> {
+  if (!fsClient) return;
+  if (size > fsMaxEdit.value) {
+    toast.error(`文件 ${(size / 1024 / 1024).toFixed(1)}MB 超过在线编辑上限 ${(fsMaxEdit.value / 1024 / 1024).toFixed(0)}MB`);
+    return;
+  }
+  try {
+    const stat = await fsClient.stat(path);
+    const bytes = await fsClient.readFile(path, 'edit');
+    if (looksBinary(bytes)) {
+      toast.error('该文件不是文本文件，无法在线编辑');
+      return;
+    }
+    editorFile.value = {
+      path,
+      name,
+      content: new TextDecoder('utf-8').decode(bytes),
+      mtime: stat.mtime,
+    };
+    editorDirty.value = false;
+    viewMode.value = 'editor';
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : '文件读取失败');
+  }
+}
+
+async function onSaveFile(text: string): Promise<void> {
+  if (!fsClient || !editorFile.value) return;
+  savingFile.value = true;
+  try {
+    const stat = await fsClient.stat(editorFile.value.path);
+    if (stat.mtime && editorFile.value.mtime && stat.mtime !== editorFile.value.mtime) {
+      const overwrite = await dialog.confirm('文件已被修改', '远端文件在打开后被修改过，仍要覆盖吗？');
+      if (!overwrite) {
+        savingFile.value = false;
+        return;
+      }
+    }
+    await fsClient.writeFile(editorFile.value.path, new TextEncoder().encode(text), { intent: 'edit' });
+    const latest = await fsClient.stat(editorFile.value.path);
+    editorFile.value = { ...editorFile.value, content: text, mtime: latest.mtime };
+    editorDirty.value = false;
+    toast.success('已保存');
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : '保存失败');
+  } finally {
+    savingFile.value = false;
+  }
+}
+
+function onEditorDirty(value: boolean): void {
+  editorDirty.value = value;
+}
+
+async function onCloseEditor(): Promise<void> {
+  if (editorDirty.value) {
+    const discard = await dialog.confirm('放弃更改', '当前文件有未保存的修改，确定放弃吗？');
+    if (!discard) return;
+  }
+  editorFile.value = null;
+  editorDirty.value = false;
+  viewMode.value = 'terminal';
+  await nextTick();
+  fit();
+  if (term && socket) socket.resize(term.cols, term.rows);
+}
+
+async function onDownloadFile(path: string, name: string): Promise<void> {
+  if (!fsClient) return;
+  try {
+    const bytes = await fsClient.readFile(path, 'download');
+    downloadBlob(new Blob([bytes as BlobPart]), sanitizeFilename(name) || name);
+    toast.success('文件已下载');
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : '下载失败');
+  }
+}
+
+function onOpenTerminal(dir: string): void {
+  const escaped = dir.replace(/'/g, `'\\''`);
+  socket?.sendInput(new TextEncoder().encode(`cd '${escaped}'\n`));
+  viewMode.value = 'terminal';
+  editorFile.value = null;
+  nextTick(() => {
+    fit();
+    term?.focus();
+  });
+}
+
+function onPickFiles(dir: string): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.onchange = () => {
+    const files = [...(input.files ?? [])];
+    if (files.length) void onUploadFiles(files, dir);
+  };
+  input.click();
+}
+
+async function onUploadFiles(files: File[], dir: string): Promise<void> {
+  if (!fsClient) return;
+  for (const file of files) {
+    const item = { name: file.name, percent: 0 };
+    transfers.push(item);
+    try {
+      await fsClient.writeFile(joinPath(dir, file.name), file, {
+        intent: 'upload',
+        onProgress: progress => {
+          item.percent = progress.total ? Math.round((progress.loaded / progress.total) * 100) : 0;
+        },
+      });
+      toast.success(`已上传 ${file.name}`);
+      void treeRef.value?.refresh(dir);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `上传 ${file.name} 失败`);
+    } finally {
+      const index = transfers.indexOf(item);
+      if (index >= 0) transfers.splice(index, 1);
+    }
+  }
+}
+
 function clearScreen(): void {
   term?.clear();
   term?.focus();
@@ -365,6 +569,8 @@ function cleanup(): void {
   window.clearTimeout(retryTimer);
   window.clearTimeout(resizeTimer);
   stopConnectClock();
+  fsClient?.dispose();
+  fsClient = null;
   closeSocket();
   observer?.disconnect();
   observer = null;
@@ -457,6 +663,45 @@ onBeforeUnmount(cleanup);
   overflow: hidden;
   background: #0f1113;
 }
+.terminal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.terminal-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.file-panel {
+  width: 260px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #22272e;
+  background: #12151a;
+}
+.file-panel > :first-child { flex: 1; min-height: 0; }
+.transfer-list {
+  flex: none;
+  max-height: 96px;
+  overflow: auto;
+  padding: 6px 8px;
+  border-top: 1px solid #22272e;
+  background: #101318;
+}
+.transfer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #b7c0cc;
+}
+.transfer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.transfer-percent { color: #5b8def; flex: none; }
 .terminal-host :deep(.xterm) { height: 100%; }
 .terminal-host :deep(.xterm-viewport) { background: transparent !important; }
 .terminal-mask {
