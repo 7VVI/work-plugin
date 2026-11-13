@@ -25,6 +25,7 @@
 import { ref, onMounted } from 'vue';
 import { usePrefStore } from '@shared/stores/prefStore';
 import { useCryptoStore } from '@shared/stores/cryptoStore';
+import { applyTheme } from '@shared/utils/themeTransition';
 import SearchBox from './components/SearchBox.vue';
 import FavoriteGrid from './components/FavoriteGrid.vue';
 import QuickAdd from './components/QuickAdd.vue';
@@ -35,16 +36,9 @@ const refreshKey = ref(0);
 const showAddForm = ref(false);
 const systemCount = ref(0);
 
-function resolveTheme(theme: string): 'light' | 'dark' {
-  if (theme === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  return theme === 'dark' ? 'dark' : 'light';
-}
-
 onMounted(async () => {
   await prefStore.load();
-  document.documentElement.dataset.theme = resolveTheme(prefStore.theme);
+  applyTheme(prefStore.theme);
   await cryptoStore.checkStatus();
 });
 

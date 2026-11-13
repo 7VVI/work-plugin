@@ -10,9 +10,9 @@
           <div class="setting-desc">控制台与弹窗的显示主题</div>
         </div>
         <div class="seg-group">
-          <button class="seg-btn" :class="{ on: prefStore.theme === 'light' }" @click="prefStore.theme = 'light'">浅色</button>
-          <button class="seg-btn" :class="{ on: prefStore.theme === 'dark' }" @click="prefStore.theme = 'dark'">深色</button>
-          <button class="seg-btn" :class="{ on: prefStore.theme === 'system' }" @click="prefStore.theme = 'system'">跟随系统</button>
+          <button class="seg-btn" :class="{ on: prefStore.theme === 'light' }" @click="setTheme('light', $event)">浅色</button>
+          <button class="seg-btn" :class="{ on: prefStore.theme === 'dark' }" @click="setTheme('dark', $event)">深色</button>
+          <button class="seg-btn" :class="{ on: prefStore.theme === 'system' }" @click="setTheme('system', $event)">跟随系统</button>
         </div>
       </div>
     </section>
@@ -172,6 +172,7 @@ import { useDialogStore } from '@shared/stores/dialogStore';
 import { importExportService } from '@shared/services/importExportService';
 import { cryptoService } from '@shared/services/cryptoService';
 import { isWeb } from '@shared/platform';
+import { applyTheme, switchTheme, type ThemeMode } from '@shared/utils/themeTransition';
 import CloudSyncSection from '../components/settings/CloudSyncSection.vue';
 import ServerAccessSection from '../../web/ServerAccessSection.vue';
 
@@ -191,6 +192,14 @@ onMounted(async () => {
   hasMasterPwd.value = await cryptoService.isEnabled();
   masterPwdOn.value = hasMasterPwd.value;
 });
+
+function setTheme(mode: ThemeMode, event: MouseEvent) {
+  if (prefStore.theme === mode) return;
+  void switchTheme(() => {
+    prefStore.theme = mode;
+    applyTheme(mode);
+  }, event.currentTarget as HTMLElement);
+}
 
 async function toggleMasterPwd() {
   if (masterPwdOn.value) {

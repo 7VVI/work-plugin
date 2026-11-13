@@ -723,3 +723,96 @@ input[type="checkbox"].form-check:checked::after {
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); background-clip: content-box; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.24); background-clip: content-box; }
 [data-theme="dark"] ::selection { background: rgba(91,141,239,.3); }
+
+/* ============================================================
+   主题切换：光圈扩散 + 全局渐变
+   ============================================================ */
+
+/* 切换瞬间冻结表面过渡：新主题快照必须拍到最终配色，
+   否则快照会落在过渡中间态（搜索框/卡片仍是旧颜色） */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+/* 不支持 View Transitions 时的兜底：整屏表面做颜色渐变 */
+html.theme-fading,
+html.theme-fading body,
+html.theme-fading .app-shell,
+html.theme-fading .app-header,
+html.theme-fading .content-area,
+html.theme-fading .tabs-row,
+html.theme-fading .tabs-bar,
+html.theme-fading .statusbar,
+html.theme-fading .panel,
+html.theme-fading .panel-solid,
+html.theme-fading .stat-card,
+html.theme-fading .search-input,
+html.theme-fading .inp,
+html.theme-fading .form-input,
+html.theme-fading .form-select,
+html.theme-fading .form-textarea,
+html.theme-fading .btn-g,
+html.theme-fading .btn-default,
+html.theme-fading .icon-btn,
+html.theme-fading .ibtn,
+html.theme-fading .row-action,
+html.theme-fading .chip,
+html.theme-fading .seg-group,
+html.theme-fading .seg-btn {
+  transition:
+    background-color 600ms ease,
+    color 600ms ease,
+    border-color 600ms ease,
+    box-shadow 600ms ease;
+}
+
+/* 光圈：从主题按钮中心扩散，逐渐露出新主题 */
+::view-transition-old(root) {
+  animation: dock-theme-old 800ms cubic-bezier(.2, .75, .25, 1) both;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: dock-theme-reveal 800ms cubic-bezier(.2, .75, .25, 1) both;
+  mix-blend-mode: normal;
+}
+::view-transition-group(root) {
+  animation-duration: 800ms;
+  animation-timing-function: cubic-bezier(.2, .75, .25, 1);
+}
+
+@keyframes dock-theme-reveal {
+  from {
+    clip-path: circle(0px at var(--theme-x, 100vw) var(--theme-y, 0px));
+  }
+  to {
+    clip-path: circle(150vmax at var(--theme-x, 100vw) var(--theme-y, 0px));
+  }
+}
+@keyframes dock-theme-old {
+  from { opacity: 1; }
+  to { opacity: .92; }
+}
+
+/* 主题按钮单独成层，旋转与光圈推进同步 */
+::view-transition-old(dock-theme-toggle) {
+  animation: dock-toggle-out 800ms cubic-bezier(.2, .75, .25, 1) both;
+  mix-blend-mode: normal;
+}
+::view-transition-new(dock-theme-toggle) {
+  animation: dock-toggle-in 800ms cubic-bezier(.2, .75, .25, 1) both;
+  mix-blend-mode: normal;
+}
+@keyframes dock-toggle-out {
+  0% { opacity: 1; transform: rotate(0deg) scale(1); }
+  45% { opacity: 0; transform: rotate(180deg) scale(.82); }
+  100% { opacity: 0; transform: rotate(180deg) scale(.82); }
+}
+@keyframes dock-toggle-in {
+  0% { opacity: 0; transform: rotate(-180deg) scale(.82); }
+  40% { opacity: 0; transform: rotate(-180deg) scale(.82); }
+  90% { opacity: 1; transform: rotate(0deg) scale(1); }
+  100% { opacity: 1; transform: rotate(0deg) scale(1); }
+}

@@ -5,22 +5,33 @@
       <span class="brand-name">Dock</span>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" @click="toggleTheme" :title="isDark ? '切换到亮色' : '切换到暗色'">
-        <i class="fa-solid fa-circle-half-stroke"></i>
+      <button
+        ref="toggleEl"
+        class="icon-btn theme-toggle"
+        :title="isDark ? '切换到亮色' : '切换到暗色'"
+        @click="toggleTheme"
+      >
+        <i class="fa-solid" :class="isDark ? 'fa-moon' : 'fa-sun'"></i>
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { usePrefStore } from '@shared/stores/prefStore';
+import { applyTheme, resolvedTheme, switchTheme } from '@shared/utils/themeTransition';
 
 const prefStore = usePrefStore();
-const isDark = computed(() => prefStore.theme === 'dark');
+const toggleEl = ref<HTMLButtonElement | null>(null);
+const isDark = computed(() => resolvedTheme.value === 'dark');
 
 function toggleTheme() {
-  prefStore.theme = isDark.value ? 'light' : 'dark';
+  const next = resolvedTheme.value === 'dark' ? 'light' : 'dark';
+  void switchTheme(() => {
+    prefStore.theme = next;
+    applyTheme(next);
+  }, toggleEl.value);
 }
 </script>
 
@@ -52,4 +63,11 @@ function toggleTheme() {
 }
 .icon-btn:hover { background: var(--panel2); color: var(--ink); }
 .icon-btn i { font-size: var(--text-sm); }
+.theme-toggle {
+  view-transition-name: dock-theme-toggle;
+  transition: transform 450ms cubic-bezier(.2, .8, .2, 1), background-color 300ms ease, color 300ms ease;
+}
+.theme-toggle:active { transform: scale(.85); }
+.theme-toggle i.fa-sun { color: #F59E0B; }
+.icon-btn:hover i.fa-sun { color: #FBBF24; }
 </style>

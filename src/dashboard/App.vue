@@ -28,23 +28,13 @@ import { useConfigStore } from '@shared/stores/configStore';
 import { useCloudSyncStore } from '@shared/stores/cloudSyncStore';
 import { cryptoSession } from '@shared/crypto/session';
 import { startSyncScheduler } from '@shared/sync/syncScheduler';
+import { applyTheme } from '@shared/utils/themeTransition';
 
 const prefStore = usePrefStore();
 const cryptoStore = useCryptoStore();
 const configStore = useConfigStore();
 const cloudStore = useCloudSyncStore();
 let stopSyncScheduler: (() => void) | null = null;
-
-function resolveTheme(theme: string): 'light' | 'dark' {
-  if (theme === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  return theme === 'dark' ? 'dark' : 'light';
-}
-
-function applyTheme(theme: string) {
-  document.documentElement.dataset.theme = resolveTheme(theme);
-}
 
 function onSystemThemeChange() {
   if (prefStore.theme === 'system') applyTheme('system');
