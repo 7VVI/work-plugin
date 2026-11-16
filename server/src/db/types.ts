@@ -1,11 +1,13 @@
 import type {
   DbCell,
+  DbCellUpdate,
   DbColumn,
   DbDialect,
   DbForeignKeyInfo,
   DbIndexInfo,
   DbObjectItem,
   DbObjectKind,
+  DbRoutineInfo,
   DbTriggerInfo,
 } from '@protocol/db';
 
@@ -31,6 +33,8 @@ export interface DbQueryOptions {
   timeoutMs: number;
   /** 结果起始行（分页） */
   offset?: number;
+  /** 查询使用的库（PG 为 schema），用于切换会话当前库 */
+  database?: string;
 }
 
 export interface DbQueryResult {
@@ -46,6 +50,10 @@ export interface DbQueryResult {
 export interface DbSession {
   readonly dialect: DbDialect;
   query(sql: string, options: DbQueryOptions): Promise<DbQueryResult>;
+  /** 修改一个单元格：按主键定位一行，返回受影响行数 */
+  updateCell(update: DbCellUpdate): Promise<number>;
+  /** 取存储过程 / 函数 / 触发器的定义与参数 */
+  getRoutine(kind: 'functions' | 'procedures' | 'triggers', schema: string | undefined, name: string): Promise<DbRoutineInfo>;
   listObjects(kind: DbObjectKind, schema?: string): Promise<DbObjectItem[]>;
   describeTable(schema: string | undefined, table: string): Promise<DbColumn[]>;
   listIndexes(schema: string | undefined, table: string): Promise<DbIndexInfo[]>;

@@ -61,10 +61,14 @@
 - 环境标签 + 卡片式展示
 - 连接信息一键复制
 - **数据库在线管理**：数据库类中间件（MySQL/PostgreSQL/SQL Server/SQLite/ClickHouse）卡片上点「打开数据库」进入全屏工作台，可浏览表 / 视图 / 函数 / 存储过程 / 触发器，查看数据、列结构、索引与外键，并用 SQL 编辑器执行查询（多标签页 + 保存查询，支持读写）
-  - 结果集按服务端行数上限分页（上一页 / 下一页），可导出当前结果为 CSV
-  - **列宽可手动拖动**：拖动表头右边缘即可调整该列宽度（60–1200px），长内容以省略号截断，宽度按列名记住
+  - 结果集用**瀑布流**加载：每页按服务端行数上限取一页（表数据 200 行 / 查询结果 500 行），一屏放不下时自动续拉，滚动到底继续加载下一页；底栏显示「已加载 N 行 · 每页 M 行」，可导出当前结果为 CSV
+  - **数据表格样式**：工具条（刷新 / 导出 / 全屏）、表头带排序箭头（点列名按该列排序）、行复选框（勾选后只导出勾选行）、斑马纹行、列宽可拖动且不影响其它列、底栏可输入每页行数
+  - **可直接改单元格**（仿 DBeaver）：双击某个单元格进入编辑，工具条出现「保存 / 取消」，回车保存、Esc 取消；服务端按主键生成 `UPDATE ... SET 列 = ? WHERE 主键 = ?`（值走参数绑定，标识符按方言转义），无主键的表会提示不能改。空值写成 `NULL`
+  - **存储过程 / 函数 / 触发器看定义**：它们没有数据，点开显示的是**参数表 + 源码**（MySQL 用 `SHOW CREATE PROCEDURE/FUNCTION/TRIGGER`，PG 用 `pg_get_functiondef`，SQL Server 用 `OBJECT_DEFINITION`），与表的数据网格完全是两套视图
+  - **列宽可手动拖动**：拖动表头右边缘即可调整该列宽度（60–1200px），长内容以省略号截断，宽度按列名记住；表格按各列宽度之和定宽，拖动某列不会连带改变其它列
+  - **执行按钮在编辑器左侧竖排**（执行当前语句 / 执行全部 / 保存 / 已保存查询），编辑器上方是**当前库选择器**：切换库后服务端会切到该库（MySQL/MSSQL `USE`、PostgreSQL `search_path`、ClickHouse 查询参数），SQL 里可以直接写表名，不用再带库名；从对象树打开某个库的表时，查询也会跟着切到该库
   - 光标停在某条语句上时，**只执行该条语句**（Ctrl/⌘+Enter）；「执行全部」按钮（Shift+Ctrl/⌘+Enter）按分号依次执行整段脚本
-  - 左侧树里的表名可**拖拽到编辑器**中，自动按方言加引号插入（如 MySQL 的 `` `库`.`表` ``）
+  - 左侧树里的表名可**拖拽到编辑器**中，自动按方言加引号插入（如 MySQL 的 `` `库`.`表` ``）；若该表就在当前库里，则只插入表名
   - 首次支持 5 种数据库：PostgreSQL、MySQL（含 MariaDB）、SQL Server、SQLite、ClickHouse；PG/MySQL 协议兼容库（TiDB、OceanBase、CockroachDB、TimescaleDB、KingbaseES 等）由原生驱动自动覆盖
   - 数据库访问全部在云端服务端执行（服务端需能直连内网数据库），客户端只通过 WebSocket 通信
   - SQLite 指向服务端本地文件路径，需配置 `DOCK_DB_SQLITE_ROOTS` 白名单目录
@@ -280,7 +284,7 @@ docker compose up -d --build
 - 云端 API Token 使用主密码加密保存在本地；修改或关闭主密码后需要重新输入 Token。
 - SSH 终端 v1 不支持 SFTP/文件传输、端口转发、多窗口分屏、会话录制与审计；不支持带口令的私钥；当前接受任意主机指纹（展示 SHA256，尚未做 known_hosts/TOFU pinning）。
 - SSH 终端依赖云端同步与已解锁的保险库；本地尚未同步的服务器会先触发一次同步。服务端必须能访问目标 SSH 端口，反向代理必须支持 WebSocket Upgrade；连接阶段会显示进度，约 20 秒未建立会提示超时与网络可达性检查。
-- 数据库在线管理 v1 只支持 PostgreSQL、MySQL/MariaDB、SQL Server、SQLite、ClickHouse；ClickHouse 走 HTTP 协议（8123），不支持原生 9000，也没有外键与触发器。SQLite 库文件必须放在 `DOCK_DB_SQLITE_ROOTS` 允许的目录内；SQLite 查询跑在 worker 线程里，超时靠终止 worker 实现；SQLite 不支持子查询里带 WITH，分页改为直接追加 LIMIT/OFFSET，因此自带 LIMIT 的语句无法继续翻页。保存的查询只存在本机浏览器（不入云端同步）。
+- 数据库在线管理 v1 只支持 PostgreSQL、MySQL/MariaDB、SQL Server、SQLite、ClickHouse；ClickHouse 走 HTTP 协议（8123），不支持原生 9000，也没有外键与触发器。SQLite 库文件必须放在 `DOCK_DB_SQLITE_ROOTS` 允许的目录内；SQLite 查询跑在 worker 线程里，超时靠终止 worker 实现；SQLite 不支持子查询里带 WITH，分页改为直接追加 LIMIT/OFFSET，因此自带 LIMIT 的语句无法继续翻页。SQL Server 没有 LIMIT，分页用 `OFFSET/FETCH`（会自动补 `ORDER BY (SELECT NULL)`）。ClickHouse 的账号密码填中间件的「账号 / 密码」，未填账号时按 `default` 连接。保存的查询只存在本机浏览器（不入云端同步）。
 
 ## 快捷键
 

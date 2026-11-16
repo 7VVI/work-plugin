@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPaging, normalizeCell, trimSemicolon } from '../src/db/drivers/shared';import { assertSafeIdentifier } from '../src/db/drivers/sqlite';
+import { applyPaging, buildUpdateSql, normalizeCell, trimSemicolon, useDatabaseSql } from '../src/db/drivers/shared';import { assertSafeIdentifier } from '../src/db/drivers/sqlite';
 import { PG_LIST_SQL, PG_DESCRIBE_SQL, PG_INDEX_SQL, PG_FOREIGN_KEY_SQL, PG_TRIGGER_SQL } from '../src/db/drivers/postgres';
 import { MYSQL_LIST_SQL, MYSQL_DESCRIBE_SQL, MYSQL_INDEX_SQL, MYSQL_FOREIGN_KEY_SQL, MYSQL_TRIGGER_SQL } from '../src/db/drivers/mysql';
 import { MSSQL_LIST_SQL, MSSQL_DESCRIBE_SQL, MSSQL_INDEX_SQL, MSSQL_FOREIGN_KEY_SQL, MSSQL_TRIGGER_SQL } from '../src/db/drivers/mssql';
@@ -56,10 +56,82 @@ describe('db driver SQL construction', () => {
     expect(withComment.sql).toBe('SELECT 1 LIMIT 51 OFFSET 0');
   });
 
+  it('pages SQL Server with OFFSET/FETCH (no LIMIT in T-SQL)', () => {
+    const paged = applyPaging('SELECT * FROM users ORDER BY id', 100, 200, 'mssql');
+    expect(paged.sql).toBe('SELECT * FROM users ORDER BY id OFFSET 200 ROWS FETCH NEXT 101 ROWS ONLY');
+    // 没有 ORDER BY 时要补一个，否则 T-SQL 不允许 OFFSET
+    const unordered = applyPaging('SELECT * FROM users', 100, 0, 'mssql');
+    expect(unordered.sql).toBe('SELECT * FROM users ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 101 ROWS ONLY');
+    // 已经带 OFFSET/FETCH 就不再追加
+    const manual = applyPaging('SELECT * FROM users ORDER BY id OFFSET 5 ROWS', 100, 0, 'mssql');
+    expect(manual.wrapped).toBe(false);
+  });
+
+  it('builds a parameterized UPDATE for cell editing', () => {
+    const update = {
+      schema: 'cors_3.0.0',
+      table: 'orders',
+      column: 'status',
+      value: 'paid',
+      keys: [{ column: 'id', value: '7' }],
+    };
+    const pg = buildUpdateSql(update, 'postgres', index => `$${index + 1}`);
+    expect(pg.sql).toBe('UPDATE "cors_3.0.0"."orders" SET "status" = $1 WHERE "id" = $2');
+    expect(pg.values).toEqual(['paid', '7']);
+
+    const mysql = buildUpdateSql(update, 'mysql', () => '?');
+    expect(mysql.sql).toBe('UPDATE `cors_3.0.0`.`orders` SET `status` = ? WHERE `id` = ?');
+
+    const mssql = buildUpdateSql(update, 'mssql', index => `@p${index}`);
+    expect(mssql.sql).toBe('UPDATE [cors_3.0.0].[orders] SET [status] = @p0 WHERE [id] = @p1');
+
+    const sqlite = buildUpdateSql({ ...update, schema: undefined }, 'sqlite', () => '?');
+    expect(sqlite.sql).toBe('UPDATE "orders" SET "status" = ? WHERE "id" = ?');
+  });
+
+  it('keeps cell values out of the SQL text', () => {
+    const injected = buildUpdateSql({
+      schema: 'db',
+      table: 't',
+      column: 'c',
+      value: "'; DROP TABLE t; --",
+      keys: [{ column: 'id', value: '1' }],
+    }, 'postgres', index => `$${index + 1}`);
+    expect(injected.sql).not.toContain('DROP TABLE');
+    expect(injected.values[0]).toBe("'; DROP TABLE t; --");
+  });
+
+  it('escapes identifiers in the UPDATE statement', () => {
+    const evil = buildUpdateSql({
+      table: 't" ; DROP TABLE x; --',
+      column: 'c',
+      value: '1',
+      keys: [{ column: 'id', value: '1' }],
+    }, 'postgres', index => `$${index + 1}`);
+    expect(evil.sql).toBe('UPDATE "t"" ; DROP TABLE x; --" SET "c" = $1 WHERE "id" = $2');
+  });
+
   it('rejects unsafe sqlite identifiers', () => {
     expect(assertSafeIdentifier('users')).toBe('"users"');
     expect(() => assertSafeIdentifier('users; DROP TABLE x')).toThrowError();
     expect(() => assertSafeIdentifier('')).toThrowError();
+  });
+
+  it('builds the statement that switches the current database', () => {
+    expect(useDatabaseSql('postgres', 'public')).toBe('SET search_path TO "public"');
+    expect(useDatabaseSql('mysql', 'cors_3.0.0')).toBe('USE `cors_3.0.0`');
+    expect(useDatabaseSql('mssql', 'cors')).toBe('USE [cors]');
+    expect(useDatabaseSql('clickhouse', 'cors')).toBe('USE cors');
+    // SQLite 只有单文件，没有可切换的库
+    expect(useDatabaseSql('sqlite', 'main')).toBeNull();
+    expect(useDatabaseSql('mysql', '  ')).toBeNull();
+  });
+
+  it('refuses database names that could break out of the statement', () => {
+    expect(useDatabaseSql('mysql', 'a`; DROP TABLE x; --')).toBeNull();
+    expect(useDatabaseSql('postgres', 'a"; DROP TABLE x; --')).toBeNull();
+    expect(useDatabaseSql('mssql', 'a]; DROP TABLE x; --')).toBeNull();
+    expect(useDatabaseSql('mysql', 'db; SELECT 1')).toBeNull();
   });
 
   it('keeps metadata queries parameterized', () => {

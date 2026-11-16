@@ -1,8 +1,8 @@
 import { Connection, Request, TYPES } from 'tedious';
-import type { DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbTriggerInfo } from '@protocol/db';
+import type { DbCell, DbCellUpdate, DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbRoutineInfo, DbTriggerInfo } from '@protocol/db';
 import { DbError, mapDriverError } from '../errors';
 import type { DbDriver, DbQueryOptions, DbQueryResult, DbSession, DbTarget } from '../types';
-import { applyPaging, columnsFromNames, normalizeCell } from './shared';
+import { applyPaging, buildUpdateSql, columnsFromNames, normalizeCell, useDatabaseSql } from './shared';
 
 export const MSSQL_LIST_SQL: Record<DbObjectKind, string> = {
   schemas: `SELECT name FROM sys.schemas
@@ -70,6 +70,9 @@ interface QueryOutcome {
 class MssqlSession implements DbSession {
   readonly dialect = 'mssql' as const;
 
+  /** 当前 USE 到的库 */
+  private currentDb: string | undefined;
+
   constructor(private readonly conn: Connection) {}
 
   private exec(sql: string, params: Array<{ name: string; value: string | null }>, timeoutMs: number): Promise<QueryOutcome> {
@@ -107,6 +110,7 @@ class MssqlSession implements DbSession {
 
   async query(sql: string, options: DbQueryOptions): Promise<DbQueryResult> {
     const started = Date.now();
+    await this.switchDatabase(options.database);
     const { sql: finalSql } = applyPaging(sql, options.maxRows, options.offset ?? 0, 'mssql');
     try {
       const outcome = await this.exec(finalSql, [], options.timeoutMs);
@@ -119,6 +123,62 @@ class MssqlSession implements DbSession {
         affectedRows: outcome.affectedRows,
         truncated,
         elapsedMs: Date.now() - started,
+      };
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** 修改一个单元格：UPDATE [schema].[table] SET [col] = @p0 WHERE [pk] = @p1 */
+  async updateCell(update: DbCellUpdate): Promise<number> {
+    const { sql, values } = buildUpdateSql(update, 'mssql', index => `@p${index}`);
+    const params = values.map((value, index) => ({ name: `p${index}`, value }));
+    try {
+      const outcome = await this.exec(sql, params, 15_000);
+      return outcome.affectedRows;
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** 取存储过程 / 函数 / 触发器的定义与参数 */
+  async getRoutine(
+    kind: 'functions' | 'procedures' | 'triggers',
+    schema: string | undefined,
+    name: string,
+  ): Promise<DbRoutineInfo> {
+    const ns = schema ?? 'dbo';
+    const qualified = `${ns}.${name}`;
+    try {
+      const outcome = await this.exec(
+        `SELECT OBJECT_DEFINITION(OBJECT_ID(@qualified)) AS definition`,
+        [{ name: 'qualified', value: qualified }],
+        15_000,
+      );
+      const definition = outcome.rows[0]?.[0] === undefined || outcome.rows[0]?.[0] === null
+        ? ''
+        : String(outcome.rows[0][0]);
+      const params = await this.exec(
+        `SELECT p.name AS name, TYPE_NAME(p.user_type_id) AS type,
+                CASE WHEN p.is_output = 1 THEN 'OUT' ELSE 'IN' END AS mode
+           FROM sys.parameters p
+             JOIN sys.objects o ON o.object_id = p.object_id
+             JOIN sys.schemas s ON s.schema_id = o.schema_id
+          WHERE o.name = @name AND s.name = @schema
+          ORDER BY p.parameter_id`,
+        [
+          { name: 'name', value: name },
+          { name: 'schema', value: ns },
+        ],
+        15_000,
+      );
+      return {
+        definition,
+        parameters: params.rows.map(row => ({
+          name: String(row[0] ?? ''),
+          type: row[1] === null || row[1] === undefined ? undefined : String(row[1]),
+          mode: row[2] === null || row[2] === undefined ? undefined : String(row[2]),
+        })),
       };
     } catch (error) {
       throw mapDriverError(error);
@@ -229,6 +289,16 @@ class MssqlSession implements DbSession {
   /** 中断当前语句：直接断开连接 */
   abort(): void {
     try { this.conn.close(); } catch { /* already dead */ }
+  }
+
+  /** 切到目标库，之后可以用不带库名的表名 */
+  private async switchDatabase(database?: string): Promise<void> {
+    const target = database?.trim();
+    if (!target || target === this.currentDb) return;
+    const stmt = useDatabaseSql('mssql', target);
+    if (!stmt) return;
+    await this.exec(stmt, [], 15_000);
+    this.currentDb = target;
   }
 }
 

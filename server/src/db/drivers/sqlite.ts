@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module';
 import { Worker } from 'node:worker_threads';
-import type { DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbTriggerInfo } from '@protocol/db';
+import type { DbCell, DbCellUpdate, DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbRoutineInfo, DbTriggerInfo } from '@protocol/db';
 import { DbError, mapDriverError } from '../errors';
 import type { DbDriver, DbQueryOptions, DbQueryResult, DbSession, DbTarget } from '../types';
-import { applyPaging, normalizeCell } from './shared';
+import { applyPaging, buildUpdateSql, normalizeCell } from './shared';
 
 const requireFromHere = createRequire(import.meta.url);
 
@@ -133,6 +133,23 @@ export class SqliteSession implements DbSession {
     } catch (error) {
       throw mapDriverError(error);
     }
+  }
+
+  /** 修改一个单元格：UPDATE "table" SET "col" = ? WHERE "pk" = ? */
+  async updateCell(update: DbCellUpdate): Promise<number> {
+    const { sql, values } = buildUpdateSql(update, 'sqlite', () => '?');
+    try {
+      const reply = await this.run(sql, 'run', 15_000, values);
+      if (!reply.ok) throw new DbError('DB_QUERY_FAILED', reply.error ?? 'SQLite 修改失败');
+      return reply.affectedRows ?? 0;
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** SQLite 没有存储过程（只有内置函数，无源码） */
+  async getRoutine(): Promise<DbRoutineInfo> {
+    throw new DbError('DB_UNSUPPORTED', 'SQLite 不支持存储过程');
   }
 
   async listObjects(kind: DbObjectKind, schema?: string): Promise<DbObjectItem[]> {

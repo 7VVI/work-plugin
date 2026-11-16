@@ -1,4 +1,4 @@
-import type { DbCell, DbErrorCode, DbObjectKind, DbServerMessage } from '@protocol/db';
+import type { DbCell, DbCellUpdate, DbErrorCode, DbObjectKind, DbServerMessage } from '@protocol/db';
 import { DbError, redactDriverError } from './errors';
 import { assertSingleStatement, isReadOnlyStatement } from './sqlGuard';
 import type { DbQueryResult, DbSession } from './types';
@@ -8,7 +8,11 @@ export const DB_CONTROL_MAX_CHARS = 200_000;
 /** 单个结果分片的序列化体积上限 */
 export const DB_CHUNK_MAX_BYTES = 180 * 1024;
 const MAX_SQL_CHARS = 64 * 1024;
+const MAX_DATABASE_CHARS = 128;
 const MAX_OBJECTS = 2000;
+/** 单元格修改时标识符与值的上限 */
+const MAX_IDENT_CHARS = 128;
+const MAX_CELL_VALUE_CHARS = 8192;
 
 export interface DbGatewayCaps {
   maxRows: number;
@@ -82,6 +86,12 @@ export class DbGateway {
         return true;
       case 'db-query':
         this.onQuery(id, message);
+        return true;
+      case 'db-update':
+        this.onUpdate(id, message);
+        return true;
+      case 'db-routine':
+        this.onRoutine(id, message);
         return true;
       case 'db-cancel':
         this.onCancel(id);
@@ -238,6 +248,9 @@ export class DbGateway {
     const offset = Number.isFinite(requestedOffset) && requestedOffset > 0
       ? Math.floor(requestedOffset)
       : 0;
+    const database = typeof message.database === 'string' && message.database.length <= MAX_DATABASE_CHARS
+      ? message.database
+      : undefined;
     this.enqueue(id, async () => {
       const result = await this.options.session.query(sql, {
         maxRows,
@@ -245,14 +258,86 @@ export class DbGateway {
         maxTextCellBytes: this.options.caps.maxTextCellBytes,
         timeoutMs: this.options.caps.queryTimeoutMs,
         offset,
+        database,
       });
       this.sendResult(id, result, offset);
     });
   }
 
+  // ---------- 单元格修改 ----------
+
+  private onUpdate(id: number, message: Record<string, unknown>): void {
+    if (this.options.caps.readOnly) {
+      this.fail(id, 'DB_UNSUPPORTED', '服务端开启了只读模式，不能修改数据');
+      return;
+    }
+    const update = this.readUpdate(message);
+    if (!update) {
+      this.fail(id, 'DB_FAILED', '修改参数不合法');
+      return;
+    }
+    this.enqueue(id, async () => {
+      const affectedRows = await this.options.session.updateCell(update);
+      this.options.sendJson({ type: 'db-update-result', id, affectedRows });
+    });
+  }
+
+  private readUpdate(message: Record<string, unknown>): DbCellUpdate | null {
+    const raw = message.update;
+    if (!raw || typeof raw !== 'object') return null;
+    const source = raw as Record<string, unknown>;
+    const table = source.table;
+    const column = source.column;
+    if (typeof table !== 'string' || !table || table.length > MAX_IDENT_CHARS) return null;
+    if (typeof column !== 'string' || !column || column.length > MAX_IDENT_CHARS) return null;
+    const schema = typeof source.schema === 'string' && source.schema.length <= MAX_IDENT_CHARS
+      ? source.schema
+      : undefined;
+    const value = source.value === null || source.value === undefined ? null : String(source.value).slice(0, MAX_CELL_VALUE_CHARS);
+    const keysRaw = Array.isArray(source.keys) ? source.keys : [];
+    const keys: Array<{ column: string; value: string | null }> = [];
+    for (const item of keysRaw) {
+      if (!item || typeof item !== 'object') return null;
+      const key = item as Record<string, unknown>;
+      if (typeof key.column !== 'string' || !key.column || key.column.length > MAX_IDENT_CHARS) return null;
+      keys.push({
+        column: key.column,
+        value: key.value === null || key.value === undefined ? null : String(key.value).slice(0, MAX_CELL_VALUE_CHARS),
+      });
+    }
+    if (keys.length === 0) return null;
+    return { schema, table, column, value, keys };
+  }
+
+  // ---------- 存储过程 / 函数 / 触发器 ----------
+
+  private onRoutine(id: number, message: Record<string, unknown>): void {
+    const kind = message.kind;
+    if (kind !== 'functions' && kind !== 'procedures' && kind !== 'triggers') {
+      this.fail(id, 'DB_FAILED', '对象类型不合法');
+      return;
+    }
+    const name = typeof message.name === 'string' ? message.name : '';
+    if (!name || name.length > MAX_IDENT_CHARS) {
+      this.fail(id, 'DB_FAILED', '对象名不合法');
+      return;
+    }
+    const schema = this.readSchema(message);
+    this.enqueue(id, async () => {
+      const info = await this.options.session.getRoutine(kind, schema, name);
+      this.options.sendJson({
+        type: 'db-routine-result',
+        id,
+        kind,
+        name,
+        definition: info.definition,
+        parameters: info.parameters,
+      });
+    });
+  }
+
   /** 取消查询：销毁当前连接（驱动层中断语句），会话需要重连 */
-  private onCancel(id: number): void {
-    this.cancelled.add(id);
+  private onCancel(id: number): void {    this.cancelled.add(id);
     try {
       this.options.session.abort();
     } catch {

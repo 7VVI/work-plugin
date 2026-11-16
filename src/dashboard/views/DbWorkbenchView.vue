@@ -34,8 +34,9 @@
         :objects-of="store.objectsOf"
         :is-loading="(name: string) => !!store.loadingDatabases[name]"
         :active-table="store.activeTable"
+        :active-routine="activeRoutine?.name ?? null"
         :capabilities="store.capabilities"
-        @select-table="onSelectTable"
+        @select-object="onSelectObject"
         @expand-database="store.loadDatabaseObjects($event)"
         @new-query="store.openQueryTab()"
         @view-prop="onViewProp"
@@ -81,12 +82,16 @@
               v-if="activeProp === 'data'"
               :result="store.tableData"
               :loading="store.tableLoading"
-              paging
-              :offset="store.tableOffset"
-              :has-next="!!store.tableData?.nextOffset"
-              @prev="store.loadTablePage(Math.max(0, store.tableOffset - store.tablePageSize))"
-              @next="store.loadTablePage(store.tableOffset + store.tablePageSize)"
-              @export="store.exportResultCsv(store.tableData, 'dock-table')"
+              :page-size="store.tablePageSize"
+              :has-more="store.tableHasMore"
+              :loading-more="store.tableLoadingMore"
+              refreshable
+              editable
+              :on-save-cell="onSaveCell"
+              @load-more="store.loadMoreTable()"
+              @refresh="store.refreshTable()"
+              @export="onExportTable"
+              @update:page-size="store.setTablePageSize($event)"
             />
             <DbMetaPanel
               v-else
@@ -98,29 +103,53 @@
             />
           </template>
 
+          <!-- 存储过程 / 函数 / 触发器：只看定义 -->
+          <template v-else-if="activeKind === 'routine' && activeRoutine">
+            <DbRoutinePanel
+              :name="activeRoutine.name"
+              :schema="activeRoutine.schema"
+              :kind="activeRoutine.routineKind"
+              :definition="activeRoutine.definition"
+              :parameters="activeRoutine.parameters"
+              :loading="activeRoutine.loading"
+              :error="activeRoutine.error"
+            />
+          </template>
+
           <!-- 查询：整个内容区都是查询工作区 -->
           <template v-else-if="activeKind === 'query'">
             <div class="db-query">
-              <DbQueryTabs
-                :saved="store.savedQueries"
-                :running="store.activeTab?.running"
-                @run="runActive"
-                @run-all="runAll"
-                @cancel="cancelActive"
-                @save="saveActive"
-                @open-saved="store.openSavedQuery"
-                @delete-saved="store.deleteSavedQuery"
-              />
-              <div class="db-query-editor">
-                <DbSqlEditor
-                  :model-value="activeSql"
-                  :dialect="store.dialect"
-                  @update:model-value="onSqlChange"
-                  @cursor="onCursorChange"
+              <div class="db-query-top">
+                <DbDatabaseSelect
+                  :databases="store.databases"
+                  :model-value="queryDatabase"
+                  @select="onSelectDatabase"
+                />
+                <span class="db-query-hint t3">查询在所选库中执行，表名可直接使用</span>
+              </div>
+              <div class="db-query-main">
+                <DbQueryToolbar
+                  :saved="store.savedQueries"
+                  :running="store.activeTab?.running"
                   @run="runActive"
                   @run-all="runAll"
+                  @cancel="cancelActive"
                   @save="saveActive"
+                  @open-saved="store.openSavedQuery"
+                  @delete-saved="store.deleteSavedQuery"
                 />
+                <div class="db-query-editor">
+                  <DbSqlEditor
+                    :model-value="activeSql"
+                    :dialect="store.dialect"
+                    :current-database="queryDatabase"
+                    @update:model-value="onSqlChange"
+                    @cursor="onCursorChange"
+                    @run="runActive"
+                    @run-all="runAll"
+                    @save="saveActive"
+                  />
+                </div>
               </div>
               <div v-if="store.activeTab?.error" class="db-sql-error">
                 <i class="fa-solid fa-circle-exclamation"></i>{{ store.activeTab.error }}
@@ -130,12 +159,12 @@
                   v-if="store.activeTab?.result"
                   :result="store.activeTab.result"
                   :loading="store.activeTab?.running"
-                  paging
-                  :offset="store.activeTab?.offset ?? 0"
-                  :has-next="!!store.activeTab?.result?.nextOffset"
-                  @prev="prevQueryPage"
-                  @next="nextQueryPage"
-                  @export="exportQueryCsv"
+                  :page-size="store.activeTab?.pageSize"
+                  :has-more="!!store.activeTab?.result?.nextOffset"
+                  :loading-more="store.activeTab?.loadingMore"
+                  @load-more="loadMoreQuery"
+                  @export="onExportQuery"
+                  @update:page-size="onQueryPageSize"
                 />
                 <div v-else class="db-query-hint t3">
                   <i class="fa-solid fa-keyboard"></i>
@@ -165,6 +194,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import type { DbCell, DbObjectKind } from '@protocol/db';
 import { useDbStore, type DbPanelTab } from '@shared/stores/dbStore';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
@@ -173,7 +203,9 @@ import DbObjectTree from '../components/db/DbObjectTree.vue';
 import DbDataGrid from '../components/db/DbDataGrid.vue';
 import DbMetaPanel from '../components/db/DbMetaPanel.vue';
 import DbSqlEditor from '../components/db/DbSqlEditor.vue';
-import DbQueryTabs from '../components/db/DbQueryTabs.vue';
+import DbQueryToolbar from '../components/db/DbQueryToolbar.vue';
+import DbDatabaseSelect from '../components/db/DbDatabaseSelect.vue';
+import DbRoutinePanel from '../components/db/DbRoutinePanel.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -217,7 +249,11 @@ const statusText = computed(() => {
   return '未连接';
 });
 
-const activeKind = computed<'object' | 'query' | 'none'>(() => store.activeOpenTab?.kind ?? 'none');
+const activeKind = computed<'object' | 'query' | 'routine' | 'none'>(() => store.activeOpenTab?.kind ?? 'none');
+const activeRoutine = computed(() => {
+  const tab = store.activeOpenTab;
+  return tab && tab.kind === 'routine' ? tab : null;
+});
 const activeProp = computed<DbPanelTab>(() => {
   const tab = store.activeOpenTab;
   return tab && tab.kind === 'object' ? tab.prop : 'data';
@@ -233,13 +269,27 @@ const propTabs: Array<{ key: DbPanelTab; label: string }> = [
 
 const activeSql = computed(() => store.activeTab?.sql ?? '');
 
+/** 查询使用的库：跟随当前查询 tab，没有查询 tab 时用工作区的当前库 */
+const queryDatabase = computed(() => store.activeTab?.database || store.currentDatabase);
+
+function onSelectDatabase(name: string): void {
+  store.setCurrentDatabase(name);
+}
+
 function setProp(prop: DbPanelTab): void {
   const tab = store.activeOpenTab;
   if (tab) store.setObjectProp(tab.id, prop);
 }
 
-function onSelectTable(schema: string | undefined, name: string): void {
-  void store.openObjectTab(schema, name);
+function onSelectObject(schema: string | undefined, name: string, kind: DbObjectKind): void {
+  // 表 / 视图看数据，函数 / 存储过程 / 触发器看定义
+  if (kind === 'tables' || kind === 'views') {
+    void store.openObjectTab(schema, name);
+    return;
+  }
+  if (kind === 'functions' || kind === 'procedures' || kind === 'triggers') {
+    void store.openRoutineTab(schema, name, kind);
+  }
 }
 
 async function onViewProp(prop: DbPanelTab): Promise<void> {
@@ -289,20 +339,26 @@ async function saveActive(): Promise<void> {
   await store.saveQuery(id, name);
 }
 
-function exportQueryCsv(): void {
-  if (store.activeQueryTabId) store.exportCsv(store.activeQueryTabId);
+function onExportQuery(rows?: DbCell[][]): void {
+  if (store.activeQueryTabId) store.exportCsv(store.activeQueryTabId, rows);
 }
 
-async function prevQueryPage(): Promise<void> {
-  const id = store.activeQueryTabId;
-  if (!id) return;
-  await store.prevQueryPage(id);
+function onExportTable(rows?: DbCell[][]): void {
+  store.exportResultCsv(store.tableData, 'dock-table', rows);
 }
 
-async function nextQueryPage(): Promise<void> {
-  const id = store.activeQueryTabId;
-  if (!id) return;
-  await store.nextQueryPage(id);
+/** 保存单元格：返回 false 时保留编辑态 */
+async function onSaveCell(rowIndex: number, column: string, value: string | null): Promise<boolean> {
+  return store.updateCell(rowIndex, column, value);
+}
+
+function onQueryPageSize(size: number): void {
+  if (store.activeQueryTabId) void store.setQueryPageSize(store.activeQueryTabId, size);
+}
+
+async function loadMoreQuery(): Promise<void> {
+  if (!store.activeQueryTabId) return;
+  await store.loadMoreQuery(store.activeQueryTabId);
 }
 
 async function reload(): Promise<void> {
@@ -312,7 +368,7 @@ async function reload(): Promise<void> {
     await store.loadDatabaseObjects(db.name);
   }
   if (store.activeTable) {
-    await store.openTable(store.activeTable.schema, store.activeTable.name);
+    await store.openTable(store.activeTable.schema, store.activeTable.name, true);
   }
 }
 
@@ -461,14 +517,30 @@ onBeforeUnmount(() => {
 .db-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .db-content > * { flex: 1; min-width: 0; }
 
-/* 查询工作区：工具条 + 编辑器（占满）+ 结果 */
+/* 查询工作区：库选择 + 工具条 + 编辑器（占满）+ 结果 */
 .db-query {
   display: flex;
   flex-direction: column;
   min-height: 0;
   height: 100%;
 }
-.db-query-editor { flex: 1 1 60%; min-height: 160px; overflow: hidden; }
+.db-query-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.db-query-hint { font-size: 12px; }
+.db-query-main {
+  display: flex;
+  flex: 1 1 60%;
+  min-height: 160px;
+  overflow: hidden;
+}
+.db-query-editor { flex: 1; min-width: 0; overflow: hidden; }
 .db-query-result {
   flex: 1 1 40%;
   min-height: 0;

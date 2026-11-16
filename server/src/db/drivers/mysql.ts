@@ -1,8 +1,8 @@
 import mysql from 'mysql2/promise';
-import type { DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbTriggerInfo } from '@protocol/db';
+import type { DbCell, DbCellUpdate, DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbRoutineInfo, DbTriggerInfo } from '@protocol/db';
 import { mapDriverError } from '../errors';
 import type { DbDriver, DbQueryOptions, DbQueryResult, DbSession, DbTarget } from '../types';
-import { applyPaging, columnsFromNames, normalizeCell } from './shared';
+import { applyPaging, buildUpdateSql, columnsFromNames, normalizeCell, quoteIdentifier, useDatabaseSql } from './shared';
 
 export const MYSQL_LIST_SQL: Record<DbObjectKind, string> = {
   schemas: `SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA
@@ -47,6 +47,9 @@ export const MYSQL_TRIGGER_SQL = `SELECT TRIGGER_NAME AS name, EVENT_OBJECT_TABL
 class MysqlSession implements DbSession {
   readonly dialect = 'mysql' as const;
 
+  /** 当前 USE 到的库 */
+  private currentDb: string | undefined;
+
   constructor(
     private readonly conn: mysql.Connection,
     private readonly databaseName?: string,
@@ -68,6 +71,7 @@ class MysqlSession implements DbSession {
 
   async query(sql: string, options: DbQueryOptions): Promise<DbQueryResult> {
     const started = Date.now();
+    await this.switchDatabase(options.database);
     const { sql: finalSql } = applyPaging(sql, options.maxRows, options.offset ?? 0, 'mysql');
     try {
       const { fields, rows } = await this.raw(finalSql);
@@ -79,6 +83,58 @@ class MysqlSession implements DbSession {
         rowCount: limited.length,
         truncated,
         elapsedMs: Date.now() - started,
+      };
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** 修改一个单元格：UPDATE ... SET col = ? WHERE pk = ? */
+  async updateCell(update: DbCellUpdate): Promise<number> {
+    const { sql, values } = buildUpdateSql(update, 'mysql', () => '?');
+    try {
+      const [result] = await this.conn.execute({ sql, values } as never);
+      return Number((result as { affectedRows?: number })?.affectedRows ?? 0);
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** 取存储过程 / 函数 / 触发器的定义与参数 */
+  async getRoutine(
+    kind: 'functions' | 'procedures' | 'triggers',
+    schema: string | undefined,
+    name: string,
+  ): Promise<DbRoutineInfo> {
+    const db = schema ?? this.currentDatabase();
+    const keyword = kind === 'functions' ? 'FUNCTION' : kind === 'procedures' ? 'PROCEDURE' : 'TRIGGER';
+    const qualified = `${quoteIdentifier(db, 'mysql')}.${quoteIdentifier(name, 'mysql')}`;
+    try {
+      const { rows } = await this.raw(`SHOW CREATE ${keyword} ${qualified}`);
+      // MySQL 8 的列顺序是：名称 / sql_mode / CREATE 语句 / ...，直接找 CREATE 开头的那列更稳
+      const row = rows[0] ?? [];
+      let definition = '';
+      for (const cell of row) {
+        const text = cell === null || cell === undefined ? '' : String(cell);
+        if (/^\s*CREATE\b/i.test(text)) {
+          definition = text;
+          break;
+        }
+      }
+      const { rows: params } = await this.raw(
+        `SELECT PARAMETER_NAME, DTD_IDENTIFIER, PARAMETER_MODE
+           FROM information_schema.PARAMETERS
+          WHERE SPECIFIC_SCHEMA = ? AND SPECIFIC_NAME = ?
+          ORDER BY ORDINAL_POSITION`,
+        [db, name],
+      );
+      return {
+        definition,
+        parameters: params.map(row => ({
+          name: String(row[0] ?? ''),
+          type: row[1] === null || row[1] === undefined ? undefined : String(row[1]),
+          mode: row[2] === null || row[2] === undefined ? undefined : String(row[2]),
+        })),
       };
     } catch (error) {
       throw mapDriverError(error);
@@ -167,6 +223,16 @@ class MysqlSession implements DbSession {
 
   private currentDatabase(): string {
     return this.databaseName ?? '';
+  }
+
+  /** 切到目标库，之后可以用不带库名的表名 */
+  private async switchDatabase(database?: string): Promise<void> {
+    const target = database?.trim();
+    if (!target || target === this.currentDb) return;
+    const stmt = useDatabaseSql('mysql', target);
+    if (!stmt) return;
+    await this.raw(stmt);
+    this.currentDb = target;
   }
 }
 

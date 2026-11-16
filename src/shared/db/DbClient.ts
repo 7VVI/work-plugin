@@ -1,11 +1,13 @@
 import type {
   DbCell,
+  DbCellUpdate,
   DbColumn,
   DbErrorCode,
   DbForeignKeyInfo,
   DbIndexInfo,
   DbObjectItem,
   DbObjectKind,
+  DbRoutineInfo,
   DbServerMessage,
   DbTriggerInfo,
 } from '@protocol/db';
@@ -53,6 +55,8 @@ const TERMINAL_TYPES = new Set([
   'db-foreign-keys',
   'db-triggers',
   'db-result-end',
+  'db-update-result',
+  'db-routine-result',
 ]);
 
 /**
@@ -90,7 +94,13 @@ export class DbClient {
 
   query(
     sql: string,
-    options: { maxRows?: number; offset?: number; onRequestId?: (id: number) => void } = {},
+    options: {
+      maxRows?: number;
+      offset?: number;
+      /** 查询使用的库（PG 为 schema） */
+      database?: string;
+      onRequestId?: (id: number) => void;
+    } = {},
   ): Promise<DbQueryOutcome> {
     const { onRequestId, ...payload } = options;
     return this.request('db-query', { sql, ...payload }, onRequestId) as Promise<DbQueryOutcome>;
@@ -99,6 +109,20 @@ export class DbClient {
   /** 取消正在执行的查询（服务端会中断语句并断开会话） */
   cancel(id: number): void {
     this.socket.send({ type: 'db-cancel', id });
+  }
+
+  /** 修改一个单元格（按主键定位），返回受影响行数 */
+  updateCell(update: DbCellUpdate): Promise<number> {
+    return this.request('db-update', { update }) as Promise<number>;
+  }
+
+  /** 取存储过程 / 函数 / 触发器的定义与参数 */
+  getRoutine(
+    kind: 'functions' | 'procedures' | 'triggers',
+    schema: string | undefined,
+    name: string,
+  ): Promise<DbRoutineInfo> {
+    return this.request('db-routine', { kind, schema, name }) as Promise<DbRoutineInfo>;
   }
 
   dispose(): void {
@@ -195,6 +219,10 @@ function payloadOf(message: DbServerMessage): unknown {
       return message.foreignKeys;
     case 'db-triggers':
       return message.triggers;
+    case 'db-update-result':
+      return message.affectedRows;
+    case 'db-routine-result':
+      return { definition: message.definition, parameters: message.parameters };
     default:
       return null;
   }

@@ -70,6 +70,61 @@ describe('DbClient', () => {
     });
   });
 
+  it('sends the requested database with the query', async () => {
+    const { client, socket } = createClient();
+    const promise = client.query('SELECT * FROM users', { database: 'cors_3.0.0' });
+    const id = lastId(socket);
+    expect(socket.sent[0]).toMatchObject({ type: 'db-query', id, sql: 'SELECT * FROM users', database: 'cors_3.0.0' });
+
+    socket.emit({ type: 'db-result-end', id, rowCount: 0, truncated: false });
+    await promise;
+  });
+
+  it('sends a cell update frame and resolves with affected rows', async () => {
+    const { client, socket } = createClient();
+    const promise = client.updateCell({
+      table: 'users',
+      column: 'name',
+      value: '张三',
+      keys: [{ column: 'id', value: '3' }],
+    });
+    const id = lastId(socket);
+    expect(socket.sent[0]).toMatchObject({
+      type: 'db-update',
+      id,
+      update: { table: 'users', column: 'name', value: '张三' },
+    });
+
+    socket.emit({ type: 'db-update-result', id, affectedRows: 1 });
+    await expect(promise).resolves.toBe(1);
+  });
+
+  it('requests a routine definition and resolves with it', async () => {
+    const { client, socket } = createClient();
+    const promise = client.getRoutine('procedures', 'cors_3.0.0', 'demo_proc');
+    const id = lastId(socket);
+    expect(socket.sent[0]).toMatchObject({
+      type: 'db-routine',
+      id,
+      kind: 'procedures',
+      schema: 'cors_3.0.0',
+      name: 'demo_proc',
+    });
+
+    socket.emit({
+      type: 'db-routine-result',
+      id,
+      kind: 'procedures',
+      name: 'demo_proc',
+      definition: 'CREATE PROCEDURE demo_proc()',
+      parameters: [{ name: 'a', type: 'int' }],
+    });
+    await expect(promise).resolves.toEqual({
+      definition: 'CREATE PROCEDURE demo_proc()',
+      parameters: [{ name: 'a', type: 'int' }],
+    });
+  });
+
   it('rejects with the server error code', async () => {
     const { client, socket } = createClient();
     const promise = client.query('SELECT 1');

@@ -32,10 +32,10 @@
                 class="db-row db-row-leaf"
                 :class="{ active: isActive(item) }"
                 :title="item.name"
-                draggable="true"
+                :draggable="group.kind === 'tables' || group.kind === 'views'"
                 @dragstart="onDragStart($event, db.name, item)"
-                @click="emit('select-table', db.name, item.name)"
-                @dblclick="emit('select-table', db.name, item.name)"
+                @click="emit('select-object', db.name, item.name, group.kind)"
+                @dblclick="emit('select-object', db.name, item.name, group.kind)"
               >
                 <i :class="[leafIcon(group.kind), group.kind === 'tables' ? 'db-icon-green' : '']" class="db-row-icon"></i>
                 <span class="db-row-name">{{ item.name }}</span>
@@ -87,12 +87,15 @@ const props = defineProps<{
   objectsOf: (database: string, kind: DbObjectKind) => DbObjectItem[];
   isLoading?: (database: string) => boolean;
   activeTable?: { schema?: string; name: string } | null;
+  /** 当前打开的存储过程 / 函数 / 触发器名（用于高亮） */
+  activeRoutine?: string | null;
   /** 方言能力位：不支持的对象类型不展示 */
   capabilities?: { functions: boolean; procedures: boolean; triggers: boolean; foreignKeys: boolean };
 }>();
 
 const emit = defineEmits<{
-  'select-table': [schema: string | undefined, name: string];
+  /** 选中一个对象：表 / 视图按表处理，函数 / 存储过程 / 触发器看定义 */
+  'select-object': [schema: string | undefined, name: string, kind: DbObjectKind];
   'expand-database': [database: string];
   'new-query': [];
   'view-prop': [prop: DbPanelTab];
@@ -164,8 +167,8 @@ function countOf(database: string, kind: DbObjectKind): number {
 }
 
 function isActive(item: DbObjectItem): boolean {
-  if (!props.activeTable) return false;
-  return props.activeTable.name === item.name;
+  if (props.activeTable?.name === item.name) return true;
+  return !!props.activeRoutine && props.activeRoutine === item.name;
 }
 
 /** 拖到编辑器里插入表名 */

@@ -86,13 +86,39 @@ export interface DbCaps {
   readOnly: boolean;
 }
 
+/** 单元格修改：按主键定位一行，改一个列 */
+export interface DbCellUpdate {
+  schema?: string;
+  table: string;
+  column: string;
+  /** 新值（空字符串按 NULL 处理） */
+  value: string | null;
+  /** 定位用的主键列与值 */
+  keys: Array<{ column: string; value: string | null }>;
+}
+
+/** 存储过程 / 函数 / 触发器的参数 */
+export interface DbRoutineParameter {
+  name: string;
+  type?: string;
+  mode?: string;
+}
+
+/** 存储过程 / 函数 / 触发器的定义 */
+export interface DbRoutineInfo {
+  definition: string;
+  parameters: DbRoutineParameter[];
+}
+
 export type DbClientMessage =
   | { type: 'db-list'; id: number; kind: DbObjectKind; schema?: string }
   | { type: 'db-describe'; id: number; schema?: string; table: string }
   | { type: 'db-indexes'; id: number; schema?: string; table: string }
   | { type: 'db-foreign-keys'; id: number; schema?: string; table: string }
   | { type: 'db-triggers'; id: number; schema?: string; table: string }
-  | { type: 'db-query'; id: number; sql: string; maxRows?: number; offset?: number }
+  | { type: 'db-query'; id: number; sql: string; maxRows?: number; offset?: number; database?: string }
+  | { type: 'db-update'; id: number; update: DbCellUpdate }
+  | { type: 'db-routine'; id: number; kind: 'functions' | 'procedures' | 'triggers'; schema?: string; name: string }
   | { type: 'db-cancel'; id: number }
   | { type: 'db-ping'; t: number }
   | { type: 'db-close' };
@@ -130,6 +156,15 @@ export type DbServerMessage =
       rowCount: number;
       truncated: boolean;
       nextOffset?: number;
+    }
+  | { type: 'db-update-result'; id: number; affectedRows: number }
+  | {
+      type: 'db-routine-result';
+      id: number;
+      kind: 'functions' | 'procedures' | 'triggers';
+      name: string;
+      definition: string;
+      parameters: DbRoutineParameter[];
     };
 
 export type DbWsClientMessage = Extract<DbClientMessage, { type: `db-${string}` }>;

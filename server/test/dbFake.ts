@@ -16,8 +16,14 @@ export interface FakeDbBehavior {
   lastTarget?: DbTarget;
   /** 记录最近一次 query 的 SQL */
   lastSql?: string;
+  /** 记录最近一次 query 的选项（含 database） */
+  lastOptions?: DbQueryOptions;
   /** 是否被 abort（取消查询） */
   aborted?: boolean;
+  /** 是否执行过单元格修改 */
+  updated?: boolean;
+  /** 最近一次取存储过程定义的对象 */
+  lastRoutine?: { kind: string; schema?: string; name: string };
   /** 建连延迟（毫秒），用于模拟慢连接 */
   connectDelayMs?: number;
 }
@@ -42,6 +48,7 @@ export class FakeDbDriver implements DbDriver {
       dialect: this.dialect,
       async query(sql: string, options: DbQueryOptions): Promise<DbQueryResult> {
         behavior.lastSql = sql;
+        behavior.lastOptions = options;
         if (behavior.queryError) throw behavior.queryError;
         const total = behavior.totalRows ?? behavior.rowCount ?? 2;
         const offset = options.offset ?? 0;
@@ -63,6 +70,14 @@ export class FakeDbDriver implements DbDriver {
       },
       async listObjects(kind: DbObjectKind): Promise<DbObjectItem[]> {
         return behavior.objects?.[kind] ?? [];
+      },
+      async updateCell(): Promise<number> {
+        behavior.updated = true;
+        return 1;
+      },
+      async getRoutine(kind, schema, name) {
+        behavior.lastRoutine = { kind, schema, name };
+        return { definition: 'CREATE PROCEDURE demo()', parameters: [{ name: 'a', type: 'int' }] };
       },
       async describeTable() {
         return [{ name: 'id', dataType: 'int', ordinal: 1, primary: true }];

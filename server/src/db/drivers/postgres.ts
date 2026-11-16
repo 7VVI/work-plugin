@@ -1,8 +1,8 @@
 import { Client } from 'pg';
-import type { DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbTriggerInfo } from '@protocol/db';
+import type { DbCell, DbCellUpdate, DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbRoutineInfo, DbRoutineParameter, DbTriggerInfo } from '@protocol/db';
 import { DbError, mapDriverError } from '../errors';
 import type { DbDriver, DbQueryOptions, DbQueryResult, DbSession, DbTarget } from '../types';
-import { applyPaging, columnsFromNames, normalizeCell } from './shared';
+import { applyPaging, buildUpdateSql, columnsFromNames, normalizeCell, useDatabaseSql } from './shared';
 
 export const PG_LIST_SQL: Record<DbObjectKind, string> = {
   schemas: `SELECT n.nspname AS name
@@ -84,6 +84,9 @@ export const PG_TRIGGER_SQL = `SELECT t.tgname AS name, c.relname AS table_name,
 class PostgresSession implements DbSession {
   readonly dialect = 'postgres' as const;
 
+  /** 当前 search_path 指向的 schema */
+  private currentSchema: string | undefined;
+
   constructor(private readonly client: Client) {}
 
   private async raw(sql: string, params: unknown[] = []): Promise<{ fields: string[]; rows: unknown[][] }> {
@@ -94,8 +97,19 @@ class PostgresSession implements DbSession {
     };
   }
 
+  /** 切到目标 schema，之后可以用不带库名的表名 */
+  private async switchSchema(database?: string): Promise<void> {
+    const target = database?.trim();
+    if (!target || target === this.currentSchema) return;
+    const stmt = useDatabaseSql('postgres', target);
+    if (!stmt) return;
+    await this.raw(stmt);
+    this.currentSchema = target;
+  }
+
   async query(sql: string, options: DbQueryOptions): Promise<DbQueryResult> {
     const started = Date.now();
+    await this.switchSchema(options.database);
     const { sql: finalSql } = applyPaging(sql, options.maxRows, options.offset ?? 0, 'postgres');
     try {
       const { fields, rows } = await this.raw(finalSql);
@@ -108,6 +122,59 @@ class PostgresSession implements DbSession {
         truncated,
         elapsedMs: Date.now() - started,
       };
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** 修改一个单元格：UPDATE ... SET col = $1 WHERE pk = $2 */
+  async updateCell(update: DbCellUpdate): Promise<number> {
+    const { sql, values } = buildUpdateSql(update, 'postgres', index => `$${index + 1}`);
+    try {
+      const res = await this.client.query({ text: sql, values });
+      return res.rowCount ?? 0;
+    } catch (error) {
+      throw mapDriverError(error);
+    }
+  }
+
+  /** 取存储过程 / 函数 / 触发器的定义与参数 */
+  async getRoutine(
+    kind: 'functions' | 'procedures' | 'triggers',
+    schema: string | undefined,
+    name: string,
+  ): Promise<DbRoutineInfo> {
+    const ns = schema ?? 'public';
+    try {
+      if (kind === 'triggers') {
+        const { rows } = await this.raw(
+          `SELECT pg_get_triggerdef(t.oid) AS definition
+             FROM pg_trigger t
+               JOIN pg_class c ON c.oid = t.tgrelid
+               JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE t.tgname = $1 AND n.nspname = $2`,
+          [name, ns],
+        );
+        return { definition: rows[0]?.[0] === undefined ? '' : String(rows[0][0]), parameters: [] };
+      }
+      const prokind = kind === 'functions' ? 'f' : 'p';
+      const { rows } = await this.raw(
+        `SELECT pg_get_functiondef(p.oid) AS definition,
+                pg_get_function_arguments(p.oid) AS args,
+                pg_get_function_result(p.oid) AS result
+           FROM pg_proc p
+               JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE p.proname = $1 AND n.nspname = $2 AND p.prokind = $3`,
+        [name, ns, prokind],
+      );
+      const definition = rows[0]?.[0] === undefined ? '' : String(rows[0][0]);
+      const args = rows[0]?.[1] === undefined || rows[0]?.[1] === null ? '' : String(rows[0][1]);
+      const result = rows[0]?.[2] === undefined || rows[0]?.[2] === null ? '' : String(rows[0][2]);
+      const parameters = parsePostgresArgs(args);
+      if (result.trim()) {
+        parameters.push({ name: 'RETURN', type: result.trim() });
+      }
+      return { definition, parameters };
     } catch (error) {
       throw mapDriverError(error);
     }
@@ -215,4 +282,30 @@ export class PostgresDriver implements DbDriver {
 
 export function assertPostgresDialect(dialect: string): void {
   if (dialect !== 'postgres') throw new DbError('DB_TYPE_UNSUPPORTED');
+}
+
+/** 解析 pg_get_function_arguments 的结果：a integer, b text DEFAULT 'x' */
+function parsePostgresArgs(args: string): DbRoutineParameter[] {
+  const text = args.trim();
+  if (!text) return [];
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of text) {
+    if (ch === '(' || ch === '[') depth += 1;
+    if (ch === ')' || ch === ']') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) parts.push(current);
+  return parts.map(part => {
+    const item = part.trim();
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)\s+(.*)$/.exec(item);
+    if (!match) return { name: item };
+    return { name: match[1], type: match[2].trim() };
+  });
 }

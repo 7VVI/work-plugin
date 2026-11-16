@@ -1,8 +1,8 @@
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
-import type { DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbTriggerInfo } from '@protocol/db';
-import { mapDriverError } from '../errors';
+import type { DbCell, DbCellUpdate, DbColumn, DbForeignKeyInfo, DbIndexInfo, DbObjectItem, DbObjectKind, DbRoutineInfo, DbTriggerInfo } from '@protocol/db';
+import { DbError, mapDriverError } from '../errors';
 import type { DbDriver, DbQueryOptions, DbQueryResult, DbSession, DbTarget } from '../types';
-import { applyPaging, columnsFromNames, normalizeCell } from './shared';
+import { applyPaging, columnsFromNames, normalizeCell, useDatabaseSql } from './shared';
 
 export const CH_LIST_SQL: Record<DbObjectKind, string> = {
   schemas: `SELECT name FROM system.databases
@@ -25,10 +25,15 @@ export const CH_INDEX_SQL = `SELECT name, type, expr, granularity FROM system.da
 class ClickhouseSession implements DbSession {
   readonly dialect = 'clickhouse' as const;
 
+  /** 当前查询使用的库（HTTP 协议无会话状态，每次查询随参数带上） */
+  private currentDb: string;
+
   constructor(
     private readonly client: ClickHouseClient,
-    private readonly database: string,
-  ) {}
+    database: string,
+  ) {
+    this.currentDb = database;
+  }
 
   private async queryRows(
     sql: string,
@@ -37,7 +42,7 @@ class ClickhouseSession implements DbSession {
     const result = await this.client.query({
       query: sql,
       format: 'JSONCompact',
-      query_params: { database: this.database, ...params },
+      query_params: { database: this.currentDb, ...params },
     });
     const payload = (await result.json()) as {
       meta?: Array<{ name: string; type: string }>;
@@ -47,8 +52,17 @@ class ClickhouseSession implements DbSession {
     return { columns, rows: payload.data ?? [] };
   }
 
+  /** 切到目标库，之后可以用不带库名的表名 */
+  private switchDatabase(database?: string): void {
+    const target = database?.trim();
+    if (!target) return;
+    if (!useDatabaseSql('clickhouse', target)) return;
+    this.currentDb = target;
+  }
+
   async query(sql: string, options: DbQueryOptions): Promise<DbQueryResult> {
     const started = Date.now();
+    this.switchDatabase(options.database);
     const { sql: finalSql } = applyPaging(sql, options.maxRows, options.offset ?? 0, 'clickhouse');
     try {
       const { columns, rows } = await this.queryRows(finalSql);
@@ -66,12 +80,22 @@ class ClickhouseSession implements DbSession {
     }
   }
 
+  /** ClickHouse 不支持直接改单行数据 */
+  async updateCell(): Promise<number> {
+    throw new DbError('DB_UNSUPPORTED', 'ClickHouse 不支持直接修改数据');
+  }
+
+  /** ClickHouse 没有存储过程 */
+  async getRoutine(): Promise<DbRoutineInfo> {
+    throw new DbError('DB_UNSUPPORTED', 'ClickHouse 不支持存储过程');
+  }
+
   async listObjects(kind: DbObjectKind, schema?: string): Promise<DbObjectItem[]> {
     if (kind === 'schemas') {
       const { rows } = await this.queryRows(CH_LIST_SQL.schemas);
       return rows.map((row) => ({ name: String(row[0]) }));
     }
-    const database = schema ?? this.database;
+    const database = schema ?? this.currentDb;
     const { rows } = await this.queryRows(CH_LIST_SQL[kind], { database });
     if (kind === 'functions' || kind === 'procedures' || kind === 'triggers') {
       return rows.map((row) => ({ name: String(row[0]) }));
@@ -85,7 +109,7 @@ class ClickhouseSession implements DbSession {
 
   async describeTable(schema: string | undefined, table: string): Promise<DbColumn[]> {
     const { rows } = await this.queryRows(CH_DESCRIBE_SQL, {
-      database: schema ?? this.database,
+      database: schema ?? this.currentDb,
       table,
     });
     return rows.map((row, index) => ({
@@ -99,7 +123,7 @@ class ClickhouseSession implements DbSession {
 
   async listIndexes(schema: string | undefined, table: string): Promise<DbIndexInfo[]> {
     const { rows } = await this.queryRows(CH_INDEX_SQL, {
-      database: schema ?? this.database,
+      database: schema ?? this.currentDb,
       table,
     });
     return rows.map((row) => ({

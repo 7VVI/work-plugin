@@ -197,8 +197,76 @@ describe('db workbench gateway', () => {
     expect(end).toMatchObject({ rowCount: 3, truncated: false });
   });
 
-  it('rejects multi statement SQL', async () => {
+  it('passes the requested database to the session', async () => {
     const harness = await buildHarness();
+    const { socket, messages } = await openSession(harness);
+    socket.send(JSON.stringify({ type: 'db-query', id: 8, sql: 'SELECT * FROM users', database: 'cors_3.0.0' }));
+
+    await waitFor(messages, 8, 'db-result-end');
+    expect(harness.fake.behavior.lastOptions?.database).toBe('cors_3.0.0');
+  });
+
+  it('applies a cell update and reports affected rows', async () => {
+    const harness = await buildHarness();
+    const { socket, messages } = await openSession(harness);
+    socket.send(JSON.stringify({
+      type: 'db-update',
+      id: 41,
+      update: {
+        schema: 'public',
+        table: 'users',
+        column: 'name',
+        value: '张三',
+        keys: [{ column: 'id', value: '3' }],
+      },
+    }));
+
+    const result = await waitFor(messages, 41, 'db-update-result');
+    expect(result).toMatchObject({ affectedRows: 1 });
+    expect(harness.fake.behavior.updated).toBe(true);
+  });
+
+  it('rejects a cell update without keys', async () => {
+    const harness = await buildHarness();
+    const { socket, messages } = await openSession(harness);
+    socket.send(JSON.stringify({
+      type: 'db-update',
+      id: 42,
+      update: { table: 'users', column: 'name', value: 'x', keys: [] },
+    }));
+
+    const failure = await waitFor(messages, 42, 'db-fail');
+    expect(failure).toMatchObject({ code: 'DB_FAILED' });
+    expect(harness.fake.behavior.updated).toBeUndefined();
+  });
+
+  it('returns the definition of a stored procedure', async () => {
+    const harness = await buildHarness();
+    const { socket, messages } = await openSession(harness);
+    socket.send(JSON.stringify({
+      type: 'db-routine',
+      id: 51,
+      kind: 'procedures',
+      schema: 'cors_3.0.0',
+      name: 'demo_proc',
+    }));
+
+    const result = await waitFor(messages, 51, 'db-routine-result');
+    expect(result).toMatchObject({ kind: 'procedures', name: 'demo_proc' });
+    expect(String(result.definition)).toContain('CREATE PROCEDURE');
+    expect(harness.fake.behavior.lastRoutine).toMatchObject({ kind: 'procedures', schema: 'cors_3.0.0', name: 'demo_proc' });
+  });
+
+  it('rejects a routine request with an invalid kind', async () => {
+    const harness = await buildHarness();
+    const { socket, messages } = await openSession(harness);
+    socket.send(JSON.stringify({ type: 'db-routine', id: 52, kind: 'tables', name: 'users' }));
+
+    const failure = await waitFor(messages, 52, 'db-fail');
+    expect(failure).toMatchObject({ code: 'DB_FAILED' });
+  });
+
+  it('rejects multi statement SQL', async () => {    const harness = await buildHarness();
     const { socket, messages } = await openSession(harness);
     socket.send(JSON.stringify({ type: 'db-query', id: 9, sql: 'SELECT 1; DROP TABLE users' }));
     const failure = await waitFor(messages, 9, 'db-fail');

@@ -2,12 +2,14 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type {
   DbCaps,
+  DbCell,
   DbColumn,
   DbDialect,
   DbForeignKeyInfo,
   DbIndexInfo,
   DbObjectItem,
   DbObjectKind,
+  DbRoutineParameter,
   DbTriggerInfo,
 } from '@protocol/db';
 import { DbClient, type DbQueryOutcome } from '@shared/db/DbClient';
@@ -47,7 +49,21 @@ export interface DbQueryOpenTab {
   queryTabId: string;
 }
 
-export type DbOpenTab = DbObjectTab | DbQueryOpenTab;
+/** 存储过程 / 函数 / 触发器：只看定义，没有数据 */
+export interface DbRoutineOpenTab {
+  id: string;
+  kind: 'routine';
+  label: string;
+  schema?: string;
+  name: string;
+  routineKind: 'functions' | 'procedures' | 'triggers';
+  definition: string;
+  parameters: DbRoutineParameter[];
+  loading: boolean;
+  error: string | null;
+}
+
+export type DbOpenTab = DbObjectTab | DbQueryOpenTab | DbRoutineOpenTab;
 
 export interface DbQueryTab {
   id: string;
@@ -58,10 +74,14 @@ export interface DbQueryTab {
   result: DbQueryOutcome | null;
   offset: number;
   pageSize: number;
+  /** 该查询使用的库（PG 为 schema），执行时切到它，表名可不带库名 */
+  database: string;
   /** 光标位置（决定执行哪条语句） */
   cursor: number;
   /** 正在执行的请求 id（用于取消） */
   requestId: number | null;
+  /** 正在追加下一页 */
+  loadingMore: boolean;
 }
 
 export interface DbSavedQuery {
@@ -74,6 +94,24 @@ export interface DbSavedQuery {
 }
 
 const SAVED_QUERIES_KEY = 'db.savedQueries';
+/** 表数据瀑布流：单页行数与自动续拉页数上限 */
+const TABLE_PAGE_SIZE = 200;
+const TABLE_AUTO_PAGES = 5;
+
+/** 已打开表的快照：切 tab 时直接复用，不重新查 */
+interface TableSnapshot {
+  columns: DbColumn[];
+  indexes: DbIndexInfo[];
+  foreignKeys: DbForeignKeyInfo[];
+  triggers: DbTriggerInfo[];
+  data: DbQueryOutcome | null;
+  offset: number;
+  hasMore: boolean;
+}
+
+function tableKey(schema: string | undefined, name: string): string {
+  return `${schema ?? ''}.${name}`;
+}
 
 let tabSeq = 0;
 
@@ -85,6 +123,8 @@ export const useDbStore = defineStore('db', () => {
   const middlewareId = ref<string>('');
 
   const databases = ref<DbObjectItem[]>([]);
+  /** 查询工作区当前使用的库（PG 为 schema） */
+  const currentDatabase = ref('');
   /** 每个库下面的对象：{ 库名: { tables: [], views: [], ... } } */
   const dbObjects = ref<Record<string, Partial<Record<DbObjectKind, DbObjectItem[]>>>>({});
   const loadingDatabases = ref<Record<string, boolean>>({});
@@ -97,8 +137,10 @@ export const useDbStore = defineStore('db', () => {
   const tableTriggers = ref<DbTriggerInfo[]>([]);
   const tableData = ref<DbQueryOutcome | null>(null);
   const tableOffset = ref(0);
-  const tablePageSize = 200;
+  const tablePageSize = ref(TABLE_PAGE_SIZE);
+  const tableHasMore = ref(false);
   const tableLoading = ref(false);
+  const tableLoadingMore = ref(false);
 
   const queryTabs = ref<DbQueryTab[]>([]);
   const activeQueryTabId = ref<string | null>(null);
@@ -109,6 +151,7 @@ export const useDbStore = defineStore('db', () => {
 
   let socket: DbSocket | null = null;
   let client: DbClient | null = null;
+  const tableCache = new Map<string, TableSnapshot>();
 
   const activeTab = computed(() => queryTabs.value.find(tab => tab.id === activeQueryTabId.value) ?? null);
   const activeOpenTab = computed(() => openTabs.value.find(tab => tab.id === activeOpenTabId.value) ?? null);
@@ -164,6 +207,8 @@ export const useDbStore = defineStore('db', () => {
     status.value = 'idle';
     dialect.value = null;
     caps.value = null;
+    currentDatabase.value = '';
+    tableCache.clear();
     tableData.value = null;
     tableColumns.value = [];
     tableIndexes.value = [];
@@ -186,13 +231,67 @@ export const useDbStore = defineStore('db', () => {
       openTabs.value = [...openTabs.value, { id, kind: 'object', label: table, schema, table, prop: 'data' }];
     }
     activeOpenTabId.value = id;
+    // 打开哪个库的表，查询就跟着用哪个库，表名可以不写库名
+    if (schema) setCurrentDatabase(schema);
     await openTable(schema, table);
+  }
+
+  /** 切换查询使用的库（同时同步到当前查询 tab） */
+  function setCurrentDatabase(name: string): void {
+    currentDatabase.value = name;
+    const tab = activeTab.value;
+    if (tab && tab.database !== name) tab.database = name;
   }
 
   /** 切换对象 tab 的属性页（数据/结构/索引/外键/触发器） */
   function setObjectProp(id: string, prop: DbPanelTab): void {
     const tab = openTabs.value.find(item => item.id === id);
     if (tab && tab.kind === 'object') tab.prop = prop;
+  }
+
+  /** 打开（或聚焦）一个存储过程 / 函数 / 触发器：看定义而不是数据 */
+  async function openRoutineTab(
+    schema: string | undefined,
+    name: string,
+    routineKind: 'functions' | 'procedures' | 'triggers',
+  ): Promise<void> {
+    const id = `rtn:${routineKind}:${schema ?? ''}.${name}`;
+    let tab = openTabs.value.find(item => item.id === id) as DbRoutineOpenTab | undefined;
+    if (!tab) {
+      tab = {
+        id,
+        kind: 'routine',
+        label: name,
+        schema,
+        name,
+        routineKind,
+        definition: '',
+        parameters: [],
+        loading: false,
+        error: null,
+      };
+      openTabs.value = [...openTabs.value, tab];
+    }
+    activeOpenTabId.value = id;
+    // 必须取回数组里的响应式对象，直接改原始对象界面不会更新
+    const reactive = openTabs.value.find(item => item.id === id) as DbRoutineOpenTab | undefined;
+    if (reactive) await loadRoutine(reactive);
+  }
+
+  /** 拉取存储过程 / 函数 / 触发器的定义 */
+  async function loadRoutine(tab: DbRoutineOpenTab): Promise<void> {
+    if (!client) return;
+    tab.loading = true;
+    tab.error = null;
+    try {
+      const info = await client.getRoutine(tab.routineKind, tab.schema, tab.name);
+      tab.definition = info.definition;
+      tab.parameters = info.parameters;
+    } catch (e) {
+      tab.error = (e as Error).message;
+    } finally {
+      tab.loading = false;
+    }
   }
 
   /** 新建查询 tab */
@@ -218,8 +317,13 @@ export const useDbStore = defineStore('db', () => {
     }
     if (activeOpenTabId.value === id) {
       const next = openTabs.value[index - 1] ?? openTabs.value[index] ?? null;
-      activeOpenTabId.value = next?.id ?? null;
-      if (next?.kind === 'query') activeQueryTabId.value = next.queryTabId;
+      if (next) {
+        // 切到相邻 tab 时要把它的内容也带出来
+        activateOpenTab(next.id);
+      } else {
+        activeOpenTabId.value = null;
+        activeQueryTabId.value = null;
+      }
     }
   }
 
@@ -229,8 +333,12 @@ export const useDbStore = defineStore('db', () => {
     activeOpenTabId.value = id;
     if (tab.kind === 'query') {
       activeQueryTabId.value = tab.queryTabId;
+    } else if (tab.kind === 'routine') {
+      if (!tab.definition && !tab.loading) void loadRoutine(tab);
     } else {
       activeTable.value = { schema: tab.schema, name: tab.table };
+      // 切换到别的表 tab 时要加载该表的内容，否则下方仍是上一张表的数据
+      void openTable(tab.schema, tab.table);
     }
   }
 
@@ -245,6 +353,7 @@ export const useDbStore = defineStore('db', () => {
       const items = await client.listObjects('schemas');
       databases.value = items;
       if (!activeSchema.value && items.length > 0) activeSchema.value = items[0].name;
+      if (!currentDatabase.value && items.length > 0) currentDatabase.value = items[0].name;
     } catch (e) {
       error.value = { kind: 'unknown', message: (e as Error).message };
     }
@@ -286,10 +395,23 @@ export const useDbStore = defineStore('db', () => {
     return dbObjects.value[database]?.[kind] ?? [];
   }
 
-  async function openTable(schema: string | undefined, name: string): Promise<void> {
+  async function openTable(schema: string | undefined, name: string, force = false): Promise<void> {
     if (!client) return;
+    const key = tableKey(schema, name);
     activeTable.value = { schema, name };
     panelTab.value = 'data';
+    // 已经加载过的表直接复用快照，切 tab 时不用重新查
+    const cached = force ? undefined : tableCache.get(key);
+    if (cached) {
+      tableColumns.value = cached.columns;
+      tableIndexes.value = cached.indexes;
+      tableForeignKeys.value = cached.foreignKeys;
+      tableTriggers.value = cached.triggers;
+      tableData.value = cached.data;
+      tableOffset.value = cached.offset;
+      tableHasMore.value = cached.hasMore;
+      return;
+    }
     tableLoading.value = true;
     try {
       const [columns, indexes, foreignKeys, triggers] = await Promise.all([
@@ -303,6 +425,8 @@ export const useDbStore = defineStore('db', () => {
       tableForeignKeys.value = foreignKeys;
       tableTriggers.value = triggers;
       await loadTablePage(0);
+      await autoFillTable();
+      saveSnapshot(key);
     } catch (e) {
       error.value = { kind: 'unknown', message: (e as Error).message };
     } finally {
@@ -310,36 +434,140 @@ export const useDbStore = defineStore('db', () => {
     }
   }
 
-  async function loadTablePage(offset: number): Promise<void> {
+  /** 把当前表的内容存进快照（切换 tab 时复用） */
+  function saveSnapshot(key: string): void {
+    tableCache.set(key, {
+      columns: tableColumns.value,
+      indexes: tableIndexes.value,
+      foreignKeys: tableForeignKeys.value,
+      triggers: tableTriggers.value,
+      data: tableData.value,
+      offset: tableOffset.value,
+      hasMore: tableHasMore.value,
+    });
+  }
+
+  async function loadTablePage(offset: number, append = false): Promise<void> {
     if (!client || !activeTable.value) return;
     const { schema, name } = activeTable.value;
     const qualified = qualifiedTable(schema, name, dialect.value);
     try {
-      const result = await client.query(`SELECT * FROM ${qualified}`, { maxRows: tablePageSize, offset });
-      tableData.value = result;
-      tableOffset.value = offset;
+      const result = await client.query(`SELECT * FROM ${qualified}`, { maxRows: tablePageSize.value, offset });
+      const more = result.rows.length >= tablePageSize.value;
+      if (append && tableData.value) {
+        tableData.value = {
+          ...tableData.value,
+          rows: [...tableData.value.rows, ...result.rows],
+          rowCount: tableData.value.rowCount + result.rows.length,
+          elapsedMs: result.elapsedMs,
+          truncated: result.truncated,
+          nextOffset: result.nextOffset,
+        };
+      } else {
+        tableData.value = result;
+      }
+      tableOffset.value = offset + result.rows.length;
+      tableHasMore.value = more;
+      saveSnapshot(tableKey(schema, name));
     } catch (e) {
       error.value = { kind: 'unknown', message: (e as Error).message };
     }
   }
 
-  /** 表数据翻页（用服务端返回的 nextOffset，避免服务端行数上限与客户端页大小不一致） */
-  async function nextTablePage(): Promise<void> {
-    const next = tableData.value?.nextOffset;
-    if (next === undefined) return;
-    await loadTablePage(next);
+  /** 表数据用瀑布流：一页满就自动续拉（最多连拉几页） */
+  async function autoFillTable(): Promise<void> {
+    let guard = 0;
+    while (tableHasMore.value && guard < TABLE_AUTO_PAGES) {
+      guard += 1;
+      tableLoadingMore.value = true;
+      try {
+        await loadTablePage(tableOffset.value, true);
+      } finally {
+        tableLoadingMore.value = false;
+      }
+    }
   }
 
-  async function prevTablePage(): Promise<void> {
-    const size = tableData.value?.rowCount ?? tablePageSize;
-    await loadTablePage(Math.max(0, tableOffset.value - size));
+  /** 滚动到底时继续加载下一页 */
+  async function loadMoreTable(): Promise<void> {
+    if (!tableHasMore.value || tableLoadingMore.value) return;
+    tableLoadingMore.value = true;
+    try {
+      await loadTablePage(tableOffset.value, true);
+    } finally {
+      tableLoadingMore.value = false;
+    }
+  }
+
+  /** 重新查询当前表 */
+  async function refreshTable(): Promise<void> {
+    const table = activeTable.value;
+    if (!table) return;
+    await openTable(table.schema, table.name, true);
+  }
+
+  /** 改每页行数：重新按新页大小拉取 */
+  async function setTablePageSize(size: number): Promise<void> {
+    if (!Number.isFinite(size) || size <= 0 || size === tablePageSize.value) return;
+    tablePageSize.value = Math.floor(size);
+    await refreshTable();
+  }
+
+  /**
+   * 修改一个单元格：按主键定位行，生成 UPDATE 交给服务端执行。
+   * 成功返回 true（并同步本地数据），失败返回 false（错误信息进 error）。
+   */
+  async function updateCell(rowIndex: number, column: string, value: string | null): Promise<boolean> {
+    const table = activeTable.value;
+    const row = tableData.value?.rows[rowIndex];
+    if (!client || !table || !row) return false;
+    const columns = tableColumns.value;
+    const primaryKeys = columns.filter(col => col.primary);
+    if (primaryKeys.length === 0) {
+      error.value = { kind: 'unknown', message: '该表没有主键，无法直接修改单元格' };
+      return false;
+    }
+    const keys = primaryKeys.map(col => {
+      const index = columns.findIndex(item => item.name === col.name);
+      return { column: col.name, value: cellToText(row[index]) };
+    });
+    try {
+      await client.updateCell({
+        schema: table.schema,
+        table: table.name,
+        column,
+        value,
+        keys,
+      });
+    } catch (e) {
+      error.value = { kind: 'unknown', message: (e as Error).message };
+      return false;
+    }
+    // 更新本地显示
+    const columnIndex = columns.findIndex(col => col.name === column);
+    if (columnIndex >= 0 && tableData.value) {
+      const rows = tableData.value.rows.map((item, index) => (index === rowIndex
+        ? item.map((cell, i) => (i === columnIndex ? (value ?? null) : cell))
+        : item));
+      tableData.value = { ...tableData.value, rows };
+      saveSnapshot(tableKey(table.schema, table.name));
+    }
+    return true;
+  }
+
+  /** 单元格值转成可写回的文本（空表示 NULL） */
+  function cellToText(cell: DbCell | undefined): string | null {
+    if (cell === null || cell === undefined) return null;
+    if (typeof cell === 'boolean') return cell ? 'true' : 'false';
+    if (typeof cell === 'object') return JSON.stringify(cell);
+    return String(cell);
   }
 
   // ---------- SQL 标签页 ----------
 
   function newTab(sql = ''): string {
     const id = `tab_${Date.now()}_${++tabSeq}`;
-    queryTabs.value = [...queryTabs.value, { id, title: `查询 ${queryTabs.value.length + 1}`, sql, running: false, error: null, result: null, offset: 0, pageSize: 500, cursor: 0, requestId: null }];
+    queryTabs.value = [...queryTabs.value, { id, title: `查询 ${queryTabs.value.length + 1}`, sql, running: false, error: null, result: null, offset: 0, pageSize: 500, database: currentDatabase.value, cursor: 0, requestId: null, loadingMore: false }];
     activeQueryTabId.value = id;
     return id;
   }
@@ -369,12 +597,18 @@ export const useDbStore = defineStore('db', () => {
     if (tab) tab.cursor = position;
   }
 
+  /** 当前生效的语句（光标所在那条） */
+  function currentStatement(tab: DbQueryTab): string {
+    const statement = statementAtCursor(tab.sql, tab.cursor);
+    return statement?.text.trim() ? statement.text : tab.sql;
+  }
+
   /**
    * 执行查询。
    * mode='current'：只执行光标所在的那条语句（DBeaver 行为）；
    * mode='all'：按顶层分号拆开后依次执行。
    */
-  async function runSql(id: string, mode: 'current' | 'all' = 'current', offset = 0): Promise<void> {
+  async function runSql(id: string, mode: 'current' | 'all' = 'current'): Promise<void> {
     const tab = queryTabs.value.find(item => item.id === id);
     if (!tab || !client) return;
     const statements = mode === 'all'
@@ -389,13 +623,13 @@ export const useDbStore = defineStore('db', () => {
         if (!statement.text.trim()) continue;
         const result = await client.query(statement.text, {
           maxRows: tab.pageSize,
-          offset,
+          database: tab.database || undefined,
           onRequestId: (requestId) => { tab.requestId = requestId; },
         });
         last = result;
       }
       tab.result = last;
-      tab.offset = offset;
+      tab.offset = 0;
     } catch (e) {
       tab.result = null;
       tab.error = (e as Error).message;
@@ -412,40 +646,54 @@ export const useDbStore = defineStore('db', () => {
     client.cancel(tab.requestId);
   }
 
-  /** 翻页（offset 为起始行） */
-  async function goToPage(id: string, offset: number): Promise<void> {
+  /** 改查询结果的每页行数：按新页大小重跑当前语句 */
+  async function setQueryPageSize(id: string, size: number): Promise<void> {
     const tab = queryTabs.value.find(item => item.id === id);
-    if (!tab) return;
-    await runSql(id, 'current', Math.max(0, offset));
+    if (!tab || !Number.isFinite(size) || size <= 0 || size === tab.pageSize) return;
+    tab.pageSize = Math.floor(size);
+    tab.offset = 0;
+    await runSql(id, 'current');
   }
 
-  /** 查询结果翻页：下一页用服务端 nextOffset，上一页按实际行数回退 */
-  async function nextQueryPage(id: string): Promise<void> {
+  /** 查询结果瀑布流：滚动到底继续加载下一页并追加 */
+  async function loadMoreQuery(id: string): Promise<void> {
     const tab = queryTabs.value.find(item => item.id === id);
-    const next = tab?.result?.nextOffset;
-    if (!tab || next === undefined) return;
-    await runSql(id, 'current', next);
+    if (!tab || !client || tab.loadingMore) return;
+    const next = tab.result?.nextOffset;
+    if (next === undefined) return;
+    tab.loadingMore = true;
+    try {
+      const result = await client.query(currentStatement(tab), { maxRows: tab.pageSize, offset: next, database: tab.database || undefined });
+      if (!tab.result) return;
+      tab.result = {
+        ...tab.result,
+        rows: [...tab.result.rows, ...result.rows],
+        rowCount: tab.result.rowCount + result.rows.length,
+        elapsedMs: result.elapsedMs,
+        truncated: result.truncated,
+        nextOffset: result.nextOffset,
+      };
+      tab.offset = next + result.rows.length;
+    } catch (e) {
+      tab.error = (e as Error).message;
+    } finally {
+      tab.loadingMore = false;
+    }
   }
 
-  async function prevQueryPage(id: string): Promise<void> {
-    const tab = queryTabs.value.find(item => item.id === id);
-    if (!tab) return;
-    const size = tab.result?.rowCount ?? tab.pageSize;
-    await runSql(id, 'current', Math.max(0, tab.offset - size));
-  }
-
-  /** 把结果集导出为 CSV */
-  function exportResultCsv(result: DbQueryOutcome | null, filename: string): void {
+  /** 把结果集导出为 CSV（rows 给了就只导这些行） */
+  function exportResultCsv(result: DbQueryOutcome | null, filename: string, rows?: DbCell[][]): void {
     if (!result) return;
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
-    downloadText(toCsv(result), `${filename}-${stamp}.csv`, 'text/csv;charset=utf-8');
+    const payload = rows ? { ...result, rows } : result;
+    downloadText(toCsv(payload), `${filename}-${stamp}.csv`, 'text/csv;charset=utf-8');
   }
 
   /** 导出当前查询结果为 CSV */
-  function exportCsv(id: string): void {
+  function exportCsv(id: string, rows?: DbCell[][]): void {
     const tab = queryTabs.value.find(item => item.id === id);
     if (!tab) return;
-    exportResultCsv(tab.result, 'dock-query');
+    exportResultCsv(tab.result, 'dock-query', rows);
   }
 
   // ---------- 保存的查询（本地存储，不进云同步） ----------
@@ -493,6 +741,7 @@ export const useDbStore = defineStore('db', () => {
     caps,
     middlewareId,
     databases,
+    currentDatabase,
     dbObjects,
     loadingDatabases,
     activeSchema,
@@ -523,13 +772,20 @@ export const useDbStore = defineStore('db', () => {
     objectsOf,
     openTable,
     openObjectTab,
+    openRoutineTab,
     setObjectProp,
+    setCurrentDatabase,
     openQueryTab,
     closeOpenTab,
     activateOpenTab,
     loadTablePage,
-    nextTablePage,
-    prevTablePage,
+    loadMoreTable,
+    refreshTable,
+    setTablePageSize,
+    setQueryPageSize,
+    updateCell,
+    tableHasMore,
+    tableLoadingMore,
     newTab,
     closeTab,
     selectTab,
@@ -537,9 +793,7 @@ export const useDbStore = defineStore('db', () => {
     setCursor,
     runSql,
     cancelSql,
-    goToPage,
-    nextQueryPage,
-    prevQueryPage,
+    loadMoreQuery,
     exportCsv,
     exportResultCsv,
     loadSavedQueries,

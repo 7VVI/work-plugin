@@ -13,12 +13,14 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } f
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import type { DbDialect } from '@protocol/db';
 import { sqlLanguageExtension } from '@shared/db/sqlLanguage';
-import { qualifiedTable } from '@shared/db/sql';
+import { qualifiedTable, quoteIdent } from '@shared/db/sql';
 
 const props = defineProps<{
   modelValue: string;
   dialect?: DbDialect | null;
   readOnly?: boolean;
+  /** 查询当前使用的库：拖进来的表若属于该库，插入时只写表名 */
+  currentDatabase?: string;
 }>();
 
 const emit = defineEmits<{
@@ -84,7 +86,10 @@ function createView(text: string): EditorView {
           const dropped = readDroppedTable(event as DragEvent);
           if (!dropped) return false;
           event.preventDefault();
-          const insert = qualifiedTable(dropped.schema, dropped.name, props.dialect);
+          const sameDatabase = !!props.currentDatabase && dropped.schema === props.currentDatabase;
+          const insert = sameDatabase
+            ? quoteIdent(dropped.name, props.dialect)
+            : qualifiedTable(dropped.schema, dropped.name, props.dialect);
           const pos = editor.posAtCoords({ x: event.clientX, y: event.clientY }) ?? editor.state.selection.main.head;
           editor.dispatch({
             changes: { from: pos, to: pos, insert },
