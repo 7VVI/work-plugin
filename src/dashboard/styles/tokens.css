@@ -524,7 +524,8 @@ select.inp {
 .row-action.success:hover { color: var(--success); background: var(--success-light); }
 .row-action-sm { width: 26px; height: 26px; border-radius: 6px; }
 
-input[type="checkbox"].form-check, .form-check {
+/* 只作用于复选框本身；包一层 label 时不要套这个盒子样式 */
+input[type="checkbox"].form-check {
   appearance: none; width: 16px; height: 16px;
   border: 1.5px solid var(--border-strong); border-radius: 4px;
   background: var(--panel); cursor: pointer; transition: var(--transition-fast);

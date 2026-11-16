@@ -107,8 +107,8 @@
 
             <div class="field" v-if="isDbType">
               <label class="lbl">SSL</label>
-              <label class="form-check">
-                <input type="checkbox" v-model="useSsl" />
+              <label class="mw-check">
+                <input type="checkbox" v-model="useSsl" class="form-check" />
                 <span class="t2">启用加密连接</span>
               </label>
             </div>
@@ -366,6 +366,15 @@ async function save() {
   color: var(--ink2);
 }
 .req-mark { color: var(--danger); font-size: 7px; }
+/* 复选框一行（复选框本身用全局 .form-check 样式） */
+.mw-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink2);
+  cursor: pointer;
+}
 
 .grid-2 {
   display: grid;
