@@ -47,7 +47,8 @@ describe('buildSystemSearchSections', () => {
       '',
     );
 
-    expect(sections.map(s => s.label)).toEqual(['常用', '全部系统']);
+    // 「全部系统」分组不重复标题（弹窗顶部已有），只保留「常用」
+    expect(sections.map(s => s.label)).toEqual(['常用', '']);
     expect(sections[0].systems.map(s => s.id)).toEqual(['s1', 's3']);
     expect(sections[1].systems.map(s => s.id)).toEqual(['s2']);
   });
@@ -63,7 +64,7 @@ describe('buildSystemSearchSections', () => {
       'jenkins',
     );
 
-    expect(sections.map(s => s.label)).toEqual(['常用', '全部系统']);
+    expect(sections.map(s => s.label)).toEqual(['常用', '']);
     expect(sections[0].systems.map(s => s.id)).toEqual(['s1']);
     expect(sections[1].systems.map(s => s.id)).toEqual(['s2', 's3']);
   });
@@ -79,7 +80,7 @@ describe('buildSystemSearchSections', () => {
       'cors',
     );
 
-    expect(sections.map(s => s.label)).toEqual(['全部系统', '分组 · CORS 国内']);
+    expect(sections.map(s => s.label)).toEqual(['', '分组 · CORS 国内']);
     expect(sections[0].systems.map(s => s.id)).toEqual(['s1']);
     expect(sections[1].systems.map(s => s.id)).toEqual(['s2']);
     expect(sections[1].color).toBe('#2E6BF0');
@@ -93,7 +94,7 @@ describe('buildSystemSearchSections', () => {
     );
 
     expect(sections).toHaveLength(1);
-    expect(sections[0].label).toBe('全部系统');
+    expect(sections[0].label).toBe('');
     expect(sections[0].systems.map(s => s.id)).toEqual(['s1']);
   });
 
@@ -119,6 +120,29 @@ describe('buildSystemSearchSections', () => {
       [group('g1', 'CORS')],
       '   ',
     );
-    expect(sections.map(s => s.label)).toEqual(['全部系统']);
+    expect(sections.map(s => s.label)).toEqual(['']);
+  });
+
+  it('按环境多选过滤系统', () => {
+    const prod = { ...system('s1', 'Prod'), environment: 'production' as const };
+    const dev = { ...system('s2', 'Dev'), environment: 'development' as const };
+    const test = { ...system('s3', 'Test'), environment: 'test' as const };
+
+    const onlyProd = buildSystemSearchSections([prod, dev, test], [], '', ['production']);
+    expect(onlyProd.flatMap(s => s.systems).map(s => s.id)).toEqual(['s1']);
+
+    const prodAndTest = buildSystemSearchSections([prod, dev, test], [], '', ['production', 'test']);
+    expect(prodAndTest.flatMap(s => s.systems).map(s => s.id)).toEqual(['s1', 's3']);
+
+    // 不传环境＝不过滤
+    const all = buildSystemSearchSections([prod, dev, test], [], '');
+    expect(all.flatMap(s => s.systems)).toHaveLength(3);
+  });
+
+  it('环境过滤与关键字搜索同时生效', () => {
+    const prod = { ...system('s1', 'Nacos 生产'), environment: 'production' as const };
+    const dev = { ...system('s2', 'Nacos 开发'), environment: 'development' as const };
+    const sections = buildSystemSearchSections([prod, dev], [], 'nacos', ['development']);
+    expect(sections.flatMap(s => s.systems).map(s => s.id)).toEqual(['s2']);
   });
 });

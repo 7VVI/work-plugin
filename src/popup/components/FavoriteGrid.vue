@@ -1,9 +1,13 @@
 <template>
   <div class="section">
+    <div class="env-filter">
+      <span class="env-filter-label t3">环境</span>
+      <EnvFilter />
+    </div>
     <div ref="listRef" class="sys-list">
       <template v-if="flatList.length">
         <template v-for="section in sections" :key="section.key">
-          <div class="group-label">
+          <div v-if="section.label" class="group-label">
             <span v-if="section.color" class="group-dot" :style="{ background: section.color }"></span>
             {{ section.label }}
           </div>
@@ -38,8 +42,12 @@
 
       <div v-else class="empty">
         <i class="fa-regular fa-folder-open"></i>
-        <div class="empty-text">{{ hasQuery ? '未找到匹配的系统或分组' : '暂无系统，点击右上角“新增”添加' }}</div>
-        <button v-if="hasQuery" class="clear-btn" @click="clearQuery">清除搜索</button>
+        <div class="empty-text">
+          <template v-if="hasQuery">未找到匹配的系统或分组</template>
+          <template v-else-if="envFiltered">当前环境筛选下没有系统</template>
+          <template v-else>暂无系统，点击右上角“新增”添加</template>
+        </div>
+        <button v-if="hasQuery || envFiltered" class="clear-btn" @click="clearFilters">清除筛选</button>
       </div>
     </div>
   </div>
@@ -59,11 +67,12 @@ import { copyToClipboard } from '@shared/utils/clipboard';
 import { buildSystemSearchSections } from '../utils/systemSearch';
 import type { Group, System } from '@shared/types/entities';
 import EnvBadge from '../../dashboard/components/common/EnvBadge.vue';
+import EnvFilter from './EnvFilter.vue';
 
 const emit = defineEmits<{ count: [n: number] }>();
 const searchStore = useSearchStore();
 const toast = useToastStore();
-const { query } = storeToRefs(searchStore);
+const { query, environments } = storeToRefs(searchStore);
 
 const systems = ref<System[]>([]);
 const groups = ref<Group[]>([]);
@@ -78,7 +87,6 @@ onMounted(async () => {
   systems.value = all.sort((a, b) => a.sort - b.sort);
   groups.value = systemGroups;
   if (systems.value.length) activeId.value = systems.value[0].id;
-  emit('count', systems.value.length);
   window.addEventListener('keydown', onKeydown);
 });
 
@@ -87,9 +95,11 @@ onBeforeUnmount(() => {
 });
 
 const hasQuery = computed(() => query.value.trim().length > 0);
+/** 是否选中了环境（用于空结果提示） */
+const envFiltered = computed(() => environments.value.length > 0);
 
 const sections = computed(() =>
-  buildSystemSearchSections(systems.value, groups.value, query.value),
+  buildSystemSearchSections(systems.value, groups.value, query.value, environments.value),
 );
 const flatList = computed(() => sections.value.flatMap(section => section.systems));
 
@@ -97,6 +107,7 @@ watch(flatList, (list) => {
   if (!list.some(s => s.id === activeId.value)) {
     activeId.value = list[0]?.id ?? null;
   }
+  emit('count', list.length);
 });
 
 async function onOpen(s: System) {
@@ -126,8 +137,8 @@ async function onCopySystem(s: System) {
   }
 }
 
-function clearQuery() {
-  searchStore.clear();
+function clearFilters() {
+  searchStore.clearAll();
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -174,6 +185,15 @@ function iconShadow(s: System): string {
 
 <style scoped>
 .section { padding: 0 var(--gap-md) var(--gap-sm); flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* 环境筛选行：列表区顶部 */
+.env-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+.env-filter-label { font-size: var(--text-xs); flex-shrink: 0; }
 .sys-list {
   display: flex;
   flex-direction: column;

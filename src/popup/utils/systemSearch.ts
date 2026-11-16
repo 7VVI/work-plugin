@@ -17,6 +17,7 @@ function matchesSystem(system: System, q: string): boolean {
 
 /**
  * 构建快捷面板的搜索结果：
+ * - 先按环境筛选（多选）；
  * - 系统名称/URL 直接命中的结果排在前面（收藏优先）；
  * - 分组名称命中的系统追加在后面，按分组分节展示；
  * - 已经直接命中的系统不会在分组结果中重复出现。
@@ -25,16 +26,21 @@ export function buildSystemSearchSections(
   systems: System[],
   groups: Group[],
   query: string,
+  environments?: string[],
 ): SystemSearchSection[] {
   const q = query.trim().toLowerCase();
-  const sorted = [...systems].sort(bySort);
+  const envs = environments && environments.length ? new Set(environments) : null;
+  const sorted = [...systems]
+    .filter(s => !envs || envs.has(s.environment))
+    .sort(bySort);
 
   if (!q) {
     const favorites = sorted.filter(s => s.favorite);
     const rest = sorted.filter(s => !s.favorite);
     return [
       ...(favorites.length ? [{ key: 'favorite', label: '常用', systems: favorites }] : []),
-      ...(rest.length ? [{ key: 'all', label: '全部系统', systems: rest }] : []),
+      // 顶部标题已经写着「全部系统」，这里不再重复一遍
+      ...(rest.length ? [{ key: 'all', label: '', systems: rest }] : []),
     ];
   }
 
@@ -56,7 +62,7 @@ export function buildSystemSearchSections(
 
   return [
     ...(favorites.length ? [{ key: 'match-favorite', label: '常用', systems: favorites }] : []),
-    ...(rest.length ? [{ key: 'match-all', label: '全部系统', systems: rest }] : []),
+    ...(rest.length ? [{ key: 'match-all', label: '', systems: rest }] : []),
     ...groupSections,
   ];
 }

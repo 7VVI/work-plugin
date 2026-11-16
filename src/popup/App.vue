@@ -110,31 +110,37 @@ function onSaved() {
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .header-count {
   font-size: 10px;
   color: var(--text-tertiary);
   background: var(--surface-secondary);
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: var(--radius-pill);
   font-weight: var(--font-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .header-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 .hdr-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 9px;
   border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: var(--font-medium);
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
   transition: var(--transition-fast);
   border: 1px solid var(--border-strong);
   background: var(--bg-pure);
