@@ -23,6 +23,18 @@ export interface ServerConfig {
   sshFsEnabled: boolean;
   sshFsMaxEdit: number;
   sshFsMaxTransfer: number;
+  dbEnabled: boolean;
+  dbMaxSessions: number;
+  dbMaxPerMiddleware: number;
+  dbIdleMs: number;
+  dbTicketTtlMs: number;
+  dbConnectTimeoutMs: number;
+  dbQueryTimeoutMs: number;
+  dbMaxRows: number;
+  dbMaxResultBytes: number;
+  dbMaxTextCellBytes: number;
+  dbSqliteRoots: string[];
+  dbReadOnly: boolean;
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -90,5 +102,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     sshFsEnabled: env.DOCK_SSH_FS_ENABLED !== 'false',
     sshFsMaxEdit: parseLimit(env.DOCK_SSH_FS_MAX_EDIT, 2 * 1024 * 1024, 1024, 64 * 1024 * 1024),
     sshFsMaxTransfer: parseLimit(env.DOCK_SSH_FS_MAX_TRANSFER, 200 * 1024 * 1024, 1024, 2 * 1024 * 1024 * 1024),
+    dbEnabled: env.DOCK_DB_ENABLED !== 'false',
+    dbMaxSessions: parseLimit(env.DOCK_DB_MAX_SESSIONS, 8, 1, 64),
+    dbMaxPerMiddleware: parseLimit(env.DOCK_DB_MAX_PER_MIDDLEWARE, 2, 1, 16),
+    dbIdleMs: parseLimit(env.DOCK_DB_IDLE_MS, 30 * 60_000, 60_000, 24 * 60 * 60_000),
+    dbTicketTtlMs: parseLimit(env.DOCK_DB_TICKET_TTL_MS, 30_000, 5_000, 5 * 60_000),
+    dbConnectTimeoutMs: parseLimit(env.DOCK_DB_CONNECT_TIMEOUT_MS, 8_000, 1_000, 120_000),
+    dbQueryTimeoutMs: parseLimit(env.DOCK_DB_QUERY_TIMEOUT_MS, 30_000, 1_000, 10 * 60_000),
+    dbMaxRows: parseLimit(env.DOCK_DB_MAX_ROWS, 500, 1, 5_000),
+    dbMaxResultBytes: parseLimit(env.DOCK_DB_MAX_RESULT_BYTES, 2 * 1024 * 1024, 1024, 64 * 1024 * 1024),
+    dbMaxTextCellBytes: parseLimit(env.DOCK_DB_MAX_TEXT_CELL_BYTES, 64 * 1024, 256, 1024 * 1024),
+    dbSqliteRoots: (env.DOCK_DB_SQLITE_ROOTS?.trim() || './data/sqlite')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => resolve(s)),
+    dbReadOnly: env.DOCK_DB_READ_ONLY === 'true',
   };
 }

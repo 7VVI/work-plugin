@@ -6,6 +6,7 @@ import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { SSH_PROTOCOL } from '@protocol/ssh';
+import { DB_PROTOCOL } from '@protocol/db';
 import type { ServerConfig } from './config';
 import { openDatabase, pruneExpiredSessions, setSetting, type Db } from './db';
 import { StateStore } from './stateStore';
@@ -15,6 +16,11 @@ import { RealSshConnector, type SshConnector } from './ssh/connector';
 import { registerSshRoutes } from './ssh/routes';
 import { SshSessionManager } from './ssh/sessionManager';
 import { SshTicketStore } from './ssh/ticketStore';
+import { registerDbRoutes } from './db/routes';
+import { DbSessionManager } from './db/sessionManager';
+import { defaultDbDriverFactory } from './db/registry';
+import { WsTicketStore } from './ticketStore';
+import type { DbDriverFactory } from './db/types';
 import {
   validateHistoryQuery,
   validateLoginBody,
@@ -32,6 +38,7 @@ export interface DockApp {
 
 export interface BuildAppOptions {
   sshConnector?: SshConnector;
+  dbDriverFactory?: DbDriverFactory;
 }
 
 const CSP = [
@@ -62,6 +69,19 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
       maxTransfer: config.sshFsMaxTransfer,
     },
   });
+  const dbTickets = new WsTicketStore({ ttlMs: config.dbTicketTtlMs });
+  const dbSessions = new DbSessionManager(options.dbDriverFactory ?? defaultDbDriverFactory, {
+    maxSessions: config.dbMaxSessions,
+    maxPerMiddleware: config.dbMaxPerMiddleware,
+    idleMs: config.dbIdleMs,
+    connectTimeoutMs: config.dbConnectTimeoutMs,
+    queryTimeoutMs: config.dbQueryTimeoutMs,
+    maxRows: config.dbMaxRows,
+    maxResultBytes: config.dbMaxResultBytes,
+    maxTextCellBytes: config.dbMaxTextCellBytes,
+    readOnly: config.dbReadOnly,
+    sqliteRoots: config.dbSqliteRoots,
+  });
 
   const app = Fastify({
     logger: false,
@@ -82,6 +102,7 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
       req.url.startsWith('/api/sync/')
       || req.url.startsWith('/api/health')
       || req.url.startsWith('/api/ssh/')
+      || req.url.startsWith('/api/db/')
     ) {
       reply.header('Access-Control-Allow-Origin', '*');
     }
@@ -105,6 +126,13 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
     return reply.code(204).send();
   });
 
+  app.options('/api/db/*', async (_req, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    reply.header('Access-Control-Allow-Headers', 'authorization, content-type, x-dock-csrf');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    return reply.code(204).send();
+  });
+
   app.get('/api/health', async (_req, reply) => {
     reply.header('Access-Control-Allow-Origin', '*');
     return {
@@ -115,6 +143,8 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
         sshTerminal: config.sshEnabled,
         sshFiles: config.sshEnabled && config.sshFsEnabled,
         sshProtocol: SSH_PROTOCOL,
+        dbManagement: config.dbEnabled,
+        dbProtocol: DB_PROTOCOL,
       },
       time: Date.now(),
     };
@@ -241,6 +271,15 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
     assertCsrfForCookie,
   });
 
+  registerDbRoutes(app, {
+    config,
+    store,
+    tickets: dbTickets,
+    sessions: dbSessions,
+    requireSyncAuth,
+    assertCsrfForCookie,
+  });
+
   if (existsSync(config.webDist)) {
     const assetsDir = join(config.webDist, 'assets');
     if (existsSync(assetsDir)) {
@@ -276,6 +315,8 @@ export async function buildApp(config: ServerConfig, options: BuildAppOptions = 
   app.addHook('onClose', async () => {
     sshSessions.closeAll();
     sshTickets.close();
+    dbSessions.closeAll();
+    dbTickets.close();
     store.close();
   });
 

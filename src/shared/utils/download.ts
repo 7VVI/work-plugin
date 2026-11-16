@@ -5,7 +5,8 @@ export function downloadBlob(blob: Blob, filename: string): void {
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  // 立即 revoke 会让浏览器还没开始读取 blob 就把下载取消掉，延后释放
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export function downloadText(content: string, filename: string, mime: string): void {

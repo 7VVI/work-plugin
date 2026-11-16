@@ -5,6 +5,7 @@ dist-web/
 dist-zip/
 server/data/
 server/.tmp-e2e/
+/data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

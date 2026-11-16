@@ -289,3 +289,13 @@ export function validateSshTicketBody(body: unknown): { serverId: string } {
   }
   return { serverId };
 }
+
+/** 只接受中间件 id：连接参数一律由服务端从快照里取 */
+export function validateDbTicketBody(body: unknown): { middlewareId: string } {
+  if (!body || typeof body !== 'object') badRequest('INVALID_PAYLOAD', 'Body must be an object');
+  const middlewareId = (body as Record<string, unknown>).middlewareId;
+  if (typeof middlewareId !== 'string' || !ID_RE.test(middlewareId)) {
+    badRequest('INVALID_PAYLOAD', 'Invalid middlewareId');
+  }
+  return { middlewareId };
+}

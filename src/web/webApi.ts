@@ -5,6 +5,7 @@ import type {
   TombstoneMap,
 } from '@protocol/types';
 import type { SshTicketResponse } from '@protocol/ssh';
+import type { DbTicketResponse } from '@protocol/db';
 
 export class WebApiError extends Error {
   constructor(
@@ -120,6 +121,13 @@ export const webApi = {
     return request<SshTicketResponse>('/api/ssh/ticket', {
       method: 'POST',
       body: JSON.stringify({ serverId }),
+    });
+  },
+
+  async createDbTicket(middlewareId: string): Promise<DbTicketResponse> {
+    return request<DbTicketResponse>('/api/db/ticket', {
+      method: 'POST',
+      body: JSON.stringify({ middlewareId }),
     });
   },
 

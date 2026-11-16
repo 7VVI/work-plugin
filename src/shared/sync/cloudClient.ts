@@ -7,6 +7,7 @@ import type {
   TombstoneMap,
 } from '@protocol/types';
 import type { SshTicketResponse } from '@protocol/ssh';
+import type { DbTicketResponse } from '@protocol/db';
 
 export class CloudHttpError extends Error {
   constructor(
@@ -91,6 +92,13 @@ export class CloudClient {
     return this.request('/api/ssh/ticket', {
       method: 'POST',
       body: JSON.stringify({ serverId }),
+    });
+  }
+
+  async createDbTicket(middlewareId: string): Promise<DbTicketResponse> {
+    return this.request('/api/db/ticket', {
+      method: 'POST',
+      body: JSON.stringify({ middlewareId }),
     });
   }
 

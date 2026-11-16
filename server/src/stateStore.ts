@@ -11,6 +11,7 @@ import {
   normalizeTombstones,
   type ServerState,
   type ServerRec,
+  type MiddlewareRec,
   type SnapshotCounts,
   type SyncPushRequest,
   type SyncStats,
@@ -147,6 +148,10 @@ export class StateStore {
 
   getServer(id: string): ServerRec | undefined {
     return this.state.snapshot.data.servers.find(server => server.id === id);
+  }
+
+  getMiddleware(id: string): MiddlewareRec | undefined {
+    return this.state.snapshot.data.middlewares.find(middleware => middleware.id === id);
   }
 
   getRevision(): number {

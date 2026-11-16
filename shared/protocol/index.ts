@@ -4,3 +4,4 @@ export * from './canonical';
 export * from './merge';
 export * from './limits';
 export * from './ssh';
+export * from './db';

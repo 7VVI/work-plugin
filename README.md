@@ -60,6 +60,14 @@
 - 支持 Redis、MySQL、PostgreSQL、MongoDB、Elasticsearch、RabbitMQ、Kafka、Nginx、MinIO 等
 - 环境标签 + 卡片式展示
 - 连接信息一键复制
+- **数据库在线管理**：数据库类中间件（MySQL/PostgreSQL/SQL Server/SQLite/ClickHouse）卡片上点「打开数据库」进入全屏工作台，可浏览表 / 视图 / 函数 / 存储过程 / 触发器，查看数据、列结构、索引与外键，并用 SQL 编辑器执行查询（多标签页 + 保存查询，支持读写）
+  - 结果集按服务端行数上限分页（上一页 / 下一页），可导出当前结果为 CSV
+  - **列宽可手动拖动**：拖动表头右边缘即可调整该列宽度（60–1200px），长内容以省略号截断，宽度按列名记住
+  - 光标停在某条语句上时，**只执行该条语句**（Ctrl/⌘+Enter）；「执行全部」按钮（Shift+Ctrl/⌘+Enter）按分号依次执行整段脚本
+  - 左侧树里的表名可**拖拽到编辑器**中，自动按方言加引号插入（如 MySQL 的 `` `库`.`表` ``）
+  - 首次支持 5 种数据库：PostgreSQL、MySQL（含 MariaDB）、SQL Server、SQLite、ClickHouse；PG/MySQL 协议兼容库（TiDB、OceanBase、CockroachDB、TimescaleDB、KingbaseES 等）由原生驱动自动覆盖
+  - 数据库访问全部在云端服务端执行（服务端需能直连内网数据库），客户端只通过 WebSocket 通信
+  - SQLite 指向服务端本地文件路径，需配置 `DOCK_DB_SQLITE_ROOTS` 白名单目录
 
 ### 配置中心
 - 树形分组 → 配置 → 字段三级结构
@@ -202,6 +210,7 @@ npm run lint
 - **传输与落盘**：域名必须使用 HTTPS；IP 地址（含内网 IP:端口）允许 HTTP，但会明文传输，仅建议内网使用；生产部署请用 Caddy/Nginx/Traefik 终止 TLS。
 - **SSH 终端**：服务端在这里充当 SSH 堡垒机。扩展/Web 先通过已认证的 HTTP 接口换取 30 秒一次性票据（绑定 `serverId` 与 Origin、单次使用），再用票据升级 WebSocket；服务端只允许连接云端快照中存在的服务器，客户端不能任意指定 host/port。会话默认全局 8、单服务器 2、30 分钟空闲断开；日志只记录 serverId、结果、主机指纹与时长，不记录凭据或终端内容。当前接受任意主机指纹（服务端与终端标题栏会展示 SHA256 指纹），不支持带口令的私钥，生产环境请确保云端与目标服务器网络可信。
 - **SFTP 文件管理**：同一条 SSH 连接上再开一条 sftp 子系统通道，文件数据仍走同一条 WebSocket（base64 分片）。可写范围就是该 SSH 账号本身的权限，没有额外放权；读写按块限流并强制大小上限（编辑 2MB、传输 200MB），文件操作失败只影响该次请求，不会中断终端会话。
+- **数据库在线管理**：与 SSH 终端同构的堡垒机模型。扩展/Web 先用已认证接口换取 30 秒一次性票据（绑定中间件 id 与 Origin、单次使用），再用票据升级 WebSocket（`/api/db/ws`）；**服务端只按中间件 id 从云端快照里取连接参数**，客户端不能指定 host/port/账号，客户端协议里也不存在凭据字段。会话默认全局 8、同一中间件 2、30 分钟空闲断开；单次只允许一条 SQL，语句超时 30 秒、结果默认 500 行 / 2MB 上限，超限截断并回传 `nextOffset`。SQL 允许读写（`DOCK_DB_READ_ONLY=true` 可切成只读）；日志只记录中间件 id、方言、行数与耗时，不记录 SQL 文本与密码，驱动报错回传前会脱敏。
 
 ### Docker 部署
 
@@ -215,9 +224,18 @@ docker compose up -d --build
 - 访问 `https://你的域名/`，输入 `DOCK_ADMIN_SECRET` 进入与插件一致的云端管理面板。
 - 反向代理需转发到容器 `8080`；保持 `DOCK_COOKIE_SECURE=true`，并设置 `DOCK_PUBLIC_ORIGIN=https://你的域名`。
 - **SSH 终端**默认开启（`DOCK_SSH_ENABLED=true`），可用 `DOCK_SSH_MAX_SESSIONS` / `DOCK_SSH_MAX_PER_SERVER` / `DOCK_SSH_IDLE_MS` / `DOCK_SSH_TICKET_TTL_MS` 调整会话与票据；设为 `DOCK_SSH_ENABLED=false` 可完全关闭。
+- **数据库在线管理**默认开启（`DOCK_DB_ENABLED=true`），可用 `DOCK_DB_MAX_SESSIONS` / `DOCK_DB_MAX_PER_MIDDLEWARE` / `DOCK_DB_IDLE_MS` / `DOCK_DB_TICKET_TTL_MS` / `DOCK_DB_CONNECT_TIMEOUT_MS` / `DOCK_DB_QUERY_TIMEOUT_MS` / `DOCK_DB_MAX_ROWS` / `DOCK_DB_MAX_RESULT_BYTES` 调整会话、超时与结果上限；`DOCK_DB_READ_ONLY=true` 只放行查询语句；`DOCK_DB_SQLITE_ROOTS` 指定允许访问的 SQLite 目录（逗号分隔）。SQLite 库文件需放在可写卷上（容器默认 `read_only: true`）。
 - 反向代理必须支持 WebSocket Upgrade（Nginx 示例）：
   ```nginx
   location /api/ssh/ws {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;
+    proxy_buffering off;
+  }
+  location /api/db/ws {
     proxy_pass http://127.0.0.1:8080;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
@@ -262,6 +280,7 @@ docker compose up -d --build
 - 云端 API Token 使用主密码加密保存在本地；修改或关闭主密码后需要重新输入 Token。
 - SSH 终端 v1 不支持 SFTP/文件传输、端口转发、多窗口分屏、会话录制与审计；不支持带口令的私钥；当前接受任意主机指纹（展示 SHA256，尚未做 known_hosts/TOFU pinning）。
 - SSH 终端依赖云端同步与已解锁的保险库；本地尚未同步的服务器会先触发一次同步。服务端必须能访问目标 SSH 端口，反向代理必须支持 WebSocket Upgrade；连接阶段会显示进度，约 20 秒未建立会提示超时与网络可达性检查。
+- 数据库在线管理 v1 只支持 PostgreSQL、MySQL/MariaDB、SQL Server、SQLite、ClickHouse；ClickHouse 走 HTTP 协议（8123），不支持原生 9000，也没有外键与触发器。SQLite 库文件必须放在 `DOCK_DB_SQLITE_ROOTS` 允许的目录内；SQLite 查询跑在 worker 线程里，超时靠终止 worker 实现；SQLite 不支持子查询里带 WITH，分页改为直接追加 LIMIT/OFFSET，因此自带 LIMIT 的语句无法继续翻页。保存的查询只存在本机浏览器（不入云端同步）。
 
 ## 快捷键
 

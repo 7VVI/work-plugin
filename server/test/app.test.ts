@@ -37,6 +37,18 @@ function testConfig(dir: string, overrides: Partial<ServerConfig> = {}): ServerC
     sshFsEnabled: true,
     sshFsMaxEdit: 2 * 1024 * 1024,
     sshFsMaxTransfer: 200 * 1024 * 1024,
+    dbEnabled: true,
+    dbMaxSessions: 8,
+    dbMaxPerMiddleware: 2,
+    dbIdleMs: 30 * 60_000,
+    dbTicketTtlMs: 30_000,
+    dbConnectTimeoutMs: 8_000,
+    dbQueryTimeoutMs: 30_000,
+    dbMaxRows: 500,
+    dbMaxResultBytes: 2 * 1024 * 1024,
+    dbMaxTextCellBytes: 64 * 1024,
+    dbSqliteRoots: [join(dir, 'sqlite')],
+    dbReadOnly: false,
     ...overrides,
   };
 }

@@ -14,6 +14,17 @@ export const MIDDLEWARE_EXTRA_SCHEMAS: Record<MiddlewareType, MiddlewareFieldSch
     { key: 'charset', label: 'Charset', type: 'string', defaultValue: 'utf8mb4' },
     { key: 'collation', label: 'Collation', type: 'string' },
   ],
+  postgresql: [
+    { key: 'ssl', label: 'SSL', type: 'boolean', defaultValue: false },
+    { key: 'application_name', label: 'Application Name', type: 'string' },
+  ],
+  mssql: [
+    { key: 'ssl', label: 'SSL', type: 'boolean', defaultValue: false },
+    { key: 'instanceName', label: 'Instance Name', type: 'string' },
+  ],
+  sqlite: [
+    { key: 'filePath', label: '文件路径', type: 'string', required: true },
+  ],
   redis: [
     { key: 'db', label: 'DB Index', type: 'number', defaultValue: 0 },
   ],

@@ -35,6 +35,14 @@
           <div class="card-top">
             <EnvBadge :env="mwEnv(m)" />
             <div class="card-actions">
+              <button
+                v-if="isDbMiddleware(m.type)"
+                class="ibtn ibtn-sm"
+                title="打开数据库"
+                @click.stop="openDatabase(m.id)"
+              >
+                <i class="fa-solid fa-database"></i>
+              </button>
               <button class="ibtn ibtn-sm danger" title="删除" @click.stop="onDelete(m.id)">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
@@ -97,26 +105,17 @@ import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
 import { useDialogStore } from '@shared/stores/dialogStore';
 import type { Middleware, Environment } from '@shared/types/entities';
+import { getMiddlewareMeta, isDbMiddleware, type MiddlewareType } from '@shared/types/enums';
 import { formatRelativeTime } from '@shared/utils/time';
 import MiddlewareForm from '../components/middleware/MiddlewareForm.vue';
 import EnvBadge from '../components/common/EnvBadge.vue';
 import GroupSidebar from '../components/common/GroupSidebar.vue';
 import { UNGROUPED_GROUP_ID, matchesGroupFilter } from '@shared/utils/groupFilter';
-
-const MW_TYPES: Record<string, { icon: string; color: string }> = {
-  redis: { icon: 'fa-solid fa-bolt', color: '#DC382D' },
-  mysql: { icon: 'fa-solid fa-database', color: '#00758F' },
-  postgresql: { icon: 'fa-solid fa-database', color: '#336791' },
-  mongodb: { icon: 'fa-solid fa-leaf', color: '#47A248' },
-  elasticsearch: { icon: 'fa-solid fa-magnifying-glass', color: '#B7791F' },
-  rabbitmq: { icon: 'fa-solid fa-message', color: '#FF6600' },
-  kafka: { icon: 'fa-solid fa-stream', color: '#4B5563' },
-  nginx: { icon: 'fa-solid fa-server', color: '#009639' },
-  minio: { icon: 'fa-solid fa-cube', color: '#C72E49' },
-};
+import { useRouter } from 'vue-router';
 
 function mwMeta(type: string) {
-  return MW_TYPES[type] || { icon: 'fa-solid fa-cube', color: '#2E6BF0' };
+  const meta = getMiddlewareMeta(type as MiddlewareType);
+  return { icon: meta.icon, color: meta.color };
 }
 
 function mwEnv(m: Middleware): Environment {
@@ -132,6 +131,7 @@ function iconStyle(m: Middleware) {
 const store = useMiddlewareStore();
 const toast = useToastStore();
 const dialog = useDialogStore();
+const router = useRouter();
 const formVisible = ref(false);
 const editing = ref<Middleware | null>(null);
 const search = ref('');
@@ -161,6 +161,10 @@ const filtered = computed(() => {
 
 function onCreate() { editing.value = null; formVisible.value = true; }
 function onEdit(m: Middleware) { editing.value = m; formVisible.value = true; }
+
+function openDatabase(id: string) {
+  void router.push(`/db/${id}`);
+}
 
 async function onDelete(id: string) {
   const ok = await dialog.confirm('确认删除', '确认删除该中间件？');

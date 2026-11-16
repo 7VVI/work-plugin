@@ -1,8 +1,8 @@
 export type Environment = 'production' | 'development' | 'test' | 'staging';
 
 export type MiddlewareType =
-  | 'mysql' | 'redis' | 'rabbitmq' | 'kafka' | 'nacos'
-  | 'apollo' | 'minio' | 'elasticsearch' | 'clickhouse' | 'mongodb' | 'rocketmq';
+  | 'mysql' | 'postgresql' | 'mssql' | 'sqlite' | 'redis' | 'rabbitmq' | 'kafka'
+  | 'nacos' | 'apollo' | 'minio' | 'elasticsearch' | 'clickhouse' | 'mongodb' | 'rocketmq';
 
 export type GroupEntityType = 'system' | 'server' | 'middleware';
 

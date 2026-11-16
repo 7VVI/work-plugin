@@ -1,6 +1,6 @@
 export type MiddlewareType =
-  | 'mysql' | 'redis' | 'rabbitmq' | 'kafka' | 'nacos'
-  | 'apollo' | 'minio' | 'elasticsearch' | 'clickhouse' | 'mongodb' | 'rocketmq';
+  | 'mysql' | 'postgresql' | 'mssql' | 'sqlite' | 'redis' | 'rabbitmq' | 'kafka'
+  | 'nacos' | 'apollo' | 'minio' | 'elasticsearch' | 'clickhouse' | 'mongodb' | 'rocketmq';
 
 export const ENVIRONMENTS = [
   { value: 'production', label: '生产', color: '#d1fae5', textColor: '#047857' },
@@ -11,6 +11,9 @@ export const ENVIRONMENTS = [
 
 export const MIDDLEWARE_TYPES: Array<{ value: MiddlewareType; label: string; icon: string; color: string }> = [
   { value: 'mysql', label: 'MySQL', icon: 'fa-database', color: '#00758f' },
+  { value: 'postgresql', label: 'PostgreSQL', icon: 'fa-database', color: '#336791' },
+  { value: 'mssql', label: 'SQL Server', icon: 'fa-database', color: '#CC2927' },
+  { value: 'sqlite', label: 'SQLite', icon: 'fa-database', color: '#003B57' },
   { value: 'redis', label: 'Redis', icon: 'fa-bolt', color: '#dc382d' },
   { value: 'rabbitmq', label: 'RabbitMQ', icon: 'fa-message', color: '#ff6600' },
   { value: 'kafka', label: 'Kafka', icon: 'fa-stream', color: '#000000' },
@@ -22,6 +25,19 @@ export const MIDDLEWARE_TYPES: Array<{ value: MiddlewareType; label: string; ico
   { value: 'mongodb', label: 'MongoDB', icon: 'fa-leaf', color: '#009639' },
   { value: 'rocketmq', label: 'RocketMQ', icon: 'fa-paper-plane', color: '#d77a3b' },
 ];
+
+/** 支持「打开数据库」的中间件类型（可在线浏览元数据并执行 SQL） */
+export const DB_MIDDLEWARE_TYPES: MiddlewareType[] = [
+  'mysql',
+  'postgresql',
+  'mssql',
+  'sqlite',
+  'clickhouse',
+];
+
+export function isDbMiddleware(type: string): boolean {
+  return (DB_MIDDLEWARE_TYPES as string[]).includes(type);
+}
 
 export function getMiddlewareMeta(type: MiddlewareType) {
   return MIDDLEWARE_TYPES.find(m => m.value === type) ?? MIDDLEWARE_TYPES[0];

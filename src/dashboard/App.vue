@@ -1,22 +1,25 @@
 <template>
   <div class="app-shell">
-    <header class="app-header">
-      <PageHeader />
-      <NavTabs />
-    </header>
+    <template v-if="!isFullscreen">
+      <header class="app-header">
+        <PageHeader />
+        <NavTabs />
+      </header>
+    </template>
     <main class="content-area">
       <div class="view-container">
         <router-view />
       </div>
     </main>
-    <StatusBar />
+    <StatusBar v-if="!isFullscreen" />
     <ToastContainer />
     <DialogHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, watch } from 'vue';
+import { onMounted, onBeforeUnmount, watch, computed } from 'vue';
+import { useRoute } from 'vue-router';
 import PageHeader from './components/layout/PageHeader.vue';
 import NavTabs from './components/layout/NavTabs.vue';
 import ToastContainer from './components/common/ToastContainer.vue';
@@ -34,7 +37,11 @@ const prefStore = usePrefStore();
 const cryptoStore = useCryptoStore();
 const configStore = useConfigStore();
 const cloudStore = useCloudSyncStore();
+const route = useRoute();
 let stopSyncScheduler: (() => void) | null = null;
+
+/** 全屏页（如数据库工作台）不显示导航外壳 */
+const isFullscreen = computed(() => route.meta.fullscreen === true);
 
 function onSystemThemeChange() {
   if (prefStore.theme === 'system') applyTheme('system');

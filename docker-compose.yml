@@ -23,11 +23,25 @@ services:
       DOCK_SSH_FS_ENABLED: ${DOCK_SSH_FS_ENABLED:-true}
       DOCK_SSH_FS_MAX_EDIT: ${DOCK_SSH_FS_MAX_EDIT:-2097152}
       DOCK_SSH_FS_MAX_TRANSFER: ${DOCK_SSH_FS_MAX_TRANSFER:-209715200}
+      DOCK_DB_ENABLED: ${DOCK_DB_ENABLED:-true}
+      DOCK_DB_MAX_SESSIONS: ${DOCK_DB_MAX_SESSIONS:-8}
+      DOCK_DB_MAX_PER_MIDDLEWARE: ${DOCK_DB_MAX_PER_MIDDLEWARE:-2}
+      DOCK_DB_IDLE_MS: ${DOCK_DB_IDLE_MS:-1800000}
+      DOCK_DB_TICKET_TTL_MS: ${DOCK_DB_TICKET_TTL_MS:-30000}
+      DOCK_DB_CONNECT_TIMEOUT_MS: ${DOCK_DB_CONNECT_TIMEOUT_MS:-8000}
+      DOCK_DB_QUERY_TIMEOUT_MS: ${DOCK_DB_QUERY_TIMEOUT_MS:-30000}
+      DOCK_DB_MAX_ROWS: ${DOCK_DB_MAX_ROWS:-500}
+      DOCK_DB_MAX_RESULT_BYTES: ${DOCK_DB_MAX_RESULT_BYTES:-2097152}
+      DOCK_DB_MAX_TEXT_CELL_BYTES: ${DOCK_DB_MAX_TEXT_CELL_BYTES:-65536}
+      DOCK_DB_SQLITE_ROOTS: ${DOCK_DB_SQLITE_ROOTS:-/data/sqlite}
+      DOCK_DB_READ_ONLY: ${DOCK_DB_READ_ONLY:-false}
       DOCK_DB: /data/dock.sqlite
       DOCK_WEB_DIST: /app/public
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - dock-data:/data
+      # SQLite 库文件目录（可选）：容器 read_only，需要单独挂可写卷
+      - ${DOCK_SQLITE_DIR:-./data/sqlite}:/data/sqlite
     read_only: true
     tmpfs:
       - /tmp

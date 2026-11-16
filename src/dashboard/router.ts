@@ -7,6 +7,7 @@ const router = createRouter({
     { path: '/systems', component: () => import('./views/SystemView.vue') },
     { path: '/servers', component: () => import('./views/ServerView.vue') },
     { path: '/middlewares', component: () => import('./views/MiddlewareView.vue') },
+    { path: '/db/:middlewareId', component: () => import('./views/DbWorkbenchView.vue'), meta: { fullscreen: true } },
     { path: '/configs', component: () => import('./views/ConfigView.vue') },
     { path: '/notes', component: () => import('./views/NotesView.vue') },
     { path: '/import-export', component: () => import('./views/ImportExportView.vue') },

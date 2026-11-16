@@ -47,7 +47,7 @@
               </div>
             </div>
 
-            <div class="grid-host">
+            <div class="grid-host" v-if="form.type !== 'sqlite'">
               <div class="field">
                 <label class="lbl">Host <i class="fa-solid fa-asterisk req-mark"></i></label>
                 <input v-model="form.host" class="inp mono sm" type="text" placeholder="172.16.0.1" />
@@ -56,6 +56,11 @@
                 <label class="lbl">端口</label>
                 <input v-model.number="form.port" class="inp mono sm" type="number" />
               </div>
+            </div>
+
+            <div class="field" v-if="form.type === 'sqlite'">
+              <label class="lbl">文件路径 <i class="fa-solid fa-asterisk req-mark"></i></label>
+              <input v-model="sqliteFile" class="inp mono sm" type="text" placeholder="云端服务端上的数据库文件绝对路径" />
             </div>
 
             <div class="grid-2">
@@ -100,6 +105,14 @@
               <input v-model="extraParams" class="inp mono sm" type="text" placeholder="如：maxmemory-policy=allkeys-lru" />
             </div>
 
+            <div class="field" v-if="isDbType">
+              <label class="lbl">SSL</label>
+              <label class="form-check">
+                <input type="checkbox" v-model="useSsl" />
+                <span class="t2">启用加密连接</span>
+              </label>
+            </div>
+
             <div class="field">
               <label class="lbl">备注</label>
               <textarea v-model="form.remark" rows="2" class="inp resize-none"></textarea>
@@ -120,9 +133,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { Middleware, MiddlewareInput, Environment } from '@shared/types/entities';
-import { MIDDLEWARE_TYPES } from '@shared/types/enums';
+import { MIDDLEWARE_TYPES, isDbMiddleware } from '@shared/types/enums';
 import type { MiddlewareType } from '@shared/types/enums';
 import { useMiddlewareStore } from '@shared/stores/middlewareStore';
 import { useToastStore } from '@shared/stores/toastStore';
@@ -148,6 +161,9 @@ const ENV_OPTS: { value: Environment; label: string }[] = [
 // v3 MW_TYPES 默认端口（类型 → 端口），mwTypeChange 据此自动填充
 const DEFAULT_PORT: Record<MiddlewareType, number> = {
   mysql: 3306,
+  postgresql: 5432,
+  mssql: 1433,
+  sqlite: 0,
   redis: 6379,
   rabbitmq: 5672,
   kafka: 9092,
@@ -165,6 +181,10 @@ const showPwd = ref(false);
 const dbIndex = ref<number>(0);
 const extraParams = ref<string>('');
 const env = ref<Environment>('development');
+// 数据库类中间件的额外连接参数
+const sqliteFile = ref('');
+const useSsl = ref(false);
+const isDbType = computed(() => isDbMiddleware(form.value.type));
 
 function blankForm(): MiddlewareInput {
   return {
@@ -205,12 +225,16 @@ watch(
       dbIndex.value = (ex.dbIndex as number) ?? (ex.db as number) ?? 0;
       extraParams.value = (ex.params as string) ?? '';
       env.value = (ex.environment as Environment) ?? 'development';
+      sqliteFile.value = (ex.filePath as string) ?? '';
+      useSsl.value = ex.ssl === true;
     } else {
       form.value = blankForm();
       form.value.groupId = props.defaultGroupId || '';
       dbIndex.value = 0;
       extraParams.value = '';
       env.value = 'development';
+      sqliteFile.value = '';
+      useSsl.value = false;
     }
   },
 );
@@ -226,16 +250,26 @@ async function save() {
     toast.error('请填写名称');
     return;
   }
-  if (!form.value.host.trim()) {
-    toast.error('请填写 Host');
-    return;
+  const isSqlite = form.value.type === 'sqlite';
+  if (isSqlite) {
+    if (!sqliteFile.value.trim()) {
+      toast.error('请填写数据库文件路径');
+      return;
+    }
+    form.value.host = '';
+    form.value.port = 0;
+  } else {
+    if (!form.value.host.trim()) {
+      toast.error('请填写 Host');
+      return;
+    }
+    const port = Number(form.value.port);
+    if (!port || port <= 0) {
+      toast.error('请填写有效的端口');
+      return;
+    }
+    form.value.port = port;
   }
-  const port = Number(form.value.port);
-  if (!port || port <= 0) {
-    toast.error('请填写有效的端口');
-    return;
-  }
-  form.value.port = port;
   // 将 v3 的 DB Index / 额外参数 / 环境 收集进 extra
   const extra: Record<string, unknown> = {};
   if (dbIndex.value !== undefined && dbIndex.value !== null && !Number.isNaN(dbIndex.value)) {
@@ -243,6 +277,8 @@ async function save() {
   }
   if (extraParams.value.trim()) extra.params = extraParams.value.trim();
   extra.environment = env.value;
+  if (isSqlite) extra.filePath = sqliteFile.value.trim();
+  if (isDbType.value) extra.ssl = useSsl.value;
   form.value.extra = extra;
   try {
     if (props.middleware) {
